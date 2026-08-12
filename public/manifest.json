@@ -1,0 +1,17 @@
+{
+  "short_name": "Zest",
+  "name": "Zest Tournament",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "background_color": "#07090e",
+  "theme_color": "#0f121d",
+  "display": "standalone",
+  "orientation": "portrait"
+}
