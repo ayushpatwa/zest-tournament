@@ -1,9 +1,10 @@
 // Service to handle Make.com Webhook integrations for Google Sheets logging
 
 const WEBHOOK_STORAGE_KEY = 'zest_make_webhook_url';
+const DEFAULT_MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/d7lav19d6j4mxvuittql3pkdb8vwzs55';
 
 export const getWebhookUrl = () => {
-  return localStorage.getItem(WEBHOOK_STORAGE_KEY) || '';
+  return localStorage.getItem(WEBHOOK_STORAGE_KEY) || DEFAULT_MAKE_WEBHOOK_URL;
 };
 
 export const setWebhookUrl = (url) => {
