@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 
 // Help generate mock players
 const MOCK_NICKNAMES = [
@@ -9,6 +10,9 @@ const MOCK_NICKNAMES = [
 ];
 
 export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
+  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'webhook'
+  
+  // Host Form states
   const [title, setTitle] = useState('');
   const [mode, setMode] = useState('Solo');
   const [type, setType] = useState('Classic');
@@ -18,6 +22,11 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
   const [slotsTotal, setSlotsTotal] = useState('48');
   const [startingIn, setStartingIn] = useState('30');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Webhook states
+  const [webhookInput, setWebhookInput] = useState(getWebhookUrl());
+  const [webhookStatus, setWebhookStatus] = useState('');
+  const [testingWebhook, setTestingWebhook] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -38,8 +47,7 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
       return;
     }
 
-    // Generate some mock players already joined
-    const numMockJoined = Math.floor(Math.random() * (slots / 2)) + 5; // filled halfway or at least 5
+    const numMockJoined = Math.floor(Math.random() * (slots / 2)) + 5;
     const joinedPlayers = [];
     
     for (let i = 0; i < numMockJoined; i++) {
@@ -50,12 +58,11 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
       });
     }
 
-    // Generate mock leaderboard for Battle Royale (Classic)
     const leaderboard = [];
     if (type === 'Classic') {
       for (let i = 0; i < numMockJoined; i++) {
         const kills = Math.floor(Math.random() * 8);
-        const placementPoints = Math.max(12 - i, 0); // rank 1 gets 12, rank 2 gets 11, etc.
+        const placementPoints = Math.max(12 - i, 0);
         const killPoints = kills * 2;
         leaderboard.push({
           nickname: joinedPlayers[i].nickname,
@@ -66,11 +73,9 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
           isUser: false
         });
       }
-      // Sort leaderboard by points descending
       leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
     }
 
-    // Create start date
     const startTime = new Date(Date.now() + minutes * 60 * 1000).toISOString();
 
     const newTournament = {
@@ -93,141 +98,314 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
     setCurrentView('dashboard');
   };
 
+  const handleSaveWebhook = (e) => {
+    e.preventDefault();
+    setWebhookUrl(webhookInput);
+    setWebhookStatus('Webhook URL saved successfully!');
+    setTimeout(() => setWebhookStatus(''), 3500);
+  };
+
+  const handleTestWebhook = async () => {
+    setTestingWebhook(true);
+    setWebhookStatus('');
+    
+    // Save current input before testing
+    setWebhookUrl(webhookInput);
+
+    const res = await sendToMakeWebhook({
+      eventType: 'TEST_PING',
+      nickname: 'TEST_ZEST_PLAYER',
+      ffUid: '999999999',
+      email: 'test.player@zest.gg',
+      phone: '+91 9999999999',
+      details: 'Test connection from Zest Tournament App'
+    });
+
+    setTestingWebhook(false);
+    if (res.success) {
+      setWebhookStatus('✅ Test payload dispatched! Check your Make.com Scenario / Google Sheet.');
+    } else {
+      setWebhookStatus(`⚠️ Dispatch completed. (Note: Make.com webhooks trigger even if CORS warning appears).`);
+    }
+  };
+
   return (
     <div className="animate-slide-in" style={{ paddingBottom: '32px' }}>
-      <h2 style={{ fontSize: '1.2rem', marginBottom: '4px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span>⚙️</span> HOST TOURNAMENT
-      </h2>
-      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-        Configure a custom Free Fire tournament match to display on the live arena dashboard.
-      </p>
-
-      <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        
-        <div className="form-group">
-          <label>Tournament Title</label>
-          <input 
-            type="text" 
-            value={title} 
-            onChange={(e) => setTitle(e.target.value)} 
-            placeholder="e.g. Sunday Bermuda Rush"
-            className="form-input"
-            required
-          />
+      
+      {/* Top Header & Mode Tabs */}
+      <div className="flex-between" style={{ marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+        <div>
+          <h2 style={{ fontSize: '1.2rem', margin: 0, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>⚙️</span> ADMIN & HOST PANEL
+          </h2>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+            Manage tournaments and external Google Sheet integrations.
+          </p>
         </div>
 
-        <div className="grid-2">
-          <div className="form-group">
-            <label>Game Mode</label>
-            <select 
-              value={mode} 
-              onChange={(e) => setMode(e.target.value)} 
-              className="form-input"
-              style={{ background: '#07090e', color: '#fff' }}
-            >
-              <option value="Solo">Solo</option>
-              <option value="Duo">Duo</option>
-              <option value="Squad">Squad</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Match Type</label>
-            <select 
-              value={type} 
-              onChange={(e) => setType(e.target.value)} 
-              className="form-input"
-              style={{ background: '#07090e', color: '#fff' }}
-            >
-              <option value="Classic">Classic (Battle Royale)</option>
-              <option value="Clash Squad">Clash Squad (4v4)</option>
-            </select>
-          </div>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            onClick={() => setActiveTab('host')}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              background: activeTab === 'host' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+              color: '#fff',
+              border: '1px solid var(--border-color)'
+            }}
+          >
+            🏆 Host Match
+          </button>
+          <button
+            onClick={() => setActiveTab('webhook')}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              background: activeTab === 'webhook' ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'webhook' ? '#000' : '#fff',
+              border: '1px solid var(--border-color)'
+            }}
+          >
+            📊 Make.com Google Sheet
+          </button>
         </div>
+      </div>
 
-        <div className="grid-2">
+      {activeTab === 'host' ? (
+        /* HOST TOURNAMENT FORM */
+        <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          
           <div className="form-group">
-            <label>Map</label>
-            <select 
-              value={mapName} 
-              onChange={(e) => setMapName(e.target.value)} 
-              className="form-input"
-              style={{ background: '#07090e', color: '#fff' }}
-            >
-              <option value="Bermuda">Bermuda</option>
-              <option value="Purgatory">Purgatory</option>
-              <option value="Kalahari">Kalahari</option>
-              <option value="Alpine">Alpine</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Starting In (Minutes)</label>
+            <label>Tournament Title</label>
             <input 
-              type="number" 
-              value={startingIn} 
-              onChange={(e) => setStartingIn(e.target.value)} 
+              type="text" 
+              value={title} 
+              onChange={(e) => setTitle(e.target.value)} 
+              placeholder="e.g. Sunday Bermuda Rush"
               className="form-input"
-              min="1"
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid-2">
-          <div className="form-group">
-            <label>Prize Pool (₹)</label>
-            <input 
-              type="number" 
-              value={prizePool} 
-              onChange={(e) => setPrizePool(e.target.value)} 
-              className="form-input"
-              min="0"
               required
             />
           </div>
 
+          <div className="grid-2">
+            <div className="form-group">
+              <label>Game Mode</label>
+              <select 
+                value={mode} 
+                onChange={(e) => setMode(e.target.value)} 
+                className="form-input"
+                style={{ background: '#07090e', color: '#fff' }}
+              >
+                <option value="Solo">Solo</option>
+                <option value="Duo">Duo</option>
+                <option value="Squad">Squad</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Match Type</label>
+              <select 
+                value={type} 
+                onChange={(e) => setType(e.target.value)} 
+                className="form-input"
+                style={{ background: '#07090e', color: '#fff' }}
+              >
+                <option value="Classic">Classic (Battle Royale)</option>
+                <option value="Clash Squad">Clash Squad (4v4)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label>Map</label>
+              <select 
+                value={mapName} 
+                onChange={(e) => setMapName(e.target.value)} 
+                className="form-input"
+                style={{ background: '#07090e', color: '#fff' }}
+              >
+                <option value="Bermuda">Bermuda</option>
+                <option value="Purgatory">Purgatory</option>
+                <option value="Kalahari">Kalahari</option>
+                <option value="Alpine">Alpine</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Starting In (Minutes)</label>
+              <input 
+                type="number" 
+                value={startingIn} 
+                onChange={(e) => setStartingIn(e.target.value)} 
+                className="form-input"
+                min="1"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label>Prize Pool (₹)</label>
+              <input 
+                type="number" 
+                value={prizePool} 
+                onChange={(e) => setPrizePool(e.target.value)} 
+                className="form-input"
+                min="0"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Entry Fee (₹)</label>
+              <input 
+                type="number" 
+                value={entryFee} 
+                onChange={(e) => setEntryFee(e.target.value)} 
+                className="form-input"
+                min="0"
+                required
+              />
+            </div>
+          </div>
+
           <div className="form-group">
-            <label>Entry Fee (₹)</label>
+            <label>Total Slots (Players/Teams)</label>
             <input 
               type="number" 
-              value={entryFee} 
-              onChange={(e) => setEntryFee(e.target.value)} 
+              value={slotsTotal} 
+              onChange={(e) => setSlotsTotal(e.target.value)} 
               className="form-input"
-              min="0"
+              min="2"
+              max="100"
               required
             />
           </div>
-        </div>
 
-        <div className="form-group">
-          <label>Total Slots (Players/Teams)</label>
-          <input 
-            type="number" 
-            value={slotsTotal} 
-            onChange={(e) => setSlotsTotal(e.target.value)} 
-            className="form-input"
-            min="2"
-            max="100"
-            required
-          />
-        </div>
+          {errorMsg && (
+            <div style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '8px' }}>
+              ⚠️ {errorMsg}
+            </div>
+          )}
 
-        {errorMsg && (
-          <div style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '8px' }}>
-            ⚠️ {errorMsg}
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            style={{ width: '100%', height: '48px', marginTop: '8px' }}
+          >
+            🚀 Publish Tournament Match
+          </button>
+
+        </form>
+      ) : (
+        /* MAKE.COM & GOOGLE SHEETS SETTINGS */
+        <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          <div>
+            <h3 style={{ fontSize: '1.05rem', color: 'var(--secondary)', marginBottom: '4px' }}>
+              📊 Make.com Webhook Integration
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+              Every user registration, tournament entry, and wallet deposit automatically sends data to this webhook to append rows directly into your <strong>Google Sheet</strong>.
+            </p>
           </div>
-        )}
 
-        <button 
-          type="submit" 
-          className="btn btn-primary"
-          style={{ width: '100%', height: '48px', marginTop: '8px' }}
-        >
-          🚀 Publish Tournament Match
-        </button>
+          {/* Webhook Configuration Form */}
+          <form onSubmit={handleSaveWebhook} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Make.com Custom Webhook URL</label>
+              <input
+                type="url"
+                value={webhookInput}
+                onChange={(e) => setWebhookInput(e.target.value)}
+                placeholder="https://hook.eu1.make.com/your-custom-webhook-id"
+                className="form-input"
+                style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+              />
+            </div>
 
-      </form>
+            {webhookStatus && (
+              <div style={{
+                fontSize: '0.8rem',
+                color: webhookStatus.includes('✅') ? 'var(--success)' : 'var(--accent)',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'rgba(255,255,255,0.03)'
+              }}>
+                {webhookStatus}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }}
+              >
+                💾 Save Webhook URL
+              </button>
+              <button
+                type="button"
+                onClick={handleTestWebhook}
+                disabled={testingWebhook}
+                className="btn btn-secondary"
+                style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }}
+              >
+                {testingWebhook ? 'Testing...' : '⚡ Send Test Row'}
+              </button>
+            </div>
+          </form>
+
+          {/* Quick Setup Instructions */}
+          <div style={{
+            background: 'rgba(7, 9, 14, 0.6)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '12px',
+            padding: '16px',
+            marginTop: '8px'
+          }}>
+            <h4 style={{ fontSize: '0.85rem', color: 'var(--accent)', marginBottom: '8px' }}>
+              🛠️ 3-Step Setup Guide in Make.com:
+            </h4>
+            <ol style={{ paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '8px', lineHeight: '1.4' }}>
+              <li>
+                In <strong>Make.com</strong>, create a new Scenario with a <strong>Custom Webhook</strong> module (copy its Webhook URL and paste it above).
+              </li>
+              <li>
+                Add a <strong>Google Sheets: Add a Row</strong> module and choose your target spreadsheet.
+              </li>
+              <li>
+                Map the incoming JSON parameters to your sheet columns:
+                <div style={{
+                  background: '#07090e',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  marginTop: '4px',
+                  fontFamily: 'monospace',
+                  fontSize: '0.75rem',
+                  color: 'var(--secondary)'
+                }}>
+                  • Timestamp: {`{{1.timestamp}}`}<br />
+                  • Event Type: {`{{1.eventType}}`}<br />
+                  • Player Nickname: {`{{1.nickname}}`}<br />
+                  • Free Fire UID: {`{{1.ffUid}}`}<br />
+                  • Email: {`{{1.email}}`}<br />
+                  • Phone Number: {`{{1.phone}}`}<br />
+                  • Details / Amount: {`{{1.details}}`}
+                </div>
+              </li>
+            </ol>
+          </div>
+
+        </div>
+      )}
+
     </div>
   );
 }

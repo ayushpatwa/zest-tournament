@@ -5,6 +5,8 @@ import TournamentLobby from './components/TournamentLobby';
 import WalletPage from './components/WalletPage';
 import ProfilePage from './components/ProfilePage';
 import AdminHostPanel from './components/AdminHostPanel';
+import LoginPage from './components/LoginPage';
+import { sendToMakeWebhook } from './services/webhookService';
 import './App.css';
 
 // Initial Mock Tournaments Data
@@ -25,7 +27,7 @@ const INITIAL_TOURNAMENTS = [
       { nickname: 'Panda_OP', uid: '284019284', isUser: false },
       { nickname: 'AWM_King', uid: '573928103', isUser: false }
     ],
-    startTime: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 mins from now
+    startTime: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     status: 'upcoming',
     leaderboard: [
       { nickname: 'ViperStrike', uid: '782910384', kills: 6, placementPoints: 12, totalPoints: 24, isUser: false },
@@ -42,7 +44,7 @@ const INITIAL_TOURNAMENTS = [
     map: 'Kalahari',
     prizePool: 3500,
     entryFee: 30,
-    slotsTotal: 16, // 16 teams / slots
+    slotsTotal: 16,
     slotsJoined: 11,
     joinedPlayers: [
       { nickname: 'Squad Alpha', uid: '1002030', isUser: false },
@@ -50,7 +52,7 @@ const INITIAL_TOURNAMENTS = [
       { nickname: 'Squad Gamma', uid: '9203819', isUser: false },
       { nickname: 'Squad Delta', uid: '2039182', isUser: false }
     ],
-    startTime: new Date(Date.now() + 45 * 60 * 1000).toISOString(), // 45 mins from now
+    startTime: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
     status: 'upcoming'
   },
   {
@@ -67,7 +69,7 @@ const INITIAL_TOURNAMENTS = [
       { nickname: 'Ind_Army', uid: '3029103', isUser: false },
       { nickname: 'Garena_Boss', uid: '9403910', isUser: false }
     ],
-    startTime: new Date(Date.now() + 120 * 60 * 1000).toISOString(), // 2 hours from now
+    startTime: new Date(Date.now() + 120 * 60 * 1000).toISOString(),
     status: 'upcoming',
     leaderboard: [
       { nickname: 'Ind_Army', uid: '3029103', kills: 8, placementPoints: 12, totalPoints: 28, isUser: false },
@@ -84,36 +86,59 @@ const RANDOM_NAMES = [
 ];
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('zest_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [currentView, setCurrentView] = useState('dashboard');
   const [selectedTournamentId, setSelectedTournamentId] = useState(null);
   
   // Wallet state
-  const [walletBalance, setWalletBalance] = useState(250);
+  const [walletBalance, setWalletBalance] = useState(() => {
+    return currentUser?.wallet || 250;
+  });
+
   const [transactions, setTransactions] = useState([
-    { id: 101, type: 'deposit', amount: 150, title: 'Welcome Bonus Added', date: 'Aug 12 01:00 AM', status: 'Success' },
-    { id: 102, type: 'deposit', amount: 100, title: 'Signup Bonus Credited', date: 'Aug 12 01:05 AM', status: 'Success' }
+    { id: 101, type: 'deposit', amount: 150, title: 'Welcome Bonus Added', date: 'Aug 14 01:00 AM', status: 'Success' },
+    { id: 102, type: 'deposit', amount: 100, title: 'Signup Bonus Credited', date: 'Aug 14 01:05 AM', status: 'Success' }
   ]);
 
   // Profile state
-  const [userProfile, setUserProfile] = useState({
-    nickname: 'ZEST_FF_PLAYER',
-    uid: '482910384',
-    stats: {
-      matches: 0,
-      wins: 0,
-      kills: 0,
-      earnings: 0
-    }
+  const [userProfile, setUserProfile] = useState(() => {
+    return currentUser || {
+      nickname: 'ZEST_FF_PLAYER',
+      uid: '482910384',
+      email: 'player@zest.gg',
+      phone: '+91 9876543210',
+      stats: {
+        matches: 0,
+        wins: 0,
+        kills: 0,
+        earnings: 0
+      }
+    };
   });
 
   // Tournaments state
   const [tournaments, setTournaments] = useState(INITIAL_TOURNAMENTS);
 
+  // Sync user changes to localStorage
+  useEffect(() => {
+    if (currentUser) {
+      const updated = {
+        ...currentUser,
+        ...userProfile,
+        wallet: walletBalance
+      };
+      localStorage.setItem('zest_current_user', JSON.stringify(updated));
+    }
+  }, [userProfile, walletBalance, currentUser]);
+
   // Real-time Simulation: Auto-fill spots in the lobby
   useEffect(() => {
     const interval = setInterval(() => {
       setTournaments(prevTournaments => {
-        // Pick an upcoming tournament that still has slots left
         const openTournaments = prevTournaments.filter(t => t.status === 'upcoming' && t.slotsJoined < t.slotsTotal);
         if (openTournaments.length === 0) return prevTournaments;
 
@@ -124,11 +149,9 @@ export default function App() {
             const randomNick = RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)] + `_${Math.floor(Math.random()*900 + 100)}`;
             const randomUid = String(Math.floor(Math.random() * 900000000) + 100000000);
             
-            // Add player
             const newPlayer = { nickname: randomNick, uid: randomUid, isUser: false };
             const updatedJoined = [...t.joinedPlayers, newPlayer];
             
-            // If it's a Classic tournament, we can also add them to the leaderboard array
             let updatedLeaderboard = t.leaderboard ? [...t.leaderboard] : [];
             if (t.type === 'Classic') {
               const kills = Math.floor(Math.random() * 6);
@@ -154,10 +177,25 @@ export default function App() {
           return t;
         });
       });
-    }, 12000); // add a player every 12 seconds
+    }, 12000);
 
     return () => clearInterval(interval);
   }, []);
+
+  // Login handler
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    setUserProfile(user);
+    setWalletBalance(user.wallet || 250);
+    localStorage.setItem('zest_current_user', JSON.stringify(user));
+    setCurrentView('dashboard');
+  };
+
+  // Logout handler
+  const handleLogout = () => {
+    localStorage.removeItem('zest_current_user');
+    setCurrentUser(null);
+  };
 
   // Handle tournament join registration
   const handleRegisterUser = (tournamentId, uid, nickname, fee) => {
@@ -176,18 +214,31 @@ export default function App() {
     };
     setTransactions(prev => [newTx, ...prev]);
 
-    // 3. Update User Profile UID/Nickname if different, and increment stats
+    // 3. Update User Profile
     setUserProfile(prev => ({
       ...prev,
       uid: uid,
       nickname: nickname,
       stats: {
         ...prev.stats,
-        matches: prev.stats.matches + 1
+        matches: (prev.stats?.matches || 0) + 1
       }
     }));
 
-    // 4. Update tournament data (add user to slot list & leaderboard)
+    // Find tournament for webhook title
+    const tourney = tournaments.find(t => t.id === tournamentId);
+
+    // 4. Dispatch Webhook Event to Make.com -> Google Sheets
+    sendToMakeWebhook({
+      eventType: 'TOURNAMENT_JOIN',
+      nickname: nickname,
+      ffUid: uid,
+      email: userProfile.email || 'N/A',
+      phone: userProfile.phone || 'N/A',
+      details: `${tourney?.title || 'Tournament'} (Map: ${tourney?.map || 'Bermuda'}, Fee: ₹${fee})`
+    });
+
+    // 5. Update tournament data
     setTournaments(prevTournaments => {
       return prevTournaments.map(t => {
         if (t.id === tournamentId) {
@@ -196,9 +247,8 @@ export default function App() {
           
           let updatedLeaderboard = t.leaderboard ? [...t.leaderboard] : [];
           if (t.type === 'Classic') {
-            // Generate some random points for the user
-            const kills = Math.floor(Math.random() * 5) + 2; // user gets 2-7 kills for demo
-            const placementPoints = 10; // place top 10
+            const kills = Math.floor(Math.random() * 5) + 2;
+            const placementPoints = 10;
             const totalPoints = placementPoints + (kills * 2);
             updatedLeaderboard.push({
               nickname: nickname,
@@ -223,10 +273,28 @@ export default function App() {
     });
   };
 
+  // Wrapper for Wallet deposit to trigger webhook
+  const handleWalletDeposit = (amount) => {
+    setWalletBalance(prev => prev + amount);
+    sendToMakeWebhook({
+      eventType: 'WALLET_DEPOSIT',
+      nickname: userProfile.nickname,
+      ffUid: userProfile.uid,
+      email: userProfile.email || 'N/A',
+      phone: userProfile.phone || 'N/A',
+      details: `Added ₹${amount} to Wallet via UPI`
+    });
+  };
+
   // Add custom tournament via Admin/Host Panel
   const handleAddTournament = (newTourney) => {
     setTournaments(prev => [newTourney, ...prev]);
   };
+
+  // Render Login page if not authenticated
+  if (!currentUser) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
 
   const selectedTournament = tournaments.find(t => t.id === selectedTournamentId);
 
@@ -267,7 +335,7 @@ export default function App() {
         {currentView === 'wallet' && (
           <WalletPage 
             walletBalance={walletBalance}
-            setWalletBalance={setWalletBalance}
+            setWalletBalance={handleWalletDeposit}
             transactions={transactions}
             setTransactions={setTransactions}
           />
@@ -277,6 +345,7 @@ export default function App() {
           <ProfilePage 
             userProfile={userProfile} 
             setUserProfile={setUserProfile}
+            onLogout={handleLogout}
           />
         )}
 

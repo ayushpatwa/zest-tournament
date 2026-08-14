@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 
-export default function ProfilePage({ userProfile, setUserProfile }) {
+export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
   const [isEditing, setIsEditing] = useState(false);
   const [nick, setNick] = useState(userProfile.nickname || '');
   const [uid, setUid] = useState(userProfile.uid || '');
+  const [email, setEmail] = useState(userProfile.email || '');
+  const [phone, setPhone] = useState(userProfile.phone || '');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -12,18 +14,20 @@ export default function ProfilePage({ userProfile, setUserProfile }) {
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!nick.trim() || !uid.trim()) {
-      setErrorMsg('Inputs cannot be empty.');
+    if (!nick.trim() || !uid.trim() || !email.trim() || !phone.trim()) {
+      setErrorMsg('All fields including Email and Phone are mandatory.');
       return;
     }
 
     setUserProfile(prev => ({
       ...prev,
-      nickname: nick,
-      uid: uid
+      nickname: nick.trim(),
+      uid: uid.trim(),
+      email: email.trim(),
+      phone: phone.trim()
     }));
     setIsEditing(false);
-    setSuccessMsg('Game Account bound successfully!');
+    setSuccessMsg('Account details updated successfully!');
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
@@ -73,7 +77,7 @@ export default function ProfilePage({ userProfile, setUserProfile }) {
               LVL 56
             </span>
           </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'monospace' }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--secondary)', marginTop: '4px', fontFamily: 'monospace' }}>
             UID: {userProfile.uid || "Not Linked"}
           </p>
         </div>
@@ -94,10 +98,26 @@ export default function ProfilePage({ userProfile, setUserProfile }) {
         </button>
       </div>
 
+      {/* Account Info details */}
+      <div className="glass-panel" style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+        <div>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Registered Email</span>
+          <p style={{ fontSize: '0.85rem', fontWeight: '600', color: '#fff', marginTop: '2px', wordBreak: 'break-all' }}>
+            {userProfile.email || "N/A"}
+          </p>
+        </div>
+        <div>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Phone Number</span>
+          <p style={{ fontSize: '0.85rem', fontWeight: '600', color: '#fff', marginTop: '2px' }}>
+            {userProfile.phone || "N/A"}
+          </p>
+        </div>
+      </div>
+
       {/* Edit Profile Panel */}
       {isEditing && (
         <div className="glass-panel animate-slide-in" style={{ padding: '16px', border: '1px solid var(--secondary)' }}>
-          <h3 style={{ fontSize: '0.9rem', marginBottom: '12px', color: 'var(--secondary)' }}>LINK FREE FIRE ID</h3>
+          <h3 style={{ fontSize: '0.9rem', marginBottom: '12px', color: 'var(--secondary)' }}>EDIT PLAYER DETAILS</h3>
           <form onSubmit={handleUpdateProfile}>
             <div className="form-group">
               <label>In-Game Nickname</label>
@@ -107,16 +127,40 @@ export default function ProfilePage({ userProfile, setUserProfile }) {
                 onChange={(e) => setNick(e.target.value)} 
                 className="form-input"
                 placeholder="e.g. ZEST_PRO"
+                required
               />
             </div>
             <div className="form-group">
-              <label>UID (User ID)</label>
+              <label>UID (Free Fire User ID)</label>
               <input 
                 type="number" 
                 value={uid} 
                 onChange={(e) => setUid(e.target.value)} 
                 className="form-input"
                 placeholder="e.g. 5819038291"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Email Address</label>
+              <input 
+                type="email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                className="form-input"
+                placeholder="gamer@gmail.com"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Phone Number</label>
+              <input 
+                type="tel" 
+                value={phone} 
+                onChange={(e) => setPhone(e.target.value)} 
+                className="form-input"
+                placeholder="+91 9876543210"
+                required
               />
             </div>
             {errorMsg && (
@@ -162,28 +206,28 @@ export default function ProfilePage({ userProfile, setUserProfile }) {
           <div className="glass-panel" style={{ padding: '12px 16px' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Matches Played</span>
             <p style={{ fontSize: '1.25rem', fontFamily: 'var(--font-heading)', fontWeight: '700', marginTop: '4px' }}>
-              {userProfile.stats.matches}
+              {userProfile.stats?.matches || 0}
             </p>
           </div>
 
           <div className="glass-panel" style={{ padding: '12px 16px' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Tournaments Won</span>
             <p style={{ fontSize: '1.25rem', fontFamily: 'var(--font-heading)', fontWeight: '700', marginTop: '4px', color: 'var(--accent)' }}>
-              {userProfile.stats.wins}
+              {userProfile.stats?.wins || 0}
             </p>
           </div>
 
           <div className="glass-panel" style={{ padding: '12px 16px' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Kills</span>
             <p style={{ fontSize: '1.25rem', fontFamily: 'var(--font-heading)', fontWeight: '700', marginTop: '4px' }}>
-              {userProfile.stats.kills}
+              {userProfile.stats?.kills || 0}
             </p>
           </div>
 
           <div className="glass-panel" style={{ padding: '12px 16px' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Earnings</span>
             <p style={{ fontSize: '1.25rem', fontFamily: 'var(--font-heading)', fontWeight: '700', marginTop: '4px', color: 'var(--success)' }}>
-              ₹{userProfile.stats.earnings}
+              ₹{userProfile.stats?.earnings || 0}
             </p>
           </div>
 
@@ -220,6 +264,22 @@ export default function ProfilePage({ userProfile, setUserProfile }) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Sign Out Button */}
+      <div style={{ marginTop: '8px' }}>
+        <button
+          onClick={onLogout}
+          className="btn btn-outline"
+          style={{
+            width: '100%',
+            borderColor: 'rgba(255, 23, 68, 0.4)',
+            color: '#ff80ab',
+            fontSize: '0.85rem'
+          }}
+        >
+          🚪 Sign Out / Switch Account
+        </button>
       </div>
 
     </div>

@@ -23,7 +23,7 @@ export default function WalletPage({
       
       // Update states
       setTimeout(() => {
-        setWalletBalance(prev => prev + amt);
+        setWalletBalance(amt);
         const newTx = {
           id: Date.now(),
           type: 'deposit',
