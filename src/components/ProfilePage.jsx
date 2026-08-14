@@ -66,19 +66,33 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
         <div style={{ flex: 1 }}>
           <h2 style={{ fontSize: '1.2rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span>{userProfile.nickname || "Gamer_Newbie"}</span>
-            <span style={{ 
-              fontSize: '0.65rem', 
-              background: 'rgba(255,214,0,0.15)', 
-              color: 'var(--accent)', 
-              padding: '2px 6px', 
-              borderRadius: '4px',
-              border: '1px solid rgba(255,214,0,0.3)'
-            }}>
-              LVL 56
-            </span>
+            {userProfile.role === 'admin' ? (
+              <span style={{ 
+                fontSize: '0.65rem', 
+                background: 'rgba(255,214,0,0.2)', 
+                color: 'var(--accent)', 
+                padding: '2px 6px', 
+                borderRadius: '4px',
+                border: '1px solid rgba(255,214,0,0.4)',
+                fontWeight: '900'
+              }}>
+                👑 ADMIN
+              </span>
+            ) : (
+              <span style={{ 
+                fontSize: '0.65rem', 
+                background: 'rgba(255,214,0,0.15)', 
+                color: 'var(--accent)', 
+                padding: '2px 6px', 
+                borderRadius: '4px',
+                border: '1px solid rgba(255,214,0,0.3)'
+              }}>
+                LVL 56
+              </span>
+            )}
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--secondary)', marginTop: '4px', fontFamily: 'monospace' }}>
-            UID: {userProfile.uid || "Not Linked"}
+            UID: {userProfile.uid || "Not Linked"} {userProfile.role === 'admin' && '• [Host Access Active]'}
           </p>
         </div>
 

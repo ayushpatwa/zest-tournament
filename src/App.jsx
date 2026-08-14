@@ -305,6 +305,7 @@ export default function App() {
         currentView={currentView} 
         setCurrentView={setCurrentView} 
         walletBalance={walletBalance} 
+        currentUser={currentUser}
       />
 
       {/* Main viewport */}
@@ -346,10 +347,11 @@ export default function App() {
             userProfile={userProfile} 
             setUserProfile={setUserProfile}
             onLogout={handleLogout}
+            currentUser={currentUser}
           />
         )}
 
-        {currentView === 'admin' && (
+        {currentView === 'admin' && currentUser?.role === 'admin' && (
           <AdminHostPanel 
             onAddTournament={handleAddTournament}
             setCurrentView={setCurrentView}

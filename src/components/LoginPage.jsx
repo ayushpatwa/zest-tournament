@@ -2,13 +2,22 @@ import React, { useState } from 'react';
 import { sendToMakeWebhook } from '../services/webhookService';
 
 export default function LoginPage({ onLoginSuccess }) {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'admin'
+  
+  // Sign Up form state
   const [nickname, setNickname] = useState('');
   const [ffUid, setFfUid] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [loginIdentifier, setLoginIdentifier] = useState(''); // UID or Email
+  
+  // Player Sign In state
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  
+  // Admin Login state
+  const [adminUsername, setAdminUsername] = useState('admin');
+  const [adminPasscode, setAdminPasscode] = useState('');
+
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -54,7 +63,8 @@ export default function LoginPage({ onLoginSuccess }) {
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
       password: password,
-      wallet: 250, // Starter bonus
+      role: 'player', // Standard player
+      wallet: 250,
       stats: {
         matches: 0,
         wins: 0,
@@ -64,7 +74,6 @@ export default function LoginPage({ onLoginSuccess }) {
       createdAt: new Date().toISOString()
     };
 
-    // Save to local users list
     const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
     const userExists = existingUsers.some(u => u.uid === newUser.uid || u.email === newUser.email);
 
@@ -77,14 +86,13 @@ export default function LoginPage({ onLoginSuccess }) {
     existingUsers.push(newUser);
     localStorage.setItem('zest_registered_users', JSON.stringify(existingUsers));
 
-    // Dispatch to Make.com Webhook for Google Sheet entry
     await sendToMakeWebhook({
       eventType: 'USER_SIGNUP',
       nickname: newUser.nickname,
       ffUid: newUser.uid,
       email: newUser.email,
       phone: newUser.phone,
-      details: 'New Registration + ₹250 Welcome Bonus'
+      details: 'New Player Registration + ₹250 Welcome Bonus'
     });
 
     setLoading(false);
@@ -117,7 +125,6 @@ export default function LoginPage({ onLoginSuccess }) {
       return;
     }
 
-    // Dispatch login event to Make.com Webhook
     await sendToMakeWebhook({
       eventType: 'USER_LOGIN',
       nickname: user.nickname,
@@ -129,6 +136,49 @@ export default function LoginPage({ onLoginSuccess }) {
 
     setLoading(false);
     onLoginSuccess(user);
+  };
+
+  const handleAdminLogin = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+
+    const trimmedUser = adminUsername.trim().toLowerCase();
+    const trimmedPass = adminPasscode.trim();
+
+    // Check Master Admin credentials or registered admin
+    if ((trimmedUser === 'admin' || trimmedUser === 'admin@zest.gg') && (trimmedPass === 'admin123' || trimmedPass === 'admin')) {
+      setLoading(true);
+      const adminUser = {
+        id: 'admin_master_1',
+        nickname: '👑 ZEST TOURNAMENT ADMIN',
+        uid: 'ADMIN_001',
+        email: 'admin@zest.gg',
+        phone: '+91 9999999999',
+        role: 'admin', // Full host permissions
+        wallet: 99999,
+        stats: {
+          matches: 50,
+          wins: 45,
+          kills: 500,
+          earnings: 50000
+        }
+      };
+
+      await sendToMakeWebhook({
+        eventType: 'ADMIN_LOGIN',
+        nickname: adminUser.nickname,
+        ffUid: adminUser.uid,
+        email: adminUser.email,
+        phone: adminUser.phone,
+        details: 'Admin verified and logged in with HOST access'
+      });
+
+      setLoading(false);
+      onLoginSuccess(adminUser);
+      return;
+    }
+
+    setErrorMsg('Invalid Admin username or password. (Default: admin / admin123)');
   };
 
   return (
@@ -145,9 +195,11 @@ export default function LoginPage({ onLoginSuccess }) {
     }}>
       
       {/* Brand Header */}
-      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
         <div style={{
-          background: 'linear-gradient(135deg, var(--primary) 0%, #ff1744 100%)',
+          background: authMode === 'admin' 
+            ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' 
+            : 'linear-gradient(135deg, var(--primary) 0%, #ff1744 100%)',
           width: '56px',
           height: '56px',
           borderRadius: '16px',
@@ -155,13 +207,14 @@ export default function LoginPage({ onLoginSuccess }) {
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '2rem',
-          boxShadow: 'var(--glow-primary)',
-          marginBottom: '12px'
+          boxShadow: authMode === 'admin' ? '0 0 20px rgba(255, 214, 0, 0.5)' : 'var(--glow-primary)',
+          marginBottom: '12px',
+          transition: 'all 0.3s ease'
         }}>
-          🔥
+          {authMode === 'admin' ? '👑' : '🔥'}
         </div>
         <h1 style={{
-          fontSize: '1.8rem',
+          fontSize: '1.75rem',
           fontFamily: 'var(--font-heading)',
           fontWeight: '900',
           letterSpacing: '1.5px',
@@ -173,13 +226,13 @@ export default function LoginPage({ onLoginSuccess }) {
           ZEST TOURNAMENT
         </h1>
         <p style={{
-          fontSize: '0.85rem',
-          color: 'var(--secondary)',
+          fontSize: '0.8rem',
+          color: authMode === 'admin' ? 'var(--accent)' : 'var(--secondary)',
           fontFamily: 'var(--font-heading)',
           letterSpacing: '1px',
           textTransform: 'uppercase'
         }}>
-          Free Fire Esports Arena
+          {authMode === 'admin' ? '⚡ Organizer Admin Portal' : 'Free Fire Esports Arena'}
         </p>
       </div>
 
@@ -188,61 +241,84 @@ export default function LoginPage({ onLoginSuccess }) {
         className="glass-panel animate-slide-in"
         style={{
           width: '100%',
-          maxWidth: '420px',
-          padding: '28px 24px',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          maxWidth: '430px',
+          padding: '24px 20px',
+          border: authMode === 'admin' ? '1px solid rgba(255, 214, 0, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
           boxShadow: '0 12px 40px rgba(0, 0, 0, 0.8)',
           position: 'relative'
         }}
       >
-        {/* Toggle Mode Switcher */}
+        {/* Mode Selector Tabs (Sign In, Sign Up, Admin) */}
         <div style={{
           display: 'flex',
           background: 'rgba(7, 9, 14, 0.6)',
           borderRadius: '10px',
           padding: '4px',
-          marginBottom: '20px',
-          border: '1px solid var(--border-color)'
+          marginBottom: '18px',
+          border: '1px solid var(--border-color)',
+          gap: '4px'
         }}>
           <button
             type="button"
-            onClick={() => { setIsSignUp(false); setErrorMsg(''); }}
+            onClick={() => { setAuthMode('signin'); setErrorMsg(''); }}
             style={{
               flex: 1,
-              padding: '10px',
+              padding: '8px 4px',
               border: 'none',
-              borderRadius: '8px',
-              background: !isSignUp ? 'var(--primary)' : 'transparent',
+              borderRadius: '6px',
+              background: authMode === 'signin' ? 'var(--primary)' : 'transparent',
               color: '#fff',
               fontFamily: 'var(--font-heading)',
-              fontSize: '0.8rem',
+              fontSize: '0.72rem',
               fontWeight: '700',
               cursor: 'pointer',
-              boxShadow: !isSignUp ? 'var(--glow-primary)' : 'none',
+              boxShadow: authMode === 'signin' ? 'var(--glow-primary)' : 'none',
               transition: 'all 0.2s ease'
             }}
           >
             SIGN IN
           </button>
+          
           <button
             type="button"
-            onClick={() => { setIsSignUp(true); setErrorMsg(''); }}
+            onClick={() => { setAuthMode('signup'); setErrorMsg(''); }}
             style={{
               flex: 1,
-              padding: '10px',
+              padding: '8px 4px',
               border: 'none',
-              borderRadius: '8px',
-              background: isSignUp ? 'var(--primary)' : 'transparent',
+              borderRadius: '6px',
+              background: authMode === 'signup' ? 'var(--primary)' : 'transparent',
               color: '#fff',
               fontFamily: 'var(--font-heading)',
-              fontSize: '0.8rem',
+              fontSize: '0.72rem',
               fontWeight: '700',
               cursor: 'pointer',
-              boxShadow: isSignUp ? 'var(--glow-primary)' : 'none',
+              boxShadow: authMode === 'signup' ? 'var(--glow-primary)' : 'none',
               transition: 'all 0.2s ease'
             }}
           >
-            CREATE ACCOUNT
+            REGISTER
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setAuthMode('admin'); setErrorMsg(''); }}
+            style={{
+              flex: 1,
+              padding: '8px 4px',
+              border: 'none',
+              borderRadius: '6px',
+              background: authMode === 'admin' ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' : 'transparent',
+              color: authMode === 'admin' ? '#000' : 'var(--accent)',
+              fontFamily: 'var(--font-heading)',
+              fontSize: '0.72rem',
+              fontWeight: '700',
+              cursor: 'pointer',
+              boxShadow: authMode === 'admin' ? '0 0 10px rgba(255,214,0,0.4)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            👑 ADMIN
           </button>
         </div>
 
@@ -262,8 +338,51 @@ export default function LoginPage({ onLoginSuccess }) {
           </div>
         )}
 
-        {/* SIGN UP FORM */}
-        {isSignUp ? (
+        {/* MODE 1: PLAYER SIGN IN */}
+        {authMode === 'signin' && (
+          <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Free Fire UID or Email</label>
+              <input
+                type="text"
+                value={loginIdentifier}
+                onChange={(e) => setLoginIdentifier(e.target.value)}
+                placeholder="Enter UID or Email"
+                className="form-input"
+                required
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="form-input"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+              style={{
+                width: '100%',
+                height: '46px',
+                marginTop: '4px',
+                fontSize: '0.9rem'
+              }}
+            >
+              {loading ? 'Signing In...' : '🚀 Sign In as Player'}
+            </button>
+          </form>
+        )}
+
+        {/* MODE 2: PLAYER SIGN UP */}
+        {authMode === 'signup' && (
           <form onSubmit={handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Free Fire Nickname <span style={{ color: 'var(--primary)' }}>*</span></label>
@@ -336,31 +455,45 @@ export default function LoginPage({ onLoginSuccess }) {
                 fontSize: '0.9rem'
               }}
             >
-              {loading ? 'Creating Account...' : '🔥 Register & Get ₹250'}
+              {loading ? 'Registering...' : '🔥 Register & Get ₹250'}
             </button>
           </form>
-        ) : (
-          /* SIGN IN FORM */
-          <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        )}
+
+        {/* MODE 3: ADMIN LOGIN */}
+        {authMode === 'admin' && (
+          <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{
+              background: 'rgba(255, 214, 0, 0.08)',
+              border: '1px solid rgba(255, 214, 0, 0.25)',
+              padding: '10px',
+              borderRadius: '8px',
+              fontSize: '0.75rem',
+              color: 'var(--accent)',
+              lineHeight: '1.4'
+            }}>
+              🔑 <strong>Administrator Portal:</strong> Sign in here to unlock tournament creation (Host) & Google Sheet configurations.
+            </div>
+
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Free Fire UID or Email</label>
+              <label>Admin Username</label>
               <input
                 type="text"
-                value={loginIdentifier}
-                onChange={(e) => setLoginIdentifier(e.target.value)}
-                placeholder="UID or Email"
+                value={adminUsername}
+                onChange={(e) => setAdminUsername(e.target.value)}
+                placeholder="admin"
                 className="form-input"
                 required
               />
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Password</label>
+              <label>Admin Passcode</label>
               <input
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                value={adminPasscode}
+                onChange={(e) => setAdminPasscode(e.target.value)}
+                placeholder="Enter admin passcode (Default: admin123)"
                 className="form-input"
                 required
               />
@@ -368,37 +501,32 @@ export default function LoginPage({ onLoginSuccess }) {
 
             <button
               type="submit"
-              className="btn btn-primary"
+              className="btn btn-secondary"
               disabled={loading}
               style={{
                 width: '100%',
                 height: '46px',
                 marginTop: '4px',
-                fontSize: '0.9rem'
+                fontSize: '0.88rem',
+                background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)',
+                color: '#000',
+                fontWeight: '900'
               }}
             >
-              {loading ? 'Signing In...' : '🚀 Sign In to Arena'}
+              {loading ? 'Authenticating...' : '👑 Access Admin Host Portal'}
             </button>
+
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+              Default credentials: User: <code style={{ color: 'var(--secondary)' }}>admin</code> | Pass: <code style={{ color: 'var(--secondary)' }}>admin123</code>
+            </div>
           </form>
         )}
-
-        {/* Required Registration Notice */}
-        <div style={{
-          marginTop: '16px',
-          paddingTop: '12px',
-          borderTop: '1px solid var(--border-color)',
-          textAlign: 'center',
-          fontSize: '0.75rem',
-          color: 'var(--text-muted)'
-        }}>
-          <span>🔒 Login or Sign Up is mandatory to access tournaments</span>
-        </div>
 
       </div>
 
       {/* Footer Tag */}
-      <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-        <span>📊 Data securely synced via Make.com Google Sheets</span>
+      <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+        <span>📊 Real-time player logs synced to Make.com Google Sheets</span>
       </div>
 
     </div>

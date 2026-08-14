@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function Navbar({ currentView, setCurrentView, walletBalance }) {
+export default function Navbar({ currentView, setCurrentView, walletBalance, currentUser }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([
     { id: 1, text: "Welcome to Zest Tournament! Get ₹100 signup bonus.", read: false },
@@ -15,6 +15,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance }) {
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  const isAdmin = currentUser?.role === 'admin';
 
   const getPageTitle = () => {
     switch(currentView) {
@@ -64,7 +65,9 @@ export default function Navbar({ currentView, setCurrentView, walletBalance }) {
             }}
           >
             <div style={{
-              background: 'linear-gradient(135deg, var(--primary) 0%, #ff1744 100%)',
+              background: isAdmin 
+                ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' 
+                : 'linear-gradient(135deg, var(--primary) 0%, #ff1744 100%)',
               width: '38px',
               height: '38px',
               borderRadius: '10px',
@@ -75,9 +78,9 @@ export default function Navbar({ currentView, setCurrentView, walletBalance }) {
               fontWeight: '900',
               fontSize: '1.3rem',
               color: '#fff',
-              boxShadow: 'var(--glow-primary)'
+              boxShadow: isAdmin ? '0 0 15px rgba(255, 214, 0, 0.5)' : 'var(--glow-primary)'
             }}>
-              🔥
+              {isAdmin ? '👑' : '🔥'}
             </div>
 
             <div>
@@ -94,20 +97,34 @@ export default function Navbar({ currentView, setCurrentView, walletBalance }) {
                 }}>
                   ZEST
                 </h1>
-                <span className="badge" style={{ 
-                  background: 'rgba(255,87,34,0.15)', 
-                  color: 'var(--primary)', 
-                  border: '1px solid rgba(255,87,34,0.3)',
-                  fontSize: '0.6rem',
-                  padding: '2px 5px',
-                  borderRadius: '4px'
-                }}>
-                  FREE FIRE
-                </span>
+                {isAdmin ? (
+                  <span className="badge" style={{ 
+                    background: 'rgba(255, 214, 0, 0.2)', 
+                    color: 'var(--accent)', 
+                    border: '1px solid rgba(255, 214, 0, 0.4)',
+                    fontSize: '0.6rem',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontWeight: '900'
+                  }}>
+                    👑 ADMIN
+                  </span>
+                ) : (
+                  <span className="badge" style={{ 
+                    background: 'rgba(255,87,34,0.15)', 
+                    color: 'var(--primary)', 
+                    border: '1px solid rgba(255,87,34,0.3)',
+                    fontSize: '0.6rem',
+                    padding: '2px 5px',
+                    borderRadius: '4px'
+                  }}>
+                    FREE FIRE
+                  </span>
+                )}
               </div>
               <span style={{ 
                 fontSize: '0.65rem', 
-                color: 'var(--secondary)', 
+                color: isAdmin ? 'var(--accent)' : 'var(--secondary)', 
                 fontFamily: 'var(--font-heading)',
                 letterSpacing: '0.5px',
                 fontWeight: '700'
@@ -241,7 +258,9 @@ export default function Navbar({ currentView, setCurrentView, walletBalance }) {
                 width: '36px',
                 height: '36px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--secondary) 0%, #00b8d4 100%)',
+                background: isAdmin 
+                  ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' 
+                  : 'linear-gradient(135deg, var(--secondary) 0%, #00b8d4 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -251,7 +270,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance }) {
                 boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
               }}
             >
-              🦊
+              {isAdmin ? '👑' : '🦊'}
             </div>
 
           </div>
@@ -261,7 +280,9 @@ export default function Navbar({ currentView, setCurrentView, walletBalance }) {
         <div style={{
           height: '2px',
           width: '100%',
-          background: 'linear-gradient(90deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%)',
+          background: isAdmin 
+            ? 'linear-gradient(90deg, #ffd600 0%, var(--primary) 50%, var(--secondary) 100%)' 
+            : 'linear-gradient(90deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%)',
           marginTop: '6px',
           opacity: 0.8
         }} />
@@ -347,26 +368,29 @@ export default function Navbar({ currentView, setCurrentView, walletBalance }) {
           <span>PROFILE</span>
         </button>
 
-        <button 
-          onClick={() => setCurrentView('admin')}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: currentView === 'admin' ? 'var(--secondary)' : 'var(--text-muted)',
-            fontFamily: 'var(--font-heading)',
-            fontSize: '0.68rem',
-            fontWeight: '700',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '3px',
-            cursor: 'pointer',
-            transition: 'color 0.2s ease'
-          }}
-        >
-          <span style={{ fontSize: '1.25rem' }}>⚙️</span>
-          <span>HOST</span>
-        </button>
+        {/* HOST OPTION - EXCLUSIVELY FOR ADMIN LOGIN ONLY */}
+        {isAdmin && (
+          <button 
+            onClick={() => setCurrentView('admin')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: currentView === 'admin' ? 'var(--accent)' : 'var(--text-muted)',
+              fontFamily: 'var(--font-heading)',
+              fontSize: '0.68rem',
+              fontWeight: '700',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '3px',
+              cursor: 'pointer',
+              transition: 'color 0.2s ease'
+            }}
+          >
+            <span style={{ fontSize: '1.25rem' }}>⚙️</span>
+            <span>HOST (ADMIN)</span>
+          </button>
+        )}
       </nav>
     </>
   );
