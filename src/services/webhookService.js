@@ -52,13 +52,19 @@ export const setWebhookUrl = (url) => {
  */
 export const sendToMakeWebhook = async (eventData) => {
   const webhookUrl = getWebhookUrl();
+  let cleanPhone = String(eventData.phone || 'N/A').trim();
+  // If phone starts with '+', remove it or format it so Google Sheets does not treat it as a formula (=+)
+  if (cleanPhone.startsWith('+')) {
+    cleanPhone = cleanPhone.replace(/^\+/, '').trim();
+  }
+
   const payload = {
     timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
     eventType: eventData.eventType || 'GENERAL_EVENT',
     nickname: eventData.nickname || 'Unknown',
     ffUid: String(eventData.ffUid || 'N/A'),
     email: eventData.email || 'N/A',
-    phone: String(eventData.phone || 'N/A'),
+    phone: cleanPhone,
     details: eventData.details || '',
     device: typeof window !== 'undefined' && window.innerWidth < 768 ? 'Mobile App' : 'Desktop Web',
     rawTime: new Date().toISOString()
