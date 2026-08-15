@@ -22,6 +22,10 @@ export const sanitizeWebhookUrl = (input) => {
 export const getWebhookUrl = () => {
   const saved = localStorage.getItem(WEBHOOK_STORAGE_KEY);
   if (saved) {
+    if (saved.includes('d7lav19d6j4mxvuittql3pkdb8vwzs55')) {
+      localStorage.setItem(WEBHOOK_STORAGE_KEY, DEFAULT_MAKE_WEBHOOK_URL);
+      return DEFAULT_MAKE_WEBHOOK_URL;
+    }
     return sanitizeWebhookUrl(saved);
   }
   return DEFAULT_MAKE_WEBHOOK_URL;
