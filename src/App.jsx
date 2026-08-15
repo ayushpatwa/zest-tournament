@@ -225,10 +225,11 @@ export default function App() {
 
         {currentView === 'wallet' && (
           <WalletPage 
-            walletBalance={walletBalance}
-            setWalletBalance={handleWalletDeposit}
+            walletBalance={typeof walletBalance === 'number' ? walletBalance : parseFloat(walletBalance) || 0}
+            setWalletBalance={setWalletBalance}
             transactions={transactions}
             setTransactions={setTransactions}
+            userProfile={userProfile}
           />
         )}
 

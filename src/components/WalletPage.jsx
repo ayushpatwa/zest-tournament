@@ -3,9 +3,9 @@ import { openRazorpayCheckout } from '../services/razorpayService';
 import { sendToMakeWebhook } from '../services/webhookService';
 
 export default function WalletPage({ 
-  walletBalance, 
+  walletBalance = 250, 
   setWalletBalance, 
-  transactions, 
+  transactions = [], 
   setTransactions,
   userProfile 
 }) {
@@ -21,6 +21,11 @@ export default function WalletPage({
   const [withdrawSuccessMsg, setWithdrawSuccessMsg] = useState('');
   const [withdrawErrorMsg, setWithdrawErrorMsg] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  // Guarantee clean numeric balance representation
+  const numericBalance = typeof walletBalance === 'number' 
+    ? walletBalance 
+    : (parseFloat(walletBalance) || 0);
 
   // 1. Trigger Official Razorpay Checkout Modal for Deposits
   const handleProceedRazorpayDeposit = (e) => {
@@ -40,7 +45,10 @@ export default function WalletPage({
       customerPhone: userProfile?.phone || '9876543210',
       onSuccess: async (res) => {
         setProcessingStatus('');
-        setWalletBalance(prev => prev + amt);
+        
+        if (typeof setWalletBalance === 'function') {
+          setWalletBalance(prev => (typeof prev === 'number' ? prev : parseFloat(prev) || 0) + amt);
+        }
 
         const newTx = {
           id: Date.now(),
@@ -86,8 +94,8 @@ export default function WalletPage({
       return;
     }
 
-    if (amt > walletBalance) {
-      setWithdrawErrorMsg(`Insufficient balance! Your current wallet balance is ₹${walletBalance}.`);
+    if (amt > numericBalance) {
+      setWithdrawErrorMsg(`Insufficient balance! Your current wallet balance is ₹${numericBalance}.`);
       return;
     }
 
@@ -98,8 +106,10 @@ export default function WalletPage({
 
     setIsWithdrawing(true);
 
-    // Deduct balance from wallet
-    setWalletBalance(prev => prev - amt);
+    // Deduct balance from wallet cleanly
+    if (typeof setWalletBalance === 'function') {
+      setWalletBalance(prev => Math.max(0, (typeof prev === 'number' ? prev : parseFloat(prev) || 0) - amt));
+    }
 
     const newTx = {
       id: Date.now(),
@@ -170,7 +180,7 @@ export default function WalletPage({
         </span>
         <h1 style={{ fontSize: '2.5rem', fontFamily: 'var(--font-heading)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ color: 'var(--accent)' }}>🪙</span>
-          <span>₹{walletBalance}</span>
+          <span>₹{numericBalance}</span>
         </h1>
 
         <div style={{ display: 'flex', width: '100%', gap: '12px', marginTop: '8px' }}>
@@ -447,7 +457,7 @@ export default function WalletPage({
                 }}>
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Available Balance:</span>
                   <span style={{ fontSize: '1rem', fontWeight: '900', color: 'var(--accent)', fontFamily: 'var(--font-heading)' }}>
-                    ₹{walletBalance}
+                    ₹{numericBalance}
                   </span>
                 </div>
 
@@ -461,7 +471,7 @@ export default function WalletPage({
                     className="form-input"
                     required
                     min="50"
-                    max={walletBalance}
+                    max={numericBalance}
                   />
                 </div>
 
@@ -509,7 +519,7 @@ export default function WalletPage({
 
                 <button 
                   type="submit" 
-                  disabled={isWithdrawing || walletBalance < 50}
+                  disabled={isWithdrawing || numericBalance < 50}
                   className="btn btn-primary"
                   style={{
                     width: '100%',
