@@ -3,7 +3,7 @@
 const RAZORPAY_STORAGE_KEY = 'zest_razorpay_gateway_config';
 
 export const DEFAULT_RAZORPAY_CONFIG = {
-  keyId: 'rzp_test_ZestEsports01', // Default Key (can be updated with live key in Admin Panel)
+  keyId: 'rzp_test_TQ3QCNyhVc7wUP',
   merchantName: 'Zest Tournament Esports',
   themeColor: '#00e5ff'
 };
