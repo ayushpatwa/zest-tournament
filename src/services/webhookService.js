@@ -76,7 +76,7 @@ export const sendToMakeWebhook = async (eventData) => {
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'text/plain;charset=UTF-8', // text/plain skips CORS preflight block
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload)
     });
