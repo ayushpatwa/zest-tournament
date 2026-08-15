@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { initiateTranzPaymentSession, getTranzConfig } from '../services/tranzPaymentService';
+import { openRazorpayCheckout } from '../services/razorpayService';
+import { sendToMakeWebhook } from '../services/webhookService';
 
 export default function WalletPage({ 
   walletBalance, 
@@ -10,14 +11,9 @@ export default function WalletPage({
 }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState('100');
-  const [gatewayMethod, setGatewayMethod] = useState('tranz'); // 'tranz' | 'qr_manual'
+  const [paymentMethod, setPaymentMethod] = useState('razorpay'); // 'razorpay' | 'manual_qr'
+  const [processingStatus, setProcessingStatus] = useState('');
   
-  // Tranz Gateway Modal State
-  const [tranzSession, setTranzSession] = useState(null);
-  const [tranzStep, setTranzStep] = useState('method'); // 'method' | 'processing' | 'success'
-  const [selectedUpiApp, setSelectedUpiApp] = useState('phonepe');
-  const [processingStatusText, setProcessingStatusText] = useState('Connecting to Tranz Gateway...');
-
   // Manual QR States
   const [qrStep, setQrStep] = useState(1);
   const [utrNumber, setUtrNumber] = useState('');
@@ -36,8 +32,8 @@ export default function WalletPage({
     return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUri)}&bgcolor=15-18-29&color=00-E5-FF&margin=10`;
   };
 
-  // 1. Launch Tranz Gateway Checkout
-  const handleLaunchTranzGateway = async (e) => {
+  // 1. Trigger Official Razorpay Checkout Modal
+  const handleProceedRazorpayDeposit = (e) => {
     e.preventDefault();
     const amt = parseFloat(depositAmount);
     if (isNaN(amt) || amt < 10) {
@@ -46,58 +42,55 @@ export default function WalletPage({
     }
     setErrorMsg('');
 
-    if (gatewayMethod === 'tranz') {
-      const session = await initiateTranzPaymentSession({
-        amount: amt,
-        customerName: userProfile?.nickname || 'Zest Player',
-        customerEmail: userProfile?.email || 'player@zest.gg',
-        customerPhone: userProfile?.phone || '9876543210'
-      });
+    if (paymentMethod === 'razorpay') {
+      setProcessingStatus('Opening Razorpay Secure Checkout...');
 
-      setTranzSession(session);
-      setTranzStep('method');
+      openRazorpayCheckout({
+        amount: amt,
+        customerName: userProfile?.nickname || 'Zest Gamer',
+        customerEmail: userProfile?.email || 'player@zest.gg',
+        customerPhone: userProfile?.phone || '9876543210',
+        onSuccess: async (res) => {
+          setProcessingStatus('');
+          setWalletBalance(amt);
+
+          const newTx = {
+            id: Date.now(),
+            type: 'deposit',
+            amount: amt,
+            title: `Razorpay Deposit (ID: ${res.paymentId})`,
+            date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: 'Success'
+          };
+
+          setTransactions(prev => [newTx, ...prev]);
+          setShowAddModal(false);
+
+          // Dispatch to Google Sheets
+          await sendToMakeWebhook({
+            eventType: 'WALLET_DEPOSIT',
+            nickname: userProfile?.nickname || 'Player',
+            ffUid: userProfile?.uid || 'N/A',
+            email: userProfile?.email || 'N/A',
+            phone: userProfile?.phone || 'N/A',
+            details: `₹${amt} added via Razorpay (Payment ID: ${res.paymentId})`
+          });
+        },
+        onDismiss: () => {
+          setProcessingStatus('');
+        },
+        onError: (err) => {
+          setProcessingStatus('');
+          setErrorMsg(typeof err === 'string' ? err : 'Payment canceled or failed.');
+        }
+      });
     } else {
       setQrStep(2);
     }
   };
 
-  // 2. Complete Tranz Payment Execution
-  const handlePayViaTranz = (appName) => {
-    setSelectedUpiApp(appName);
-    setTranzStep('processing');
-    setProcessingStatusText(`Waiting for confirmation from ${appName.toUpperCase()}...`);
-
-    // Simulate instant secure gateway callback
-    setTimeout(() => {
-      setProcessingStatusText('Verifying payment hash with Tranz Gateway...');
-      setTimeout(() => {
-        const amt = parseFloat(depositAmount);
-        setWalletBalance(amt);
-
-        const newTx = {
-          id: Date.now(),
-          type: 'deposit',
-          amount: amt,
-          title: `Tranz Gateway Deposit (${appName.toUpperCase()} - ${tranzSession?.orderId || 'TRZ'})`,
-          date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          status: 'Success'
-        };
-
-        setTransactions(prev => [newTx, ...prev]);
-        setTranzStep('success');
-
-        setTimeout(() => {
-          setShowAddModal(false);
-          setTranzSession(null);
-          setTranzStep('method');
-          setDepositAmount('100');
-        }, 2200);
-      }, 1500);
-    }, 1800);
-  };
-
-  // Manual QR verification
-  const handleVerifyManualPayment = (e) => {
+  // 2. Manual QR Submission
+  const handleVerifyManualPayment = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -120,6 +113,16 @@ export default function WalletPage({
 
     setTransactions(prev => [newTx, ...prev]);
     setQrStep(3);
+
+    // Dispatch to Google Sheets
+    await sendToMakeWebhook({
+      eventType: 'WALLET_DEPOSIT',
+      nickname: userProfile?.nickname || 'Player',
+      ffUid: userProfile?.uid || 'N/A',
+      email: userProfile?.email || 'N/A',
+      phone: userProfile?.phone || 'N/A',
+      details: `₹${amt} added via Manual UPI (UTR: ${utrNumber.trim()})`
+    });
 
     setTimeout(() => {
       setShowAddModal(false);
@@ -168,7 +171,7 @@ export default function WalletPage({
         </div>
 
         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-          Zest Verified Account Balance
+          Zest Account Balance
         </span>
         <h1 style={{ fontSize: '2.5rem', fontFamily: 'var(--font-heading)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ color: 'var(--accent)' }}>🪙</span>
@@ -177,14 +180,14 @@ export default function WalletPage({
 
         <div style={{ display: 'flex', width: '100%', gap: '12px', marginTop: '8px' }}>
           <button 
-            onClick={() => { setShowAddModal(true); setTranzSession(null); setQrStep(1); }}
+            onClick={() => { setShowAddModal(true); setQrStep(1); setProcessingStatus(''); setErrorMsg(''); }}
             className="btn btn-secondary" 
             style={{ flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '900', background: 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)', color: '#000' }}
           >
-            ⚡ Deposit via Tranz Gateway
+            ⚡ Add Money (Razorpay)
           </button>
           <button 
-            onClick={() => alert("Withdrawals are processed instantly to your linked UPI ID. Minimum withdrawal is ₹100.")}
+            onClick={() => alert("Withdrawals are processed directly to your linked UPI ID. Minimum withdrawal amount is ₹100.")}
             className="btn btn-outline" 
             style={{ flex: 1, padding: '12px', fontSize: '0.85rem' }}
           >
@@ -193,18 +196,17 @@ export default function WalletPage({
         </div>
       </div>
 
-      {/* Gateway Trust & Payment Options Banner */}
+      {/* Razorpay Trust Banner */}
       <div className="glass-panel" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '1rem' }}>🛡️</span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Secured by <strong>Tranz 256-Bit Gateway</strong>
+          <span style={{ fontSize: '1.2rem' }}>🛡️</span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            Secured by <strong>Razorpay Gateway</strong>
           </span>
         </div>
         <div style={{ display: 'flex', gap: '10px', fontSize: '0.78rem', fontWeight: '700' }}>
-          <span style={{ color: '#00e5ff' }}>⚡ Instant UPI</span>
-          <span style={{ color: '#ffd600' }}>💳 Cards</span>
-          <span style={{ color: '#00e676' }}>🏦 NetBanking</span>
+          <span style={{ color: '#00e5ff' }}>⚡ GPay / PhonePe / Paytm</span>
+          <span style={{ color: '#ffd600' }}>💳 Cards & NetBanking</span>
         </div>
       </div>
 
@@ -257,7 +259,7 @@ export default function WalletPage({
         )}
       </div>
 
-      {/* DEPOSIT MODAL WITH TRANZ PAYMENT GATEWAY */}
+      {/* RAZORPAY DEPOSIT MODAL */}
       {showAddModal && (
         <div 
           className="flex-center" 
@@ -283,12 +285,12 @@ export default function WalletPage({
               position: 'relative'
             }}
           >
-            {/* VIEW 1: AMOUNT SELECTION & GATEWAY CHOICE */}
-            {!tranzSession && qrStep === 1 && (
+            {/* Step 1: Select Amount & Mode */}
+            {qrStep === 1 && (
               <>
                 <div className="flex-between" style={{ marginBottom: '14px' }}>
                   <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', margin: 0, color: 'var(--secondary)' }}>
-                    DEPOSIT MONEY
+                    ADD FUNDS TO WALLET
                   </h2>
                   <button 
                     onClick={() => setShowAddModal(false)}
@@ -298,9 +300,9 @@ export default function WalletPage({
                   </button>
                 </div>
 
-                <form onSubmit={handleLaunchTranzGateway}>
+                <form onSubmit={handleProceedRazorpayDeposit}>
                   
-                  {/* Gateway Option Switcher */}
+                  {/* Payment Gateway Toggle */}
                   <div style={{
                     display: 'flex',
                     background: 'rgba(0,0,0,0.4)',
@@ -311,42 +313,42 @@ export default function WalletPage({
                   }}>
                     <button
                       type="button"
-                      onClick={() => setGatewayMethod('tranz')}
+                      onClick={() => setPaymentMethod('razorpay')}
                       style={{
                         flex: 1,
                         padding: '8px 4px',
                         borderRadius: '6px',
                         border: 'none',
-                        background: gatewayMethod === 'tranz' ? 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)' : 'transparent',
-                        color: gatewayMethod === 'tranz' ? '#000' : '#fff',
+                        background: paymentMethod === 'razorpay' ? 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)' : 'transparent',
+                        color: paymentMethod === 'razorpay' ? '#000' : '#fff',
                         fontSize: '0.75rem',
                         fontWeight: '900',
                         cursor: 'pointer'
                       }}
                     >
-                      ⚡ Tranz Gateway (Instant)
+                      ⚡ Razorpay Gateway
                     </button>
                     <button
                       type="button"
-                      onClick={() => setGatewayMethod('qr_manual')}
+                      onClick={() => setPaymentMethod('manual_qr')}
                       style={{
                         flex: 1,
                         padding: '8px 4px',
                         borderRadius: '6px',
                         border: 'none',
-                        background: gatewayMethod === 'qr_manual' ? 'var(--primary)' : 'transparent',
+                        background: paymentMethod === 'manual_qr' ? 'var(--primary)' : 'transparent',
                         color: '#fff',
                         fontSize: '0.75rem',
                         fontWeight: '700',
                         cursor: 'pointer'
                       }}
                     >
-                      📲 Manual QR + UTR
+                      📲 Scan QR + UTR
                     </button>
                   </div>
 
                   <div className="form-group">
-                    <label>Enter Amount to Deposit (₹)</label>
+                    <label>Enter Amount to Add (₹)</label>
                     <input 
                       type="number" 
                       value={depositAmount}
@@ -383,6 +385,12 @@ export default function WalletPage({
                     ))}
                   </div>
 
+                  {processingStatus && (
+                    <div style={{ color: 'var(--secondary)', fontSize: '0.8rem', marginBottom: '10px' }}>
+                      ⏳ {processingStatus}
+                    </div>
+                  )}
+
                   {errorMsg && (
                     <div style={{ color: 'var(--danger)', fontSize: '0.8rem', marginBottom: '10px' }}>
                       ⚠️ {errorMsg}
@@ -397,200 +405,20 @@ export default function WalletPage({
                       padding: '12px',
                       fontSize: '0.9rem',
                       fontWeight: '900',
-                      background: gatewayMethod === 'tranz' 
+                      background: paymentMethod === 'razorpay' 
                         ? 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)' 
                         : 'var(--primary)',
-                      color: gatewayMethod === 'tranz' ? '#000' : '#fff'
+                      color: paymentMethod === 'razorpay' ? '#000' : '#fff'
                     }}
                   >
-                    {gatewayMethod === 'tranz' ? 'Proceed to Tranz Gateway ➔' : 'Generate UPI QR Code ➔'}
+                    {paymentMethod === 'razorpay' ? '🚀 Open Razorpay Checkout ➔' : 'Generate UPI QR Code ➔'}
                   </button>
                 </form>
               </>
             )}
 
-            {/* VIEW 2: TRANZ PAYMENT GATEWAY CHECKOUT MODAL */}
-            {tranzSession && (
-              <div>
-                {tranzStep === 'method' && (
-                  <div className="animate-slide-in">
-                    
-                    {/* Tranz Gateway Header */}
-                    <div className="flex-between" style={{
-                      borderBottom: '1px solid rgba(255,255,255,0.1)',
-                      paddingBottom: '10px',
-                      marginBottom: '14px'
-                    }}>
-                      <div>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--secondary)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '900' }}>
-                          TRANZ PAYMENT GATEWAY
-                        </span>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          Order: <code style={{ color: 'var(--accent)' }}>{tranzSession.orderId.substring(0, 18)}...</code>
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Total Amount</span>
-                        <div style={{ fontSize: '1.2rem', fontFamily: 'var(--font-heading)', color: 'var(--accent)', fontWeight: '900' }}>
-                          ₹{depositAmount}
-                        </div>
-                      </div>
-                    </div>
-
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                      Choose your preferred instant payment method on Tranz:
-                    </p>
-
-                    {/* 1-Click Fast UPI Options */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
-                      <button
-                        type="button"
-                        onClick={() => handlePayViaTranz('phonepe')}
-                        className="glass-panel flex-between"
-                        style={{
-                          padding: '10px 14px',
-                          border: '1px solid rgba(103, 58, 183, 0.4)',
-                          cursor: 'pointer',
-                          background: 'rgba(103, 58, 183, 0.1)',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '1.3rem' }}>🟣</span>
-                          <div style={{ textAlign: 'left' }}>
-                            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff' }}>PhonePe UPI</div>
-                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Instant zero fee approval</div>
-                          </div>
-                        </div>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--secondary)' }}>Pay ₹{depositAmount} ➔</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handlePayViaTranz('gpay')}
-                        className="glass-panel flex-between"
-                        style={{
-                          padding: '10px 14px',
-                          border: '1px solid rgba(0, 229, 255, 0.4)',
-                          cursor: 'pointer',
-                          background: 'rgba(0, 229, 255, 0.08)',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '1.3rem' }}>⚡</span>
-                          <div style={{ textAlign: 'left' }}>
-                            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff' }}>Google Pay (GPay)</div>
-                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>UPI Intent & Auto-Verify</div>
-                          </div>
-                        </div>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--secondary)' }}>Pay ₹{depositAmount} ➔</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handlePayViaTranz('paytm')}
-                        className="glass-panel flex-between"
-                        style={{
-                          padding: '10px 14px',
-                          border: '1px solid rgba(0, 186, 242, 0.4)',
-                          cursor: 'pointer',
-                          background: 'rgba(0, 186, 242, 0.08)',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '1.3rem' }}>🔵</span>
-                          <div style={{ textAlign: 'left' }}>
-                            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff' }}>Paytm / BHIM UPI</div>
-                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>UPI ID & Wallet</div>
-                          </div>
-                        </div>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--secondary)' }}>Pay ₹{depositAmount} ➔</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handlePayViaTranz('card')}
-                        className="glass-panel flex-between"
-                        style={{
-                          padding: '10px 14px',
-                          border: '1px solid rgba(255, 214, 0, 0.3)',
-                          cursor: 'pointer',
-                          background: 'rgba(255, 214, 0, 0.05)',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '1.3rem' }}>💳</span>
-                          <div style={{ textAlign: 'left' }}>
-                            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff' }}>Debit / Credit Card</div>
-                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Visa, MasterCard, RuPay</div>
-                          </div>
-                        </div>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--accent)' }}>Pay ₹{depositAmount} ➔</span>
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setTranzSession(null)}
-                      className="btn btn-outline"
-                      style={{ width: '100%', padding: '8px', fontSize: '0.75rem' }}
-                    >
-                      Cancel Payment
-                    </button>
-                  </div>
-                )}
-
-                {/* Tranz Processing Screen */}
-                {tranzStep === 'processing' && (
-                  <div className="flex-center animate-slide-in" style={{ flexDirection: 'column', padding: '40px 0', gap: '16px', textAlign: 'center' }}>
-                    <div style={{
-                      border: '4px solid rgba(0, 229, 255, 0.1)',
-                      borderTop: '4px solid var(--secondary)',
-                      borderRadius: '50%',
-                      width: '54px',
-                      height: '54px',
-                      animation: 'spin 1s linear infinite'
-                    }} />
-                    <h3 style={{ fontSize: '1rem', color: '#fff', margin: 0 }}>Processing via Tranz Gateway...</h3>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--secondary)', margin: 0 }}>{processingStatusText}</p>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Do not close this window</span>
-                  </div>
-                )}
-
-                {/* Tranz Success Screen */}
-                {tranzStep === 'success' && (
-                  <div className="flex-center animate-slide-in" style={{ flexDirection: 'column', padding: '30px 0', gap: '14px', textAlign: 'center' }}>
-                    <div style={{
-                      background: 'rgba(0, 230, 118, 0.1)',
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '50%',
-                      border: '2px solid var(--success)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '2rem',
-                      color: 'var(--success)',
-                      boxShadow: '0 0 20px rgba(0, 230, 118, 0.4)'
-                    }}>
-                      ✓
-                    </div>
-                    <h3 style={{ fontSize: '1.15rem', color: 'var(--success)', fontFamily: 'var(--font-heading)', margin: 0 }}>
-                      TRANZ PAYMENT SUCCESSFUL!
-                    </h3>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
-                      ₹{depositAmount} has been credited to your account.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* VIEW 3: MANUAL QR SCAN + UTR */}
-            {gatewayMethod === 'qr_manual' && qrStep === 2 && (
+            {/* Step 2: Manual QR Scan */}
+            {paymentMethod === 'manual_qr' && qrStep === 2 && (
               <div style={{ textAlign: 'center' }}>
                 <div className="flex-between" style={{ marginBottom: '10px' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Scan & Pay ₹{depositAmount}</span>
@@ -598,7 +426,7 @@ export default function WalletPage({
                     onClick={() => setQrStep(1)}
                     style={{ background: 'none', border: 'none', color: 'var(--secondary)', fontSize: '0.8rem', cursor: 'pointer' }}
                   >
-                    ← Change Amount
+                    ← Back
                   </button>
                 </div>
 
@@ -673,7 +501,8 @@ export default function WalletPage({
               </div>
             )}
 
-            {gatewayMethod === 'qr_manual' && qrStep === 3 && (
+            {/* Step 3: Success Screen */}
+            {paymentMethod === 'manual_qr' && qrStep === 3 && (
               <div className="flex-center animate-slide-in" style={{ flexDirection: 'column', padding: '30px 0', gap: '14px', textAlign: 'center' }}>
                 <div style={{
                   background: 'rgba(0, 230, 118, 0.1)',
