@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 
 // Help generate mock players
@@ -10,7 +10,7 @@ const MOCK_NICKNAMES = [
 ];
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onBroadcastRoomCredentials, setCurrentView }) {
-  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'webhook'
+  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'proofs' | 'webhook'
   
   // Host Form states
   const [title, setTitle] = useState('');
@@ -29,10 +29,20 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
   const [inputRoomPass, setInputRoomPass] = useState('');
   const [roomBroadcastStatus, setRoomBroadcastStatus] = useState('');
 
+  // Proofs & Result verification states
+  const [matchProofs, setMatchProofs] = useState([]);
+  const [selectedProofModal, setSelectedProofModal] = useState(null);
+  const [payoutSuccessMsg, setPayoutSuccessMsg] = useState('');
+
   // Webhook states
   const [webhookInput, setWebhookInput] = useState(getWebhookUrl());
   const [webhookStatus, setWebhookStatus] = useState('');
   const [testingWebhook, setTestingWebhook] = useState(false);
+
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem('zest_match_proofs') || '[]');
+    setMatchProofs(saved);
+  }, [activeTab]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -124,6 +134,37 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
     }
   };
 
+  const handleApprovePayout = async (proof) => {
+    // Calculate prize amount (e.g. Rank 1 = ₹500, Kills = ₹25 each)
+    const placementPrize = proof.rank === 1 ? 500 : proof.rank === 2 ? 300 : proof.rank === 3 ? 150 : 50;
+    const killPrize = (proof.kills || 0) * 25;
+    const totalPrize = placementPrize + killPrize;
+
+    // Update proof status
+    const updatedProofs = matchProofs.map(p => {
+      if (p.id === proof.id) {
+        return { ...p, status: 'approved', prizePaid: totalPrize };
+      }
+      return p;
+    });
+
+    setMatchProofs(updatedProofs);
+    localStorage.setItem('zest_match_proofs', JSON.stringify(updatedProofs));
+
+    // Send prize event to Make.com / Google Sheets
+    await sendToMakeWebhook({
+      eventType: 'PRIZE_PAYOUT',
+      nickname: proof.playerNickname,
+      ffUid: proof.playerUid,
+      email: proof.email || 'N/A',
+      phone: proof.phone || 'N/A',
+      details: `Prize Paid: ₹${totalPrize} (Rank #${proof.rank} [₹${placementPrize}] + ${proof.kills} Kills [₹${killPrize}]) for ${proof.tournamentTitle}`
+    });
+
+    setPayoutSuccessMsg(`✅ Approved & credited ₹${totalPrize} prize to ${proof.playerNickname}!`);
+    setTimeout(() => setPayoutSuccessMsg(''), 4000);
+  };
+
   const handleSaveWebhook = (e) => {
     e.preventDefault();
     setWebhookUrl(webhookInput);
@@ -162,7 +203,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
             <span>⚙️</span> ADMIN & HOST PANEL
           </h2>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-            Manage tournaments, broadcast Room credentials, and sync Google Sheets.
+            Manage tournaments, verify match proofs, broadcast Room credentials, and sync Google Sheets.
           </p>
         </div>
 
@@ -199,6 +240,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
           </button>
 
           <button
+            onClick={() => setActiveTab('proofs')}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              background: activeTab === 'proofs' ? 'var(--success)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'proofs' ? '#000' : '#fff',
+              border: '1px solid var(--border-color)',
+              fontWeight: '700'
+            }}
+          >
+            📸 Verify Results ({matchProofs.filter(p => p.status === 'pending').length})
+          </button>
+
+          <button
             onClick={() => setActiveTab('webhook')}
             className="btn"
             style={{
@@ -215,8 +272,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
         </div>
       </div>
 
-      {activeTab === 'host' ? (
-        /* HOST TOURNAMENT FORM */
+      {/* MODE 1: HOST MATCH */}
+      {activeTab === 'host' && (
         <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <h3 style={{ fontSize: '1.05rem', color: 'var(--primary)', marginBottom: '4px' }}>
             🔥 Create New Tournament Match
@@ -333,8 +390,10 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
             🚀 Publish Tournament to Live Arena
           </button>
         </form>
-      ) : activeTab === 'rooms' ? (
-        /* ROOM ID & PASS BROADCASTER */
+      )}
+
+      {/* MODE 2: ROOM ID BROADCASTER */}
+      {activeTab === 'rooms' && (
         <form onSubmit={handleBroadcastRoom} className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <h3 style={{ fontSize: '1.05rem', color: 'var(--accent)', marginBottom: '4px' }}>
             🔑 Free Fire Custom Room ID & Password Drop
@@ -397,10 +456,158 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
             ⚡ Broadcast Room ID to Players Now
           </button>
         </form>
-      ) : (
-        /* MAKE.COM & GOOGLE SHEETS SETTINGS */
+      )}
+
+      {/* MODE 3: RESULT VERIFICATION & PRIZE PAYOUTS */}
+      {activeTab === 'proofs' && (
+        <div className="glass-panel animate-slide-in" style={{ padding: '20px' }}>
+          <h3 style={{ fontSize: '1.05rem', color: 'var(--success)', marginBottom: '4px' }}>
+            🏆 Match Results & Screenshot Proof Verification
+          </h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            Review player endgame victory screenshots and 1-click credit prize payouts directly to their wallet.
+          </p>
+
+          {payoutSuccessMsg && (
+            <div style={{ color: 'var(--success)', background: 'rgba(0,230,118,0.1)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--success)' }}>
+              {payoutSuccessMsg}
+            </div>
+          )}
+
+          {matchProofs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)' }}>
+              No player match submissions yet. Once players submit proof in the lobby, they will appear here.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {matchProofs.map(proof => (
+                <div 
+                  key={proof.id}
+                  className="glass-panel"
+                  style={{
+                    padding: '16px',
+                    border: proof.status === 'approved' ? '1px solid rgba(0,230,118,0.3)' : '1px solid rgba(255,214,0,0.3)',
+                    background: proof.status === 'approved' ? 'rgba(0,230,118,0.03)' : 'rgba(255,214,0,0.03)'
+                  }}
+                >
+                  <div className="flex-between" style={{ marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#fff' }}>
+                        {proof.playerNickname} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>(UID: {proof.playerUid})</span>
+                      </h4>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--secondary)' }}>
+                        {proof.tournamentTitle} • Submitted: {proof.submittedAt}
+                      </span>
+                    </div>
+
+                    <span className="badge" style={{
+                      background: proof.status === 'approved' ? 'rgba(0,230,118,0.2)' : 'rgba(255,214,0,0.2)',
+                      color: proof.status === 'approved' ? 'var(--success)' : 'var(--accent)',
+                      fontWeight: '700'
+                    }}>
+                      {proof.status === 'approved' ? '✓ APPROVED & PAID' : '⏳ PENDING REVIEW'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    <div style={{ background: 'rgba(0,0,0,0.4)', padding: '6px 12px', borderRadius: '6px' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Claimed Rank: </span>
+                      <strong style={{ color: 'var(--accent)' }}>#{proof.rank}</strong>
+                    </div>
+                    <div style={{ background: 'rgba(0,0,0,0.4)', padding: '6px 12px', borderRadius: '6px' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Claimed Kills: </span>
+                      <strong style={{ color: 'var(--secondary)' }}>{proof.kills} Kills</strong>
+                    </div>
+                    {proof.screenshot && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProofModal(proof.screenshot)}
+                        style={{
+                          background: 'rgba(0, 229, 255, 0.1)',
+                          border: '1px solid var(--secondary)',
+                          color: 'var(--secondary)',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🖼️ View Screenshot Proof
+                      </button>
+                    )}
+                  </div>
+
+                  {proof.status === 'pending' ? (
+                    <button
+                      onClick={() => handleApprovePayout(proof)}
+                      className="btn btn-secondary"
+                      style={{
+                        padding: '10px 16px',
+                        fontSize: '0.85rem',
+                        background: 'linear-gradient(135deg, #00e676 0%, #00e5ff 100%)',
+                        color: '#000',
+                        fontWeight: '900',
+                        width: '100%'
+                      }}
+                    >
+                      💰 Approve & Credit Prize (₹{proof.rank === 1 ? 500 + (proof.kills * 25) : 100 + (proof.kills * 25)})
+                    </button>
+                  ) : (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--success)', fontWeight: '700' }}>
+                      ✅ Prize of ₹{proof.prizePaid || 500} has been credited to player's wallet.
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Screenshot Zoom Modal */}
+          {selectedProofModal && (
+            <div 
+              className="flex-center" 
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0,0,0,0.9)',
+                zIndex: 99999,
+                padding: '20px'
+              }}
+            >
+              <div style={{ maxWidth: '90%', maxHeight: '90%', position: 'relative', textAlign: 'center' }}>
+                <button
+                  onClick={() => setSelectedProofModal(null)}
+                  style={{
+                    position: 'absolute',
+                    top: '-36px',
+                    right: '0',
+                    background: 'none',
+                    border: 'none',
+                    color: '#fff',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✕ Close
+                </button>
+                <img 
+                  src={selectedProofModal} 
+                  alt="Endgame Scoreboard" 
+                  style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '12px', border: '2px solid var(--secondary)' }}
+                />
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* MODE 4: MAKE.COM & GOOGLE SHEETS */}
+      {activeTab === 'webhook' && (
         <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          
           <div>
             <h3 style={{ fontSize: '1.05rem', color: 'var(--secondary)', marginBottom: '4px' }}>
               📊 Make.com Webhook Integration
@@ -449,7 +656,6 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
               </button>
             </div>
           </form>
-
         </div>
       )}
 

@@ -40,9 +40,22 @@ function CountdownTimer({ startTime }) {
   );
 }
 
+// Hall of Fame Top Players Data
+const HALL_OF_FAME_DATA = [
+  { rank: 1, nickname: "SOUL_Viper", uid: "582910394", avatar: "👑", earnings: 48500, kills: 382, wins: 46, kd: "5.8" },
+  { rank: 2, nickname: "Garena_Sniper", uid: "192837465", avatar: "🎯", earnings: 34200, kills: 310, wins: 33, kd: "4.9" },
+  { rank: 3, nickname: "TotalGaming_Fan", uid: "910293847", avatar: "⚡", earnings: 27800, kills: 275, wins: 28, kd: "4.2" },
+  { rank: 4, nickname: "ShadowHunter", uid: "482910283", avatar: "🦊", earnings: 21500, kills: 230, wins: 22, kd: "3.8" },
+  { rank: 5, nickname: "Thunder_God", uid: "849201938", avatar: "🔥", earnings: 18900, kills: 198, wins: 19, kd: "3.5" },
+  { rank: 6, nickname: "Raptor_FF", uid: "772910481", avatar: "💀", earnings: 16200, kills: 174, wins: 16, kd: "3.2" },
+  { rank: 7, nickname: "Panda_OP", uid: "284019284", avatar: "🐼", earnings: 14500, kills: 160, wins: 14, kd: "3.0" }
+];
+
 export default function Dashboard({ tournaments, onSelectTournament, setCurrentView }) {
+  const [mainView, setMainView] = useState('tournaments'); // 'tournaments' | 'hall_of_fame'
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [hofCategory, setHofCategory] = useState('earnings'); // 'earnings' | 'kills' | 'wins'
   
   // Featured Banners list
   const featured = [
@@ -76,293 +89,426 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
   }, []);
 
   const filteredTournaments = tournaments.filter(t => {
-    const matchesFilter = selectedFilter === 'All' || t.mode.toLowerCase() === selectedFilter.toLowerCase();
-    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          t.map.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = selectedFilter === 'All' || t.mode?.toLowerCase() === selectedFilter.toLowerCase();
+    const matchesSearch = t.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          t.map?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
+  });
+
+  const sortedHof = [...HALL_OF_FAME_DATA].sort((a, b) => {
+    if (hofCategory === 'earnings') return b.earnings - a.earnings;
+    if (hofCategory === 'kills') return b.kills - a.kills;
+    if (hofCategory === 'wins') return b.wins - a.wins;
+    return 0;
   });
 
   return (
     <div className="animate-slide-in" style={{ paddingBottom: '24px' }}>
       
-      {/* Featured Banner Carousel */}
-      <div 
-        className="glass-panel" 
-        style={{
-          background: featured[activeBanner].color,
-          position: 'relative',
-          padding: '24px',
-          borderRadius: '16px',
-          height: '200px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          border: '1px solid rgba(255,255,255,0.1)',
-          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)',
-          overflow: 'hidden',
-          marginBottom: '20px',
-          transition: 'all 0.5s ease'
-        }}
-      >
-        {/* Glow Effects */}
-        <div style={{
-          position: 'absolute',
-          top: '-50%',
-          right: '-20%',
-          width: '300px',
-          height: '300px',
-          borderRadius: '50%',
-          background: 'rgba(255, 255, 255, 0.1)',
-          filter: 'blur(50px)',
-          pointerEvents: 'none'
-        }} />
+      {/* Top Main Mode Switcher (Arena vs Hall of Fame) */}
+      <div style={{
+        display: 'flex',
+        background: 'rgba(7, 9, 14, 0.7)',
+        borderRadius: '12px',
+        padding: '4px',
+        marginBottom: '16px',
+        border: '1px solid var(--border-color)',
+        gap: '6px'
+      }}>
+        <button
+          type="button"
+          onClick={() => setMainView('tournaments')}
+          style={{
+            flex: 1,
+            padding: '10px',
+            borderRadius: '8px',
+            border: 'none',
+            background: mainView === 'tournaments' ? 'var(--primary)' : 'transparent',
+            color: '#fff',
+            fontFamily: 'var(--font-heading)',
+            fontSize: '0.82rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            boxShadow: mainView === 'tournaments' ? 'var(--glow-primary)' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          🎮 MATCH ARENA
+        </button>
 
-        <span className="badge" style={{
-          position: 'absolute',
-          top: '16px',
-          right: '16px',
-          background: 'rgba(0,0,0,0.5)',
-          color: activeBanner === 0 ? 'var(--accent)' : 'var(--success)',
-          border: '1px solid rgba(255,255,255,0.2)'
-        }}>
-          {featured[activeBanner].tag}
-        </span>
-
-        <h3 style={{ fontSize: '0.85rem', color: 'var(--accent)', marginBottom: '4px' }}>
-          {featured[activeBanner].subtitle}
-        </h3>
-        <h2 style={{ 
-          fontSize: '1.4rem', 
-          fontFamily: 'var(--font-heading)',
-          fontWeight: '900', 
-          color: '#fff',
-          textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-          marginBottom: '8px'
-        }}>
-          {featured[activeBanner].title}
-        </h2>
-        <p style={{ 
-          fontSize: '0.85rem', 
-          color: 'rgba(255,255,255,0.9)', 
-          maxWidth: '80%',
-          lineHeight: '1.4',
-          marginBottom: '16px'
-        }}>
-          {featured[activeBanner].desc}
-        </p>
-
-        {/* Carousel indicators */}
-        <div style={{
-          position: 'absolute',
-          bottom: '16px',
-          right: '16px',
-          display: 'flex',
-          gap: '6px'
-        }}>
-          {featured.map((_, idx) => (
-            <div 
-              key={idx}
-              onClick={() => setActiveBanner(idx)}
-              style={{
-                width: idx === activeBanner ? '20px' : '6px',
-                height: '6px',
-                borderRadius: '3px',
-                background: '#fff',
-                opacity: idx === activeBanner ? 1 : 0.4,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            />
-          ))}
-        </div>
+        <button
+          type="button"
+          onClick={() => setMainView('hall_of_fame')}
+          style={{
+            flex: 1,
+            padding: '10px',
+            borderRadius: '8px',
+            border: 'none',
+            background: mainView === 'hall_of_fame' ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' : 'transparent',
+            color: mainView === 'hall_of_fame' ? '#000' : 'var(--accent)',
+            fontFamily: 'var(--font-heading)',
+            fontSize: '0.82rem',
+            fontWeight: '900',
+            cursor: 'pointer',
+            boxShadow: mainView === 'hall_of_fame' ? '0 0 15px rgba(255,214,0,0.4)' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          🏆 HALL OF FAME
+        </button>
       </div>
 
-      {/* Filter and Search Section */}
-      <div className="flex-between" style={{ marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {['All', 'Solo', 'Duo', 'Squad'].map(filter => (
-            <button
-              key={filter}
-              onClick={() => setSelectedFilter(filter)}
-              className="btn"
-              style={{
-                padding: '6px 12px',
-                fontSize: '0.75rem',
-                borderRadius: '20px',
-                background: selectedFilter === filter ? 'var(--primary)' : 'rgba(255, 255, 255, 0.04)',
-                border: `1px solid ${selectedFilter === filter ? 'var(--primary)' : 'var(--border-color)'}`,
-                boxShadow: selectedFilter === filter ? 'var(--glow-primary)' : 'none',
-                color: '#fff'
-              }}
-            >
-              {filter}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ position: 'relative', width: '200px' }}>
-          <input 
-            type="text" 
-            placeholder="Search map/mode..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="form-input"
+      {/* MODE 1: MATCH ARENA (TOURNAMENTS) */}
+      {mainView === 'tournaments' && (
+        <>
+          {/* Featured Banner Carousel */}
+          <div 
+            className="glass-panel" 
             style={{
-              padding: '6px 12px 6px 30px',
-              fontSize: '0.85rem',
-              borderRadius: '20px',
-              height: '32px'
+              background: featured[activeBanner].color,
+              position: 'relative',
+              padding: '24px',
+              borderRadius: '16px',
+              height: '200px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              border: '1px solid rgba(255,255,255,0.1)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              overflow: 'hidden',
+              marginBottom: '20px'
             }}
-          />
-          <span style={{
-            position: 'absolute',
-            left: '10px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            fontSize: '0.85rem',
-            color: 'var(--text-muted)'
-          }}>
-            🔍
-          </span>
-        </div>
-      </div>
+          >
+            <div style={{ position: 'absolute', top: '16px', left: '20px' }}>
+              <span className="badge badge-live">
+                ● {featured[activeBanner].tag}
+              </span>
+            </div>
 
-      {/* Tournament Cards Grid */}
-      <h2 style={{ fontSize: '1.1rem', marginBottom: '12px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span>🏆</span> Active Tournaments
-      </h2>
+            <div style={{ zIndex: 2, maxWidth: '80%' }}>
+              <h2 style={{ fontSize: '1.4rem', fontFamily: 'var(--font-heading)', color: '#fff', marginBottom: '4px', lineHeight: 1.2 }}>
+                {featured[activeBanner].title}
+              </h2>
+              <p style={{ color: '#fff', fontWeight: '700', fontSize: '0.85rem', marginBottom: '8px', opacity: 0.9 }}>
+                {featured[activeBanner].subtitle}
+              </p>
+              <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75rem', marginBottom: '14px', lineHeight: 1.3 }}>
+                {featured[activeBanner].desc}
+              </p>
+            </div>
 
-      {filteredTournaments.length === 0 ? (
-        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <p style={{ fontSize: '1.2rem', marginBottom: '8px' }}>🚀 No Tournaments Found</p>
-          <p style={{ fontSize: '0.85rem' }}>Create your own using the "HOST" panel at the bottom!</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {filteredTournaments.map(t => {
-            const slotsPct = Math.round((t.slotsJoined / t.slotsTotal) * 100);
-            
-            return (
-              <div 
-                key={t.id} 
-                className="glass-panel"
-                style={{
-                  padding: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
-                  transition: 'all 0.3s ease',
-                  cursor: 'pointer',
-                  position: 'relative'
-                }}
-                onClick={() => onSelectTournament(t.id)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.borderColor = 'rgba(0, 229, 255, 0.2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
-                }}
-              >
-                {/* Header info */}
-                <div className="flex-between">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className={`badge ${
-                      t.status === 'live' ? 'badge-live' : 
-                      t.status === 'upcoming' ? 'badge-upcoming' : 'badge-completed'
-                    }`}>
-                      {t.status}
-                    </span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {t.mode} • {t.type}
-                    </span>
-                  </div>
-
-                  <div style={{ fontSize: '0.8rem' }}>
-                    {t.status === 'upcoming' ? (
-                      <CountdownTimer startTime={t.startTime} />
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>Finished</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Match title & map */}
-                <div>
-                  <h3 style={{ fontSize: '1.05rem', color: '#fff', marginBottom: '4px' }}>
-                    {t.title}
-                  </h3>
-                  <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    <span>🗺️ Map: <strong>{t.map}</strong></span>
-                    <span>🕒 {new Date(t.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                </div>
-
-                {/* Stats / Prices */}
+            {/* Slide indicators */}
+            <div style={{ position: 'absolute', bottom: '12px', right: '16px', display: 'flex', gap: '6px' }}>
+              {featured.map((_, idx) => (
                 <div 
+                  key={idx} 
+                  onClick={() => setActiveBanner(idx)}
                   style={{
-                    background: 'rgba(0,0,0,0.2)',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    textAlign: 'center',
-                    gap: '4px'
+                    width: activeBanner === idx ? '18px' : '6px',
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: '#fff',
+                    opacity: activeBanner === idx ? 1 : 0.4,
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Search and Filters */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+            <input 
+              type="text" 
+              placeholder="🔍 Search tournament by map, title..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="form-input"
+              style={{ padding: '12px 16px', fontSize: '0.85rem' }}
+            />
+
+            {/* Mode Filter Pills */}
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+              {['All', 'Solo', 'Duo', 'Squad'].map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setSelectedFilter(mode)}
+                  style={{
+                    background: selectedFilter === mode ? 'var(--secondary)' : 'rgba(255, 255, 255, 0.05)',
+                    color: selectedFilter === mode ? '#000' : 'var(--text-primary)',
+                    border: selectedFilter === mode ? 'none' : '1px solid var(--border-color)',
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    fontFamily: 'var(--font-heading)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  <div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Prize Pool</div>
-                    <div style={{ fontSize: '0.95rem', color: 'var(--accent)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
-                      ₹{t.prizePool}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Entry Fee</div>
-                    <div style={{ fontSize: '0.95rem', color: '#fff', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
-                      {t.entryFee === 0 ? 'FREE' : `₹${t.entryFee}`}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Slots</div>
-                    <div style={{ fontSize: '0.95rem', color: 'var(--secondary)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
-                      {t.slotsJoined}/{t.slotsTotal}
-                    </div>
-                  </div>
-                </div>
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
 
-                {/* Progress bar */}
-                <div style={{ width: '100%' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                    <span>Progress</span>
-                    <span>{slotsPct}% Filled</span>
-                  </div>
-                  <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{
-                      width: `${slotsPct}%`,
-                      height: '100%',
-                      background: 'linear-gradient(90deg, var(--secondary) 0%, var(--primary) 100%)',
-                      borderRadius: '3px',
-                      transition: 'width 0.3s ease'
-                    }} />
-                  </div>
-                </div>
+          {/* Tournament Grid */}
+          {filteredTournaments.length === 0 ? (
+            <div className="glass-panel" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🎮</div>
+              <p>No tournament matches found matching your search.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {filteredTournaments.map(t => {
+                const totalSlots = t.slotsTotal || t.maxSlots || 48;
+                const joinedSlots = t.slotsJoined || 0;
+                const slotsPct = Math.min(Math.round((joinedSlots / totalSlots) * 100), 100);
 
-                {/* Action button */}
-                <div style={{ marginTop: '4px' }}>
-                  <button 
-                    className="btn btn-outline" 
-                    style={{ width: '100%', padding: '10px', fontSize: '0.8rem' }}
+                return (
+                  <div 
+                    key={t.id} 
+                    className="glass-panel"
+                    style={{
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer',
+                      position: 'relative'
+                    }}
+                    onClick={() => onSelectTournament(t.id)}
                   >
-                    ENTER LOBBY & VIEW DETAILS
-                  </button>
-                </div>
+                    {/* Header info */}
+                    <div className="flex-between">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className={`badge ${
+                          t.status === 'live' ? 'badge-live' : 
+                          t.status === 'upcoming' ? 'badge-upcoming' : 'badge-completed'
+                        }`}>
+                          {t.status || 'open'}
+                        </span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {t.mode} • {t.type}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '0.8rem' }}>
+                        {t.startTime ? <CountdownTimer startTime={t.startTime} /> : <span style={{ color: 'var(--secondary)' }}>LIVE</span>}
+                      </div>
+                    </div>
+
+                    {/* Match title & map */}
+                    <div>
+                      <h3 style={{ fontSize: '1.05rem', color: '#fff', margin: '0 0 4px 0' }}>
+                        {t.title}
+                      </h3>
+                      <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        <span>🗺️ Map: <strong>{t.map}</strong></span>
+                        <span>💰 Bounty: <strong>₹{t.perKillPrize || 25}/Kill</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Stats / Prices */}
+                    <div 
+                      style={{
+                        background: 'rgba(0,0,0,0.3)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, 1fr)',
+                        textAlign: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Prize Pool</div>
+                        <div style={{ fontSize: '0.95rem', color: 'var(--accent)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
+                          ₹{t.prizePool}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Entry Fee</div>
+                        <div style={{ fontSize: '0.95rem', color: '#fff', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
+                          ₹{t.entryFee}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Slots</div>
+                        <div style={{ fontSize: '0.95rem', color: 'var(--secondary)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
+                          {joinedSlots}/{totalSlots}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ width: '100%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                        <span>Lobby Capacity</span>
+                        <span>{slotsPct}% Filled</span>
+                      </div>
+                      <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${slotsPct}%`,
+                          height: '100%',
+                          background: 'linear-gradient(90deg, var(--secondary) 0%, var(--primary) 100%)',
+                          borderRadius: '3px'
+                        }} />
+                      </div>
+                    </div>
+
+                    {/* Action button */}
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ width: '100%', padding: '10px', fontSize: '0.8rem', marginTop: '4px' }}
+                    >
+                      ENTER LOBBY & JOIN MATCH ➔
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* MODE 2: HALL OF FAME LEADERBOARD */}
+      {mainView === 'hall_of_fame' && (
+        <div className="animate-slide-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* Header Card */}
+          <div className="glass-panel" style={{
+            background: 'linear-gradient(135deg, rgba(255, 214, 0, 0.15) 0%, rgba(21, 28, 51, 0.95) 100%)',
+            padding: '20px',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 214, 0, 0.3)',
+            textAlign: 'center'
+          }}>
+            <h2 style={{ fontFamily: 'var(--font-heading)', color: 'var(--accent)', margin: '0 0 4px 0', fontSize: '1.4rem' }}>
+              👑 ESPORTS HALL OF FAME
+            </h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+              Top competitive Free Fire warriors & prize earners on Zest.
+            </p>
+          </div>
+
+          {/* Filter Categories */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[
+              { id: 'earnings', label: '💰 Top Earners (₹)' },
+              { id: 'kills', label: '🎯 Kill Masters' },
+              { id: 'wins', label: '🏆 Win Champions' }
+            ].map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setHofCategory(cat.id)}
+                style={{
+                  flex: 1,
+                  padding: '8px 4px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: hofCategory === cat.id ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
+                  color: hofCategory === cat.id ? '#000' : '#fff',
+                  fontFamily: 'var(--font-heading)',
+                  fontSize: '0.72rem',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Top 3 Podium Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', alignItems: 'end', marginTop: '8px' }}>
+            
+            {/* Rank 2 - Silver */}
+            <div className="glass-panel" style={{ padding: '12px 6px', textAlign: 'center', border: '1px solid #c0c0c0', background: 'rgba(192,192,192,0.08)' }}>
+              <div style={{ fontSize: '1.4rem' }}>🥈</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#fff', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {sortedHof[1]?.nickname}
               </div>
-            );
-          })}
+              <div style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: '900', marginTop: '2px' }}>
+                {hofCategory === 'earnings' ? `₹${sortedHof[1]?.earnings}` : hofCategory === 'kills' ? `${sortedHof[1]?.kills} Kills` : `${sortedHof[1]?.wins} Wins`}
+              </div>
+            </div>
+
+            {/* Rank 1 - Gold (Elevated) */}
+            <div className="glass-panel" style={{ padding: '16px 6px', textAlign: 'center', border: '2px solid #ffd600', background: 'rgba(255,214,0,0.12)', boxShadow: '0 0 20px rgba(255,214,0,0.3)', transform: 'translateY(-10px)' }}>
+              <div style={{ fontSize: '1.8rem' }}>🥇</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: '900', color: '#ffd600', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {sortedHof[0]?.nickname}
+              </div>
+              <div style={{ fontSize: '0.95rem', color: 'var(--accent)', fontWeight: '900', marginTop: '2px' }}>
+                {hofCategory === 'earnings' ? `₹${sortedHof[0]?.earnings}` : hofCategory === 'kills' ? `${sortedHof[0]?.kills} Kills` : `${sortedHof[0]?.wins} Wins`}
+              </div>
+              <span className="badge" style={{ background: '#ffd600', color: '#000', fontSize: '0.6rem', fontWeight: '900', marginTop: '4px' }}>
+                MVP #1
+              </span>
+            </div>
+
+            {/* Rank 3 - Bronze */}
+            <div className="glass-panel" style={{ padding: '12px 6px', textAlign: 'center', border: '1px solid #cd7f32', background: 'rgba(205,127,50,0.08)' }}>
+              <div style={{ fontSize: '1.4rem' }}>🥉</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#fff', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {sortedHof[2]?.nickname}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: '900', marginTop: '2px' }}>
+                {hofCategory === 'earnings' ? `₹${sortedHof[2]?.earnings}` : hofCategory === 'kills' ? `${sortedHof[2]?.kills} Kills` : `${sortedHof[2]?.wins} Wins`}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Full Hall of Fame List */}
+          <div className="glass-panel" style={{ padding: '10px' }}>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              GLOBAL RANKINGS TABLE
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {sortedHof.map((player, idx) => (
+                <div 
+                  key={idx}
+                  className="flex-between"
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: idx < 3 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.03)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontWeight: '900', width: '20px', color: idx === 0 ? '#ffd600' : idx === 1 ? '#c0c0c0' : idx === 2 ? '#cd7f32' : 'var(--text-muted)' }}>
+                      #{idx + 1}
+                    </span>
+                    <span style={{ fontSize: '1.2rem' }}>{player.avatar}</span>
+                    <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff' }}>{player.nickname}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>UID: {player.uid} • KD: {player.kd}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--accent)', fontWeight: '900', fontFamily: 'var(--font-heading)' }}>
+                      ₹{player.earnings}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--secondary)' }}>
+                      🎯 {player.kills} Kills | {player.wins} Wins
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       )}
+
     </div>
   );
 }
