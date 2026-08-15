@@ -207,6 +207,57 @@ export default function TournamentLobby({
               </div>
             </div>
 
+            {/* Real-time Free Fire Room ID & Password Credentials Card */}
+            <div 
+              className="glass-panel animate-slide-in"
+              style={{
+                padding: '16px',
+                background: tournament.roomId 
+                  ? 'linear-gradient(135deg, rgba(0, 230, 118, 0.12) 0%, rgba(0, 229, 255, 0.08) 100%)' 
+                  : 'rgba(15, 18, 29, 0.6)',
+                border: tournament.roomId 
+                  ? '1px solid var(--success)' 
+                  : '1px dashed rgba(255, 255, 255, 0.15)',
+                borderRadius: '12px'
+              }}
+            >
+              <div className="flex-between" style={{ marginBottom: '8px' }}>
+                <span style={{ 
+                  fontFamily: 'var(--font-heading)', 
+                  fontSize: '0.85rem', 
+                  color: tournament.roomId ? 'var(--success)' : 'var(--accent)',
+                  fontWeight: '700',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span>🔑</span> {tournament.roomId ? 'FREE FIRE CUSTOM ROOM CREDENTIALS' : 'CUSTOM ROOM ID & PASSWORD'}
+                </span>
+                {tournament.roomId && <span className="badge badge-live">LIVE NOW</span>}
+              </div>
+
+              {tournament.roomId ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.4)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ROOM ID:</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: '900', color: 'var(--secondary)', letterSpacing: '1px' }}>
+                      {tournament.roomId}
+                    </div>
+                  </div>
+                  <div style={{ background: 'rgba(0,0,0,0.4)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>PASSWORD:</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: '900', color: 'var(--accent)', letterSpacing: '1px' }}>
+                      {tournament.roomPassword || 'None'}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '4px 0 0 0', lineHeight: '1.4' }}>
+                  ⏳ Room ID & Password will be dropped here by the Admin <strong>15 minutes</strong> before match start.
+                </p>
+              )}
+            </div>
+
             {/* Registration State Bar */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {isUserJoined ? (

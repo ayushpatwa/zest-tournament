@@ -9,8 +9,8 @@ const MOCK_NICKNAMES = [
   "Ruler_OP", "GamerBoy", "SniperQueen", "Torn_Max", "GarenaX"
 ];
 
-export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
-  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'webhook'
+export default function AdminHostPanel({ tournaments = [], onAddTournament, onBroadcastRoomCredentials, setCurrentView }) {
+  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'webhook'
   
   // Host Form states
   const [title, setTitle] = useState('');
@@ -22,6 +22,12 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
   const [slotsTotal, setSlotsTotal] = useState('48');
   const [startingIn, setStartingIn] = useState('30');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Room ID Broadcast states
+  const [selectedTourneyId, setSelectedTourneyId] = useState(tournaments[0]?.id || '');
+  const [inputRoomId, setInputRoomId] = useState('');
+  const [inputRoomPass, setInputRoomPass] = useState('');
+  const [roomBroadcastStatus, setRoomBroadcastStatus] = useState('');
 
   // Webhook states
   const [webhookInput, setWebhookInput] = useState(getWebhookUrl());
@@ -91,6 +97,8 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
       joinedPlayers: joinedPlayers,
       startTime: startTime,
       status: 'upcoming',
+      roomId: '',
+      roomPassword: '',
       leaderboard: leaderboard
     };
 
@@ -98,24 +106,39 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
     setCurrentView('dashboard');
   };
 
+  const handleBroadcastRoom = async (e) => {
+    e.preventDefault();
+    if (!selectedTourneyId) {
+      setRoomBroadcastStatus('⚠️ Please select a tournament.');
+      return;
+    }
+    if (!inputRoomId.trim()) {
+      setRoomBroadcastStatus('⚠️ Please enter the Free Fire Custom Room ID.');
+      return;
+    }
+
+    if (onBroadcastRoomCredentials) {
+      await onBroadcastRoomCredentials(selectedTourneyId, inputRoomId.trim(), inputRoomPass.trim());
+      setRoomBroadcastStatus('✅ Broadcasted Room ID & Password to all player devices in real-time!');
+      setTimeout(() => setRoomBroadcastStatus(''), 4000);
+    }
+  };
+
   const handleSaveWebhook = (e) => {
     e.preventDefault();
     setWebhookUrl(webhookInput);
-    setWebhookStatus('Webhook URL saved successfully!');
-    setTimeout(() => setWebhookStatus(''), 3500);
+    setWebhookStatus('✅ Webhook URL successfully saved to local system.');
+    setTimeout(() => setWebhookStatus(''), 3000);
   };
 
   const handleTestWebhook = async () => {
     setTestingWebhook(true);
-    setWebhookStatus('');
-    
-    // Save current input before testing
-    setWebhookUrl(webhookInput);
+    setWebhookStatus('Sending test payload to Make.com...');
 
     const res = await sendToMakeWebhook({
       eventType: 'TEST_PING',
       nickname: 'TEST_ZEST_PLAYER',
-      ffUid: '999999999',
+      ffUid: '99999999',
       email: 'test.player@zest.gg',
       phone: '+91 9999999999',
       details: 'Test connection from Zest Tournament App'
@@ -125,7 +148,7 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
     if (res.success) {
       setWebhookStatus('✅ Test payload dispatched! Check your Make.com Scenario / Google Sheet.');
     } else {
-      setWebhookStatus(`⚠️ Dispatch completed. (Note: Make.com webhooks trigger even if CORS warning appears).`);
+      setWebhookStatus(`⚠️ Dispatch completed.`);
     }
   };
 
@@ -139,11 +162,11 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
             <span>⚙️</span> ADMIN & HOST PANEL
           </h2>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-            Manage tournaments and external Google Sheet integrations.
+            Manage tournaments, broadcast Room credentials, and sync Google Sheets.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           <button
             onClick={() => setActiveTab('host')}
             className="btn"
@@ -158,6 +181,23 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
           >
             🏆 Host Match
           </button>
+
+          <button
+            onClick={() => setActiveTab('rooms')}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              background: activeTab === 'rooms' ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'rooms' ? '#000' : '#fff',
+              border: '1px solid var(--border-color)',
+              fontWeight: '700'
+            }}
+          >
+            🔑 Room ID Drop
+          </button>
+
           <button
             onClick={() => setActiveTab('webhook')}
             className="btn"
@@ -178,14 +218,17 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
       {activeTab === 'host' ? (
         /* HOST TOURNAMENT FORM */
         <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          
+          <h3 style={{ fontSize: '1.05rem', color: 'var(--primary)', marginBottom: '4px' }}>
+            🔥 Create New Tournament Match
+          </h3>
+
           <div className="form-group">
             <label>Tournament Title</label>
             <input 
               type="text" 
               value={title} 
               onChange={(e) => setTitle(e.target.value)} 
-              placeholder="e.g. Sunday Bermuda Rush"
+              placeholder="e.g. Bermuda Midnight Solo Rush" 
               className="form-input"
               required
             />
@@ -193,29 +236,20 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
 
           <div className="grid-2">
             <div className="form-group">
-              <label>Game Mode</label>
-              <select 
-                value={mode} 
-                onChange={(e) => setMode(e.target.value)} 
-                className="form-input"
-                style={{ background: '#07090e', color: '#fff' }}
-              >
-                <option value="Solo">Solo</option>
-                <option value="Duo">Duo</option>
-                <option value="Squad">Squad</option>
+              <label>Match Mode</label>
+              <select value={mode} onChange={(e) => setMode(e.target.value)} className="form-input">
+                <option value="Solo">Solo (1 vs 47)</option>
+                <option value="Duo">Duo (2 vs 2)</option>
+                <option value="Squad">Squad (4 vs 4)</option>
               </select>
             </div>
 
             <div className="form-group">
-              <label>Match Type</label>
-              <select 
-                value={type} 
-                onChange={(e) => setType(e.target.value)} 
-                className="form-input"
-                style={{ background: '#07090e', color: '#fff' }}
-              >
-                <option value="Classic">Classic (Battle Royale)</option>
-                <option value="Clash Squad">Clash Squad (4v4)</option>
+              <label>Game Type</label>
+              <select value={type} onChange={(e) => setType(e.target.value)} className="form-input">
+                <option value="Classic">Classic Battle Royale</option>
+                <option value="Clash Squad">Clash Squad 4v4</option>
+                <option value="Lone Wolf">Lone Wolf 1v1</option>
               </select>
             </div>
           </div>
@@ -223,27 +257,24 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
           <div className="grid-2">
             <div className="form-group">
               <label>Map</label>
-              <select 
-                value={mapName} 
-                onChange={(e) => setMapName(e.target.value)} 
-                className="form-input"
-                style={{ background: '#07090e', color: '#fff' }}
-              >
+              <select value={mapName} onChange={(e) => setMapName(e.target.value)} className="form-input">
                 <option value="Bermuda">Bermuda</option>
                 <option value="Purgatory">Purgatory</option>
                 <option value="Kalahari">Kalahari</option>
                 <option value="Alpine">Alpine</option>
+                <option value="NeXTerra">NeXTerra</option>
               </select>
             </div>
 
             <div className="form-group">
-              <label>Starting In (Minutes)</label>
+              <label>Starting in (Minutes)</label>
               <input 
                 type="number" 
                 value={startingIn} 
                 onChange={(e) => setStartingIn(e.target.value)} 
                 className="form-input"
-                min="1"
+                min="5"
+                max="1440"
                 required
               />
             </div>
@@ -299,9 +330,72 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
             className="btn btn-primary"
             style={{ width: '100%', height: '48px', marginTop: '8px' }}
           >
-            🚀 Publish Tournament Match
+            🚀 Publish Tournament to Live Arena
           </button>
+        </form>
+      ) : activeTab === 'rooms' ? (
+        /* ROOM ID & PASS BROADCASTER */
+        <form onSubmit={handleBroadcastRoom} className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <h3 style={{ fontSize: '1.05rem', color: 'var(--accent)', marginBottom: '4px' }}>
+            🔑 Free Fire Custom Room ID & Password Drop
+          </h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+            Broadcast the custom room ID & Password in real-time. It pops up instantly on all joined players' screens.
+          </p>
 
+          <div className="form-group">
+            <label>Select Active Tournament</label>
+            <select 
+              value={selectedTourneyId} 
+              onChange={(e) => setSelectedTourneyId(e.target.value)} 
+              className="form-input"
+            >
+              {tournaments.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.title} ({t.map} - {t.mode})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label>Custom Room ID</label>
+              <input 
+                type="text" 
+                value={inputRoomId} 
+                onChange={(e) => setInputRoomId(e.target.value)} 
+                placeholder="e.g. 7829103" 
+                className="form-input"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Room Password</label>
+              <input 
+                type="text" 
+                value={inputRoomPass} 
+                onChange={(e) => setInputRoomPass(e.target.value)} 
+                placeholder="e.g. 1234" 
+                className="form-input"
+              />
+            </div>
+          </div>
+
+          {roomBroadcastStatus && (
+            <div style={{ color: 'var(--success)', fontSize: '0.85rem', padding: '8px', background: 'rgba(0,230,118,0.1)', borderRadius: '8px' }}>
+              {roomBroadcastStatus}
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            className="btn btn-secondary"
+            style={{ width: '100%', height: '48px', marginTop: '8px', background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)', color: '#000', fontWeight: '900' }}
+          >
+            ⚡ Broadcast Room ID to Players Now
+          </button>
         </form>
       ) : (
         /* MAKE.COM & GOOGLE SHEETS SETTINGS */
@@ -316,92 +410,45 @@ export default function AdminHostPanel({ onAddTournament, setCurrentView }) {
             </p>
           </div>
 
-          {/* Webhook Configuration Form */}
           <form onSubmit={handleSaveWebhook} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
+            <div className="form-group">
               <label>Make.com Custom Webhook URL</label>
-              <input
-                type="url"
-                value={webhookInput}
-                onChange={(e) => setWebhookInput(e.target.value)}
-                placeholder="https://hook.eu1.make.com/your-custom-webhook-id"
+              <input 
+                type="text" 
+                value={webhookInput} 
+                onChange={(e) => setWebhookInput(e.target.value)} 
+                placeholder="https://hook.eu1.make.com/xxxxxxxxx" 
                 className="form-input"
                 style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                required
               />
             </div>
 
             {webhookStatus && (
-              <div style={{
-                fontSize: '0.8rem',
-                color: webhookStatus.includes('✅') ? 'var(--success)' : 'var(--accent)',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                background: 'rgba(255,255,255,0.03)'
-              }}>
+              <div style={{ color: 'var(--secondary)', fontSize: '0.85rem' }}>
                 {webhookStatus}
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
-              <button
-                type="submit"
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                type="submit" 
                 className="btn btn-primary"
-                style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }}
+                style={{ flex: 1, padding: '12px' }}
               >
                 💾 Save Webhook URL
               </button>
-              <button
-                type="button"
+              <button 
+                type="button" 
                 onClick={handleTestWebhook}
                 disabled={testingWebhook}
                 className="btn btn-secondary"
-                style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }}
+                style={{ flex: 1, padding: '12px' }}
               >
-                {testingWebhook ? 'Testing...' : '⚡ Send Test Row'}
+                {testingWebhook ? 'Sending Ping...' : '⚡ Send Test Row'}
               </button>
             </div>
           </form>
-
-          {/* Quick Setup Instructions */}
-          <div style={{
-            background: 'rgba(7, 9, 14, 0.6)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '12px',
-            padding: '16px',
-            marginTop: '8px'
-          }}>
-            <h4 style={{ fontSize: '0.85rem', color: 'var(--accent)', marginBottom: '8px' }}>
-              🛠️ 3-Step Setup Guide in Make.com:
-            </h4>
-            <ol style={{ paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '8px', lineHeight: '1.4' }}>
-              <li>
-                In <strong>Make.com</strong>, create a new Scenario with a <strong>Custom Webhook</strong> module (copy its Webhook URL and paste it above).
-              </li>
-              <li>
-                Add a <strong>Google Sheets: Add a Row</strong> module and choose your target spreadsheet.
-              </li>
-              <li>
-                Map the incoming JSON parameters to your sheet columns:
-                <div style={{
-                  background: '#07090e',
-                  padding: '8px',
-                  borderRadius: '6px',
-                  marginTop: '4px',
-                  fontFamily: 'monospace',
-                  fontSize: '0.75rem',
-                  color: 'var(--secondary)'
-                }}>
-                  • Timestamp: {`{{1.timestamp}}`}<br />
-                  • Event Type: {`{{1.eventType}}`}<br />
-                  • Player Nickname: {`{{1.nickname}}`}<br />
-                  • Free Fire UID: {`{{1.ffUid}}`}<br />
-                  • Email: {`{{1.email}}`}<br />
-                  • Phone Number: {`{{1.phone}}`}<br />
-                  • Details / Amount: {`{{1.details}}`}
-                </div>
-              </li>
-            </ol>
-          </div>
 
         </div>
       )}

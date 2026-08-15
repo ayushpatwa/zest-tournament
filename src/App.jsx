@@ -7,83 +7,15 @@ import ProfilePage from './components/ProfilePage';
 import AdminHostPanel from './components/AdminHostPanel';
 import LoginPage from './components/LoginPage';
 import { sendToMakeWebhook } from './services/webhookService';
+import { 
+  subscribeToTournamentsRealtime, 
+  saveTournamentRealtime, 
+  joinTournamentRealtime, 
+  updateRoomCredentialsRealtime,
+  saveUserProfileRealtime,
+  SEED_TOURNAMENTS 
+} from './services/firebase';
 import './App.css';
-
-// Initial Mock Tournaments Data
-const INITIAL_TOURNAMENTS = [
-  {
-    id: 't-1',
-    title: 'Free Fire Bermuda Solo Cup',
-    mode: 'Solo',
-    type: 'Classic',
-    map: 'Bermuda',
-    prizePool: 5000,
-    entryFee: 20,
-    slotsTotal: 48,
-    slotsJoined: 28,
-    joinedPlayers: [
-      { nickname: 'ViperStrike', uid: '782910384', isUser: false },
-      { nickname: 'HeadshotGod', uid: '910384729', isUser: false },
-      { nickname: 'Panda_OP', uid: '284019284', isUser: false },
-      { nickname: 'AWM_King', uid: '573928103', isUser: false }
-    ],
-    startTime: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-    status: 'upcoming',
-    leaderboard: [
-      { nickname: 'ViperStrike', uid: '782910384', kills: 6, placementPoints: 12, totalPoints: 24, isUser: false },
-      { nickname: 'HeadshotGod', uid: '910384729', kills: 4, placementPoints: 10, totalPoints: 18, isUser: false },
-      { nickname: 'Panda_OP', uid: '284019284', kills: 2, placementPoints: 8, totalPoints: 12, isUser: false },
-      { nickname: 'AWM_King', uid: '573928103', kills: 0, placementPoints: 6, totalPoints: 6, isUser: false }
-    ]
-  },
-  {
-    id: 't-2',
-    title: 'Clash Squad 4v4 Kalahari',
-    mode: 'Squad',
-    type: 'Clash Squad',
-    map: 'Kalahari',
-    prizePool: 3500,
-    entryFee: 30,
-    slotsTotal: 16,
-    slotsJoined: 11,
-    joinedPlayers: [
-      { nickname: 'Squad Alpha', uid: '1002030', isUser: false },
-      { nickname: 'Squad Beta', uid: '4839201', isUser: false },
-      { nickname: 'Squad Gamma', uid: '9203819', isUser: false },
-      { nickname: 'Squad Delta', uid: '2039182', isUser: false }
-    ],
-    startTime: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
-    status: 'upcoming'
-  },
-  {
-    id: 't-3',
-    title: 'Free Fire Purgatory Squad Arena',
-    mode: 'Squad',
-    type: 'Classic',
-    map: 'Purgatory',
-    prizePool: 12000,
-    entryFee: 100,
-    slotsTotal: 48,
-    slotsJoined: 42,
-    joinedPlayers: [
-      { nickname: 'Ind_Army', uid: '3029103', isUser: false },
-      { nickname: 'Garena_Boss', uid: '9403910', isUser: false }
-    ],
-    startTime: new Date(Date.now() + 120 * 60 * 1000).toISOString(),
-    status: 'upcoming',
-    leaderboard: [
-      { nickname: 'Ind_Army', uid: '3029103', kills: 8, placementPoints: 12, totalPoints: 28, isUser: false },
-      { nickname: 'Garena_Boss', uid: '9403910', kills: 3, placementPoints: 10, totalPoints: 16, isUser: false }
-    ]
-  }
-];
-
-// Helper to pick random names for spot booking simulation
-const RANDOM_NAMES = [
-  'Skyler_Pro', 'Chrono_OP', 'Kelly_Dash', 'Alok_Gamer', 
-  'Hayato_Awake', 'Wukong_King', 'Maxim_Eat', 'Moco_Hack',
-  'Luqueta_Goal', 'Wolfrahh_Head', 'Dasha_Disco', 'K_Captain'
-];
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -100,17 +32,28 @@ export default function App() {
   });
 
   const [transactions, setTransactions] = useState([
-    { id: 101, type: 'deposit', amount: 150, title: 'Welcome Bonus Added', date: 'Aug 14 01:00 AM', status: 'Success' },
-    { id: 102, type: 'deposit', amount: 100, title: 'Signup Bonus Credited', date: 'Aug 14 01:05 AM', status: 'Success' }
+    {
+      id: 1,
+      type: 'deposit',
+      amount: 250,
+      title: 'Welcome Signup Bonus',
+      date: 'Aug 14, 10:00 AM',
+      status: 'Success'
+    }
   ]);
 
-  // Profile state
+  // Real-time Firestore Tournaments State
+  const [tournaments, setTournaments] = useState(SEED_TOURNAMENTS);
+
+  // User Profile
   const [userProfile, setUserProfile] = useState(() => {
-    return currentUser || {
-      nickname: 'ZEST_FF_PLAYER',
-      uid: '482910384',
-      email: 'player@zest.gg',
-      phone: '+91 9876543210',
+    if (currentUser) return currentUser;
+    return {
+      nickname: 'Gamer_Newbie',
+      uid: '782910384',
+      email: '',
+      phone: '',
+      role: 'player',
       stats: {
         matches: 0,
         wins: 0,
@@ -120,10 +63,19 @@ export default function App() {
     };
   });
 
-  // Tournaments state
-  const [tournaments, setTournaments] = useState(INITIAL_TOURNAMENTS);
+  // 1. Subscribe to Real-Time Firebase Firestore Tournaments Collection
+  useEffect(() => {
+    console.log('[Firebase Realtime] Subscribing to live tournaments...');
+    const unsubscribe = subscribeToTournamentsRealtime((liveTournaments) => {
+      if (liveTournaments && liveTournaments.length > 0) {
+        setTournaments(liveTournaments);
+      }
+    });
 
-  // Sync user changes to localStorage
+    return () => unsubscribe();
+  }, []);
+
+  // Sync user profile & wallet to local storage
   useEffect(() => {
     if (currentUser) {
       const updated = {
@@ -135,59 +87,13 @@ export default function App() {
     }
   }, [userProfile, walletBalance, currentUser]);
 
-  // Real-time Simulation: Auto-fill spots in the lobby
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTournaments(prevTournaments => {
-        const openTournaments = prevTournaments.filter(t => t.status === 'upcoming' && t.slotsJoined < t.slotsTotal);
-        if (openTournaments.length === 0) return prevTournaments;
-
-        const targetTournament = openTournaments[Math.floor(Math.random() * openTournaments.length)];
-        
-        return prevTournaments.map(t => {
-          if (t.id === targetTournament.id) {
-            const randomNick = RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)] + `_${Math.floor(Math.random()*900 + 100)}`;
-            const randomUid = String(Math.floor(Math.random() * 900000000) + 100000000);
-            
-            const newPlayer = { nickname: randomNick, uid: randomUid, isUser: false };
-            const updatedJoined = [...t.joinedPlayers, newPlayer];
-            
-            let updatedLeaderboard = t.leaderboard ? [...t.leaderboard] : [];
-            if (t.type === 'Classic') {
-              const kills = Math.floor(Math.random() * 6);
-              const placementPoints = Math.max(12 - updatedLeaderboard.length, 0);
-              updatedLeaderboard.push({
-                nickname: randomNick,
-                uid: randomUid,
-                kills: kills,
-                placementPoints: placementPoints,
-                totalPoints: placementPoints + (kills * 2),
-                isUser: false
-              });
-              updatedLeaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
-            }
-
-            return {
-              ...t,
-              slotsJoined: t.slotsJoined + 1,
-              joinedPlayers: updatedJoined,
-              leaderboard: updatedLeaderboard
-            };
-          }
-          return t;
-        });
-      });
-    }, 12000);
-
-    return () => clearInterval(interval);
-  }, []);
-
   // Login handler
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
     setUserProfile(user);
     setWalletBalance(user.wallet || 250);
     localStorage.setItem('zest_current_user', JSON.stringify(user));
+    saveUserProfileRealtime(user);
     setCurrentView('dashboard');
   };
 
@@ -197,8 +103,8 @@ export default function App() {
     setCurrentUser(null);
   };
 
-  // Handle tournament join registration
-  const handleRegisterUser = (tournamentId, uid, nickname, fee) => {
+  // Handle tournament join registration (Firebase Realtime + Webhook)
+  const handleRegisterUser = async (tournamentId, uid, nickname, fee) => {
     // 1. Deduct Entry Fee
     setWalletBalance(prev => prev - fee);
     
@@ -225,10 +131,20 @@ export default function App() {
       }
     }));
 
-    // Find tournament for webhook title
-    const tourney = tournaments.find(t => t.id === tournamentId);
+    const userParticipant = { 
+      nickname: nickname, 
+      uid: uid, 
+      email: userProfile.email || 'N/A',
+      phone: userProfile.phone || 'N/A',
+      isUser: true,
+      joinedAt: new Date().toISOString()
+    };
 
-    // 4. Dispatch Webhook Event to Make.com -> Google Sheets
+    // 4. Update Firestore in Real-Time
+    await joinTournamentRealtime(tournamentId, userParticipant);
+
+    // 5. Dispatch Webhook Event to Make.com -> Google Sheets
+    const tourney = tournaments.find(t => t.id === tournamentId);
     sendToMakeWebhook({
       eventType: 'TOURNAMENT_JOIN',
       nickname: nickname,
@@ -236,40 +152,6 @@ export default function App() {
       email: userProfile.email || 'N/A',
       phone: userProfile.phone || 'N/A',
       details: `${tourney?.title || 'Tournament'} (Map: ${tourney?.map || 'Bermuda'}, Fee: ₹${fee})`
-    });
-
-    // 5. Update tournament data
-    setTournaments(prevTournaments => {
-      return prevTournaments.map(t => {
-        if (t.id === tournamentId) {
-          const userParticipant = { nickname, uid, isUser: true };
-          const updatedJoined = [...t.joinedPlayers, userParticipant];
-          
-          let updatedLeaderboard = t.leaderboard ? [...t.leaderboard] : [];
-          if (t.type === 'Classic') {
-            const kills = Math.floor(Math.random() * 5) + 2;
-            const placementPoints = 10;
-            const totalPoints = placementPoints + (kills * 2);
-            updatedLeaderboard.push({
-              nickname: nickname,
-              uid: uid,
-              kills: kills,
-              placementPoints: placementPoints,
-              totalPoints: totalPoints,
-              isUser: true
-            });
-            updatedLeaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
-          }
-
-          return {
-            ...t,
-            slotsJoined: t.slotsJoined + 1,
-            joinedPlayers: updatedJoined,
-            leaderboard: updatedLeaderboard
-          };
-        }
-        return t;
-      });
     });
   };
 
@@ -286,9 +168,17 @@ export default function App() {
     });
   };
 
-  // Add custom tournament via Admin/Host Panel
-  const handleAddTournament = (newTourney) => {
+  // Add custom tournament via Admin/Host Panel -> Direct to Firebase
+  const handleAddTournament = async (newTourney) => {
+    // Instant local optimistic update
     setTournaments(prev => [newTourney, ...prev]);
+    // Real-time Firestore sync
+    await saveTournamentRealtime(newTourney);
+  };
+
+  // Broadcast Room ID in real-time
+  const handleBroadcastRoomCredentials = async (tournamentId, roomId, roomPass) => {
+    await updateRoomCredentialsRealtime(tournamentId, roomId, roomPass);
   };
 
   // Render Login page if not authenticated
@@ -353,7 +243,9 @@ export default function App() {
 
         {currentView === 'admin' && currentUser?.role === 'admin' && (
           <AdminHostPanel 
+            tournaments={tournaments}
             onAddTournament={handleAddTournament}
+            onBroadcastRoomCredentials={handleBroadcastRoomCredentials}
             setCurrentView={setCurrentView}
           />
         )}
