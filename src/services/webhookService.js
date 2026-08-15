@@ -71,9 +71,25 @@ export const sendToMakeWebhook = async (eventData) => {
     return { success: true, simulated: true, payload };
   }
 
-  // Attempt 1: Standard fetch with JSON
+  // Prepare URL query parameters for guaranteed Make.com key parsing
+  const queryParams = new URLSearchParams({
+    timestamp: payload.timestamp,
+    eventType: payload.eventType,
+    nickname: payload.nickname,
+    ffUid: payload.ffUid,
+    email: payload.email,
+    phone: payload.phone,
+    details: payload.details,
+    device: payload.device
+  });
+
+  const fullUrl = webhookUrl.includes('?') 
+    ? `${webhookUrl}&${queryParams.toString()}` 
+    : `${webhookUrl}?${queryParams.toString()}`;
+
+  // Attempt 1: Standard fetch with JSON and URL Query params
   try {
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(fullUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -93,7 +109,7 @@ export const sendToMakeWebhook = async (eventData) => {
 
   // Attempt 2: Fallback no-cors mode
   try {
-    await fetch(webhookUrl, {
+    await fetch(fullUrl, {
       method: 'POST',
       mode: 'no-cors',
       headers: {
