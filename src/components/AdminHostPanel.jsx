@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
+import { getTranzConfig, setTranzConfig } from '../services/tranzPaymentService';
 
 // Help generate mock players
 const MOCK_NICKNAMES = [
@@ -10,7 +11,7 @@ const MOCK_NICKNAMES = [
 ];
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onBroadcastRoomCredentials, setCurrentView }) {
-  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'proofs' | 'webhook'
+  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'proofs' | 'tranz' | 'webhook'
   
   // Host Form states
   const [title, setTitle] = useState('');
@@ -33,6 +34,10 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
   const [matchProofs, setMatchProofs] = useState([]);
   const [selectedProofModal, setSelectedProofModal] = useState(null);
   const [payoutSuccessMsg, setPayoutSuccessMsg] = useState('');
+
+  // Tranz Gateway Settings states
+  const [tranzSettings, setTranzSettings] = useState(getTranzConfig());
+  const [tranzSavedStatus, setTranzSavedStatus] = useState('');
 
   // Webhook states
   const [webhookInput, setWebhookInput] = useState(getWebhookUrl());
@@ -135,12 +140,10 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
   };
 
   const handleApprovePayout = async (proof) => {
-    // Calculate prize amount (e.g. Rank 1 = ₹500, Kills = ₹25 each)
     const placementPrize = proof.rank === 1 ? 500 : proof.rank === 2 ? 300 : proof.rank === 3 ? 150 : 50;
     const killPrize = (proof.kills || 0) * 25;
     const totalPrize = placementPrize + killPrize;
 
-    // Update proof status
     const updatedProofs = matchProofs.map(p => {
       if (p.id === proof.id) {
         return { ...p, status: 'approved', prizePaid: totalPrize };
@@ -151,7 +154,6 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
     setMatchProofs(updatedProofs);
     localStorage.setItem('zest_match_proofs', JSON.stringify(updatedProofs));
 
-    // Send prize event to Make.com / Google Sheets
     await sendToMakeWebhook({
       eventType: 'PRIZE_PAYOUT',
       nickname: proof.playerNickname,
@@ -163,6 +165,13 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
 
     setPayoutSuccessMsg(`✅ Approved & credited ₹${totalPrize} prize to ${proof.playerNickname}!`);
     setTimeout(() => setPayoutSuccessMsg(''), 4000);
+  };
+
+  const handleSaveTranzConfig = (e) => {
+    e.preventDefault();
+    setTranzConfig(tranzSettings);
+    setTranzSavedStatus('✅ Tranz Payment Gateway configurations updated successfully.');
+    setTimeout(() => setTranzSavedStatus(''), 3000);
   };
 
   const handleSaveWebhook = (e) => {
@@ -203,7 +212,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
             <span>⚙️</span> ADMIN & HOST PANEL
           </h2>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-            Manage tournaments, verify match proofs, broadcast Room credentials, and sync Google Sheets.
+            Manage tournaments, Tranz payment gateway, verify match proofs, and sync Google Sheets.
           </p>
         </div>
 
@@ -256,6 +265,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
           </button>
 
           <button
+            onClick={() => setActiveTab('tranz')}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              background: activeTab === 'tranz' ? 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'tranz' ? '#000' : '#fff',
+              border: '1px solid var(--border-color)',
+              fontWeight: '900'
+            }}
+          >
+            💳 Gateway (Tranz)
+          </button>
+
+          <button
             onClick={() => setActiveTab('webhook')}
             className="btn"
             style={{
@@ -267,7 +292,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
               border: '1px solid var(--border-color)'
             }}
           >
-            📊 Make.com Google Sheet
+            📊 Google Sheet
           </button>
         </div>
       </div>
@@ -605,7 +630,85 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
         </div>
       )}
 
-      {/* MODE 4: MAKE.COM & GOOGLE SHEETS */}
+      {/* MODE 4: TRANZ PAYMENT GATEWAY CONFIGURATION */}
+      {activeTab === 'tranz' && (
+        <form onSubmit={handleSaveTranzConfig} className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', color: 'var(--secondary)', margin: '0 0 4px 0' }}>
+              💳 Tranz Payment Gateway Settings
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+              Configure your <strong>Tranz Merchant ID</strong> and <strong>API Keys</strong> to accept automated UPI payments and deposits from players.
+            </p>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Tranz Merchant ID</label>
+            <input 
+              type="text"
+              value={tranzSettings.merchantId}
+              onChange={(e) => setTranzSettings({ ...tranzSettings, merchantId: e.target.value })}
+              placeholder="e.g. TRZ_ZEST_MERCHANT_01"
+              className="form-input"
+              required
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Tranz API Secret / Key</label>
+            <input 
+              type="password"
+              value={tranzSettings.apiKey}
+              onChange={(e) => setTranzSettings({ ...tranzSettings, apiKey: e.target.value })}
+              placeholder="tranz_live_key_..."
+              className="form-input"
+              required
+            />
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Gateway Environment</label>
+              <select 
+                value={tranzSettings.environment} 
+                onChange={(e) => setTranzSettings({ ...tranzSettings, environment: e.target.value })} 
+                className="form-input"
+              >
+                <option value="live">Live Production</option>
+                <option value="test">Sandbox / Test Mode</option>
+              </select>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Tranz Gateway Endpoint URL</label>
+              <input 
+                type="text"
+                value={tranzSettings.gatewayUrl}
+                onChange={(e) => setTranzSettings({ ...tranzSettings, gatewayUrl: e.target.value })}
+                placeholder="https://api.tranzpay.io/v1/checkout"
+                className="form-input"
+                required
+              />
+            </div>
+          </div>
+
+          {tranzSavedStatus && (
+            <div style={{ color: 'var(--success)', fontSize: '0.85rem', padding: '8px', background: 'rgba(0,230,118,0.1)', borderRadius: '8px' }}>
+              {tranzSavedStatus}
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            className="btn btn-secondary"
+            style={{ width: '100%', padding: '12px', fontSize: '0.9rem', fontWeight: '900', background: 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)', color: '#000' }}
+          >
+            💾 Save Tranz Gateway Credentials
+          </button>
+        </form>
+      )}
+
+      {/* MODE 5: MAKE.COM & GOOGLE SHEETS */}
       {activeTab === 'webhook' && (
         <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
