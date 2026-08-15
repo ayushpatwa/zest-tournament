@@ -4,7 +4,7 @@ const TRANZ_STORAGE_KEY = 'zest_tranz_gateway_config';
 
 export const DEFAULT_TRANZ_CONFIG = {
   merchantId: 'TRZ_ZEST_MERCHANT_01',
-  apiKey: 'tranz_live_key_9283748291038472',
+  apiKey: 'acd6f86e72594d11e83362533199526f',
   gatewayUrl: 'https://api.tranzpay.io/v1/checkout',
   environment: 'live', // 'live' | 'test'
   merchantName: 'Zest Tournament Gaming'
