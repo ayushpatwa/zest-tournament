@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { sendToMakeWebhook } from '../services/webhookService';
+import { sendToMakeWebhook, getWebhookUrl, setWebhookUrl } from '../services/webhookService';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'admin'
+  const [showWebhookConfig, setShowWebhookConfig] = useState(false);
+  const [customWebhookUrl, setCustomWebhookUrl] = useState(getWebhookUrl());
+  const [webhookSavedMsg, setWebhookSavedMsg] = useState('');
   
   // Sign Up form state
   const [nickname, setNickname] = useState('');
@@ -524,10 +527,107 @@ export default function LoginPage({ onLoginSuccess }) {
 
       </div>
 
-      {/* Footer Tag */}
-      <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-        <span>📊 Real-time player logs synced to Make.com Google Sheets</span>
+      {/* Footer Tag & Webhook URL Quick Manager */}
+      <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+        <div>📊 Real-time player logs synced to Make.com Google Sheets</div>
+        <button
+          type="button"
+          onClick={() => { setShowWebhookConfig(true); setCustomWebhookUrl(getWebhookUrl()); }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--secondary)',
+            fontSize: '0.72rem',
+            cursor: 'pointer',
+            marginTop: '6px',
+            textDecoration: 'underline'
+          }}
+        >
+          ⚙️ Change Make.com Webhook URL
+        </button>
       </div>
+
+      {/* Quick Webhook Config Modal */}
+      {showWebhookConfig && (
+        <div 
+          className="flex-center" 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.85)',
+            zIndex: 9999,
+            padding: '20px'
+          }}
+        >
+          <div 
+            className="glass-panel animate-slide-in" 
+            style={{ 
+              width: '100%', 
+              maxWidth: '380px', 
+              padding: '20px',
+              border: '1px solid var(--secondary)',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.8)'
+            }}
+          >
+            <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1rem', color: 'var(--secondary)', marginBottom: '8px' }}>
+              📊 Make.com Webhook URL
+            </h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.4' }}>
+              Paste your Custom Webhook URL generated from Make.com to receive user registration rows in your Google Sheet.
+            </p>
+
+            <input
+              type="text"
+              value={customWebhookUrl}
+              onChange={(e) => setCustomWebhookUrl(e.target.value)}
+              placeholder="https://hook.eu1.make.com/xxxxxxxxx"
+              className="form-input"
+              style={{ fontSize: '0.8rem', fontFamily: 'monospace', marginBottom: '10px' }}
+            />
+
+            {webhookSavedMsg && (
+              <div style={{ color: 'var(--success)', fontSize: '0.75rem', marginBottom: '10px' }}>
+                {webhookSavedMsg}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ flex: 1, padding: '8px', fontSize: '0.75rem' }}
+                onClick={() => setShowWebhookConfig(false)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ flex: 1, padding: '8px', fontSize: '0.75rem' }}
+                onClick={async () => {
+                  setWebhookUrl(customWebhookUrl);
+                  setWebhookSavedMsg('Testing & sending ping...');
+                  const res = await sendToMakeWebhook({
+                    eventType: 'TEST_PING',
+                    nickname: 'ZEST_TEST_CONNECT',
+                    ffUid: '12345678',
+                    email: 'test@zest.gg',
+                    phone: '+91 9999999999',
+                    details: 'Webhook verified from Login screen'
+                  });
+                  setWebhookSavedMsg(res.success ? '✅ Saved & Test ping sent!' : '⚠️ Saved (Check Make scenario).');
+                  setTimeout(() => setWebhookSavedMsg(''), 3000);
+                }}
+              >
+                Save & Test
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
