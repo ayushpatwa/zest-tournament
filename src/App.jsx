@@ -15,6 +15,7 @@ import {
   subscribeToTournamentsRealtime, 
   subscribeToAppSettingsRealtime,
   subscribeToUserProfileRealtime,
+  subscribeToNotificationsRealtime,
   saveAppSettingsRealtime,
   saveTournamentRealtime, 
   deleteTournamentRealtime,
@@ -44,6 +45,9 @@ export default function App() {
   // Real-time Firestore Tournaments State
   const [tournaments, setTournaments] = useState(SEED_TOURNAMENTS);
 
+  // Real-time Broadcast Notifications State (Bell 🔔)
+  const [cloudNotifications, setCloudNotifications] = useState([]);
+
   // User Profile
   const [userProfile, setUserProfile] = useState(() => {
     if (currentUser) return currentUser;
@@ -67,15 +71,20 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
 
-  // 1. Subscribe to Real-Time Firebase Firestore Tournaments & App Settings
+  // 1. Subscribe to Real-Time Firebase Firestore Tournaments, Notifications & App Settings
   useEffect(() => {
-    console.log('[Firebase Realtime] Subscribing to live tournaments and app config...');
+    console.log('[Firebase Realtime] Subscribing to live tournaments, notifications and app config...');
     
     // Subscribe to tournaments
     const unsubscribeTourneys = subscribeToTournamentsRealtime((liveTournaments) => {
       if (liveTournaments && liveTournaments.length > 0) {
         setTournaments(liveTournaments);
       }
+    });
+
+    // Subscribe to broadcast notifications (Bell 🔔)
+    const unsubscribeNotifs = subscribeToNotificationsRealtime((notifs) => {
+      setCloudNotifications(notifs);
     });
 
     // Subscribe to dynamic cloud app settings (Razorpay Key ID, Webhook, App Version Updates)
@@ -100,6 +109,7 @@ export default function App() {
 
     return () => {
       unsubscribeTourneys();
+      unsubscribeNotifs();
       unsubscribeSettings();
     };
   }, []);
@@ -253,6 +263,7 @@ export default function App() {
         setCurrentView={setCurrentView} 
         walletBalance={walletBalance} 
         currentUser={currentUser}
+        cloudNotifications={cloudNotifications}
       />
 
       {/* Main viewport */}

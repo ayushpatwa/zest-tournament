@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
 
-export default function Navbar({ currentView, setCurrentView, walletBalance, currentUser }) {
+export default function Navbar({ currentView, setCurrentView, walletBalance, currentUser, cloudNotifications = [] }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, text: "Welcome to Zest Tournament! Get ₹100 signup bonus.", read: false },
-    { id: 2, text: "Bermuda Solo Cup starts in 10 minutes!", read: false },
-  ]);
+  const [readNotifIds, setReadNotifIds] = useState(() => {
+    const saved = localStorage.getItem('zest_read_notif_ids');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Calculate unread items
+  const unreadCount = cloudNotifications.filter(n => !readNotifIds.includes(n.id)).length;
 
   const toggleNotifications = () => {
     setNotificationsOpen(!notificationsOpen);
-    if (!notificationsOpen) {
-      setNotifications(notifications.map(n => ({ ...n, read: true })));
+    if (!notificationsOpen && cloudNotifications.length > 0) {
+      const allIds = cloudNotifications.map(n => n.id);
+      setReadNotifIds(allIds);
+      localStorage.setItem('zest_read_notif_ids', JSON.stringify(allIds));
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
   const isAdmin = currentUser?.role === 'admin';
 
   const getPageTitle = () => {
@@ -227,52 +231,74 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
               {/* Notifications Dropdown */}
               {notificationsOpen && (
                 <div 
-                  className="glass-panel" 
+                  className="glass-panel animate-slide-in" 
                   style={{
                     position: 'absolute',
                     top: '46px',
                     right: '0',
-                    width: '280px',
+                    width: '310px',
                     padding: '14px',
                     zIndex: 2000,
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '10px',
-                    maxHeight: '300px',
+                    maxHeight: '360px',
                     overflowY: 'auto',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.8)'
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.85)'
                   }}
                 >
                   <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>
-                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.8rem', fontWeight: '700' }}>
-                      NOTIFICATIONS
+                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
+                      📢 NOTIFICATIONS ({cloudNotifications.length})
                     </span>
                     <span 
-                      onClick={() => setNotifications([])} 
-                      style={{ fontSize: '0.7rem', color: 'var(--text-muted)', cursor: 'pointer' }}
+                      onClick={() => {
+                        const allIds = cloudNotifications.map(n => n.id);
+                        setReadNotifIds(allIds);
+                        localStorage.setItem('zest_read_notif_ids', JSON.stringify(allIds));
+                      }} 
+                      style={{ fontSize: '0.7rem', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}
                     >
-                      Clear All
+                      Mark all read
                     </span>
                   </div>
-                  {notifications.length === 0 ? (
-                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '12px 0', fontSize: '0.8rem' }}>
-                      No new notifications
+
+                  {cloudNotifications.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', fontSize: '0.8rem' }}>
+                      🔔 No announcements yet. When the admin posts tournament notices, they will appear here!
                     </div>
                   ) : (
-                    notifications.map(n => (
-                      <div key={n.id} style={{
-                        fontSize: '0.78rem',
-                        lineHeight: '1.3',
-                        padding: '8px',
-                        borderRadius: '6px',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        borderLeft: '3px solid var(--primary)',
-                        color: 'var(--text-primary)'
-                      }}>
-                        {n.text}
-                      </div>
-                    ))
+                    cloudNotifications.map(n => {
+                      const isUnread = !readNotifIds.includes(n.id);
+                      return (
+                        <div key={n.id} style={{
+                          fontSize: '0.78rem',
+                          lineHeight: '1.35',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          background: isUnread ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                          borderLeft: `3px solid ${n.type === 'alert' ? 'var(--danger)' : n.type === 'prize' ? 'var(--success)' : 'var(--primary)'}`,
+                          border: isUnread ? '1px solid rgba(0, 229, 255, 0.25)' : '1px solid rgba(255, 255, 255, 0.05)',
+                          color: 'var(--text-primary)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px'
+                        }}>
+                          <div className="flex-between" style={{ gap: '6px' }}>
+                            <strong style={{ color: '#fff', fontSize: '0.82rem' }}>
+                              {n.title || 'Match Notice'}
+                            </strong>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                              {n.createdTimeStr || 'Just now'}
+                            </span>
+                          </div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
+                            {n.message}
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               )}

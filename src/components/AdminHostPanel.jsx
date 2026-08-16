@@ -6,11 +6,14 @@ import {
   creditUserWalletRealtime, 
   deductUserWalletRealtime, 
   subscribeToAllUsersRealtime,
-  resetUserPasswordRealtime
+  resetUserPasswordRealtime,
+  sendNotificationRealtime,
+  deleteNotificationRealtime,
+  subscribeToNotificationsRealtime
 } from '../services/firebase';
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView }) {
-  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'manage' | 'razorpay' | 'webhook' | 'app_update'
+  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'broadcast' | 'manage' | 'razorpay' | 'webhook' | 'app_update'
   
   // Host Form states
   const [title, setTitle] = useState('');
@@ -25,6 +28,14 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   const [errorMsg, setErrorMsg] = useState('');
   const [deleteStatusMsg, setDeleteStatusMsg] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+
+  // Broadcast Notification (Bell 🔔) states
+  const [notifTitle, setNotifTitle] = useState('🔥 Match Starting in 15 Minutes!');
+  const [notifMessage, setNotifMessage] = useState('Join the room immediately. Room ID and Password are now dropped in the Arena!');
+  const [notifType, setNotifType] = useState('alert'); // 'alert' | 'match' | 'prize' | 'info'
+  const [notifStatus, setNotifStatus] = useState('');
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [broadcastList, setBroadcastList] = useState([]);
 
   // Prize & Wallet Manager states
   const [walletAction, setWalletAction] = useState('credit'); // 'credit' | 'deduct'
@@ -69,11 +80,46 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   }, [activeTab]);
 
   useEffect(() => {
-    const unsubscribe = subscribeToAllUsersRealtime((usersList) => {
+    const unsubscribeUsers = subscribeToAllUsersRealtime((usersList) => {
       setCloudUsers(usersList);
     });
-    return () => unsubscribe();
+    const unsubscribeNotifs = subscribeToNotificationsRealtime((notifs) => {
+      setBroadcastList(notifs);
+    });
+    return () => {
+      unsubscribeUsers();
+      unsubscribeNotifs();
+    };
   }, []);
+
+  const handleBroadcastNotification = async (e) => {
+    e.preventDefault();
+    if (!notifTitle.trim() || !notifMessage.trim()) {
+      setNotifStatus('⚠️ Please enter both a notification title and message.');
+      return;
+    }
+    setNotifLoading(true);
+    const res = await sendNotificationRealtime({
+      title: notifTitle.trim(),
+      message: notifMessage.trim(),
+      type: notifType
+    });
+    if (res.success) {
+      setNotifStatus('✅ Notification broadcasted! All players will now see the red badge on their bell 🔔 in real-time.');
+      setNotifTitle('');
+      setNotifMessage('');
+    } else {
+      setNotifStatus(`⚠️ Failed: ${res.error}`);
+    }
+    setNotifLoading(false);
+    setTimeout(() => setNotifStatus(''), 6000);
+  };
+
+  const handleDeleteNotification = async (notifId) => {
+    if (window.confirm('Delete this broadcast announcement?')) {
+      await deleteNotificationRealtime(notifId);
+    }
+  };
 
   const handleTypeChange = (newType) => {
     setType(newType);
@@ -387,6 +433,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             }}
           >
             💰 Give Prize Money
+          </button>
+
+          <button
+            onClick={() => setActiveTab('broadcast')}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              background: activeTab === 'broadcast' ? 'linear-gradient(135deg, #ff007f 0%, #ff5722 100%)' : 'rgba(255,255,255,0.05)',
+              color: '#fff',
+              border: '1px solid var(--border-color)',
+              fontWeight: '900'
+            }}
+          >
+            🔔 Send Notification ({broadcastList.length})
           </button>
 
           <button
@@ -971,6 +1033,193 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                         🔑 Reset Pass
                       </button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </form>
+      )}
+
+      {/* MODE 2.7: BROADCAST NOTIFICATIONS TO BELL 🔔 */}
+      {activeTab === 'broadcast' && (
+        <form onSubmit={handleBroadcastNotification} className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', color: '#ff007f', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>📢</span> Broadcast Notification to Players (Bell 🔔)
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+              Broadcast real-time announcements to all players. When sent, every user's notification bell rings with a red alert badge instantly!
+            </p>
+          </div>
+
+          {/* Quick Preset Templates */}
+          <div>
+            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+              ⚡ 1-Click Quick Preset Announcements:
+            </label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {[
+                { label: '⚔️ Match in 15 Mins', title: '⚔️ Match Starting in 15 Minutes!', msg: 'Please be online in Free Fire. Room ID will be dropped in the app shortly!', type: 'alert' },
+                { label: '🔑 Room ID Dropped', title: '🔑 Room ID & Password Dropped!', msg: 'Room details are now LIVE in the Arena! Join the custom room immediately.', type: 'match' },
+                { label: '🏆 Prize Money Sent', title: '🏆 Prize Money Credited to Winners!', msg: 'Winnings have been credited to the tournament champions. Check your wallet balance!', type: 'prize' },
+                { label: '🔥 Mega ₹5000 Live', title: '🔥 Mega ₹5000 Tournament Open for Registration!', msg: 'Limited slots remaining. Deposit coins and reserve your team slot now!', type: 'alert' }
+              ].map((p, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setNotifTitle(p.title);
+                    setNotifMessage(p.msg);
+                    setNotifType(p.type);
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff',
+                    padding: '4px 10px',
+                    borderRadius: '16px',
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {notifStatus && (
+            <div style={{ 
+              color: notifStatus.includes('✅') ? 'var(--success)' : 'var(--danger)', 
+              background: notifStatus.includes('✅') ? 'rgba(0,230,118,0.1)' : 'rgba(255,23,68,0.1)', 
+              padding: '12px 14px', 
+              borderRadius: '8px', 
+              border: `1px solid ${notifStatus.includes('✅') ? 'var(--success)' : 'var(--danger)'}`, 
+              fontSize: '0.88rem' 
+            }}>
+              {notifStatus}
+            </div>
+          )}
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label>Notification Headline / Title <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <input 
+                type="text" 
+                value={notifTitle} 
+                onChange={(e) => setNotifTitle(e.target.value)} 
+                placeholder="e.g. ⚔️ Bermuda Solo starts at 4:00 PM"
+                className="form-input"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Notification Category / Badge</label>
+              <select 
+                value={notifType} 
+                onChange={(e) => setNotifType(e.target.value)} 
+                className="form-input"
+              >
+                <option value="alert">🔥 Urgent Match Alert</option>
+                <option value="match">⚔️ Room / Match Update</option>
+                <option value="prize">🏆 Prize Money / Winner Payout</option>
+                <option value="info">ℹ️ General Announcement</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Notification Message Body <span style={{ color: 'var(--primary)' }}>*</span></label>
+            <textarea 
+              value={notifMessage} 
+              onChange={(e) => setNotifMessage(e.target.value)} 
+              placeholder="e.g. Join the room immediately with password 1234. Match starts in 10 minutes!"
+              className="form-input"
+              rows={3}
+              required
+            />
+          </div>
+
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={notifLoading}
+            style={{ 
+              width: '100%', 
+              height: '48px', 
+              marginTop: '4px', 
+              background: 'linear-gradient(135deg, #ff007f 0%, #ff5722 100%)', 
+              color: '#fff', 
+              fontWeight: '900',
+              fontSize: '0.92rem',
+              boxShadow: '0 4px 15px rgba(255, 0, 127, 0.4)'
+            }}
+          >
+            {notifLoading ? '📢 Broadcasting Announcement to Cloud...' : '📢 Push Broadcast Notification to All Players (Bell 🔔)'}
+          </button>
+
+          {/* Active Broadcast Announcements List */}
+          <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+            <div className="flex-between" style={{ marginBottom: '12px' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--secondary)', margin: 0, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🔔</span> Active Broadcast Notices ({broadcastList.length})
+              </h4>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Visible in the player's notification bell
+              </span>
+            </div>
+
+            {broadcastList.length === 0 ? (
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
+                No active notifications found. When you broadcast a notice, it will show here!
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+                {broadcastList.map(item => (
+                  <div 
+                    key={item.id}
+                    className="flex-between"
+                    style={{
+                      background: 'rgba(255,255,255,0.03)',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      gap: '12px',
+                      flexWrap: 'wrap'
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: '220px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                        <span className="badge" style={{ fontSize: '0.62rem', background: item.type === 'alert' ? 'rgba(255,23,68,0.2)' : item.type === 'prize' ? 'rgba(0,230,118,0.2)' : 'rgba(255,87,34,0.2)' }}>
+                          {item.type?.toUpperCase()}
+                        </span>
+                        <strong style={{ fontSize: '0.85rem', color: '#fff' }}>{item.title}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: '1.3' }}>
+                        {item.message}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--secondary)', marginTop: '4px' }}>
+                        ⏰ {item.createdTimeStr || 'Recent'}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteNotification(item.id)}
+                      className="btn btn-outline"
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '0.72rem',
+                        color: 'var(--danger)',
+                        borderColor: 'rgba(255,23,68,0.4)',
+                        borderRadius: '6px'
+                      }}
+                    >
+                      🗑️ Delete
+                    </button>
                   </div>
                 ))}
               </div>

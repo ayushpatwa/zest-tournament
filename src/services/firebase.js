@@ -693,3 +693,65 @@ export const resetUserPasswordRealtime = async (identifier, verificationPhone, n
     return { success: false, error: err.message };
   }
 };
+
+/**
+ * Real-time subscription to admin broadcast notifications (Bell 🔔)
+ */
+export const subscribeToNotificationsRealtime = (onUpdate) => {
+  try {
+    const notifsCollection = collection(db, "notifications");
+    const q = query(notifsCollection, orderBy("createdAt", "desc"), limit(30));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      onUpdate(list);
+    }, (err) => {
+      console.warn("[Firebase] Notifications subscription warning:", err);
+    });
+    return unsubscribe;
+  } catch (err) {
+    console.error("[Firebase] subscribeToNotificationsRealtime error:", err);
+    return () => {};
+  }
+};
+
+/**
+ * Sends a real-time broadcast notification to all players (Bell 🔔)
+ */
+export const sendNotificationRealtime = async (notificationData) => {
+  try {
+    const notifId = `notif_${Date.now()}`;
+    const notifRef = doc(db, "notifications", notifId);
+    await setDoc(notifRef, {
+      id: notifId,
+      title: notificationData.title || 'Announcement',
+      message: notificationData.message || '',
+      type: notificationData.type || 'info', // 'alert' | 'match' | 'prize' | 'info'
+      createdAt: serverTimestamp(),
+      createdTimeStr: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + ', ' + new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+    });
+    console.log(`[Firebase Realtime] Broadcast notification sent:`, notifId);
+    return { success: true };
+  } catch (error) {
+    console.error("[Firebase] Error sending notification:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Deletes a broadcast notification from Firestore
+ */
+export const deleteNotificationRealtime = async (notificationId) => {
+  try {
+    const notifRef = doc(db, "notifications", notificationId);
+    await deleteDoc(notifRef);
+    console.log(`[Firebase Realtime] Notification deleted:`, notificationId);
+    return { success: true };
+  } catch (error) {
+    console.error("[Firebase] Error deleting notification:", error);
+    return { success: false, error: error.message };
+  }
+};
