@@ -5,6 +5,48 @@ export default function RulesPage({ setCurrentView }) {
 
   const ruleSections = [
     {
+      id: 'account_entry',
+      icon: '🔴',
+      title: 'ACCOUNT & ENTRY RULES',
+      subtitle: 'Please Read Carefully Before Joining Any Match',
+      items: [
+        '🔥 ONLY FREE FIRE MAX ALLOWED.',
+        '🚫 BANNED CHARACTERS FROM ALL MODES: ORION, A124, RYDEN.',
+        '⛔ MULTIPLE NAME OR MULTIPLE ACCOUNT USE = DIRECT BAN (Sirf 1 account allowed hai).',
+        '⚠️ NOT MENTIONED IN BIO THAT I AM HACKER (Kick or penalty as per the host).',
+        'Sirf registered players hi matches join kar sakte hain.',
+        'In-game name simple hona chahiye (Stylish fonts / symbols allowed nahi hai).',
+        '🚫 -- HACK CHAT FOUND = DIRECT BAN.',
+        'Galat naam ya incorrect information dene par: ❌ No Prize, ❌ No Refund.',
+        '🔥 MIN LEVEL-40 ALLOWED.',
+        '📹 HUD POV MUST FOR WITHDRAWAL OR UNBAN.'
+      ]
+    },
+    {
+      id: 'id_password',
+      icon: '🔑',
+      title: 'ID & PASSWORD RULES',
+      items: [
+        'Match ID & Password app me match start hone se pehle share kiya jayega.',
+        'Waiting time sirf ID share hone ke baad count hoga.',
+        'Time miss karne par Zest Tournament responsible nahi hoga.'
+      ]
+    },
+    {
+      id: 'joining_slots',
+      icon: '🚪',
+      title: 'MATCH JOINING & SLOTS RULES',
+      items: [
+        '📹 ROOM SE JOIN HONE SE PHLE RECORDING COMPULSORY HAI.',
+        'Match join karne ke baad apne allotted slot me hi raho.',
+        'Slot change ya leave karne par: ❌ Kick, ❌ No Refund.',
+        'Late join ya missed match ka refund nahi milega.',
+        'Room full hone par valid proof dene par hi refund diya jayega.',
+        'Agar host galti se wrong room ya unregistered room me ST kar deta hai, to 1st round ke andar valid proof ke sath report karna hoga (Us case me match remake kiya jayega).',
+        '1st round ke baad report accept nahi hogi aur No Refund / No Remake diya jayega.'
+      ]
+    },
+    {
       id: 'cs_lonewolf',
       icon: '⚔️',
       title: 'FAIR GAMEPLAY RULES FOR CS / LONE WOLF ETC.',
@@ -15,7 +57,7 @@ export default function RulesPage({ setCurrentView }) {
         'Zone pack strictly NOT allowed.',
         'Camping strictly NOT allowed.',
         'Unregistered players ko invite karna allowed nahi hai.',
-        '🚫 Cheating pakde jane par: BAN + Penalty'
+        '🚫 Cheating pakde jane par: BAN + Penalty.'
       ]
     },
     {
@@ -29,9 +71,9 @@ export default function RulesPage({ setCurrentView }) {
       ]
     },
     {
-      id: 'game_rules',
+      id: 'game_weapons',
       icon: '🎮',
-      title: 'GAME RULES & GUN RESTRICTIONS',
+      title: 'GAME RULES & WEAPON RESTRICTIONS',
       items: [
         'SURVIVAL: Agr matches full nhi hote to uske according prize pool change ho sakta hai (Example: TOP 10 TO 7 OR 6).',
         'SOLO PER KILL: Sab characters allowed hain except restricted characters (❌ Orion, ❌ Ryden, ❌ A124).',
@@ -51,6 +93,7 @@ export default function RulesPage({ setCurrentView }) {
         'Recording ID & Password share hone se pehle start honi chahiye.',
         'POV minimum 24 hours tak save rakhna mandatory hai.',
         'HUD AND FREE FIRE POV MUST (24 hour tak save rakhna compulsory hai, otherwise DIRECT BAN).',
+        'HUD POV MUST FOR WITHDRAWAL OR UNBAN.',
         'Proof provide na karne par: ❌ No Prize, ❌ No Refund.',
         'Opponent ka POV sirf valid proof ke saath hi demand kiya ja sakta hai (match ke 1 hour ke andar). Late requests accept nahi hongi.',
         '⚠️ POV Rule: No POV = Canceled withdrawal and coin loss.'
@@ -59,15 +102,12 @@ export default function RulesPage({ setCurrentView }) {
     {
       id: 'match_limit',
       icon: '⚠️',
-      title: 'MATCH LIMIT & HOST RULES',
-      subtitle: 'Daily Match Limit & Room ST Policy',
+      title: 'MATCH LIMIT RULES',
+      subtitle: 'Daily Match Limit Policy',
       items: [
         '✅ Only 8 matches per day allowed.',
         'Agar daily limit exceed hoti hai, toh uske baad har extra match par penalty charge lagega.',
-        'Penalty Charges: ₹8 se ₹25 per extra match (Penalty amount mode ke hisaab se apply hoga).',
-        'Agar host galti se wrong room ya unregistered room me ST kar deta hai, to 1st round ke andar valid proof ke sath report karna hoga (Us case me match remake kiya jayega).',
-        '1st round ke baad report accept nahi hogi aur No Refund / No Remake diya jayega.',
-        '🔥 MIN LEVEL-40 ALLOWED'
+        'Penalty Charges: ₹8 se ₹25 per extra match (Penalty amount mode ke hisaab se apply hoga).'
       ]
     },
     {
@@ -168,10 +208,13 @@ export default function RulesPage({ setCurrentView }) {
       <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
         {[
           { id: 'all', label: '🌟 All Rules' },
+          { id: 'account_entry', label: '🔴 Account & Entry' },
+          { id: 'id_password', label: '🔑 ID & Pass' },
+          { id: 'joining_slots', label: '🚪 Joining & Slots' },
           { id: 'cs_lonewolf', label: '⚔️ CS / Lone Wolf' },
-          { id: 'cs_headshot', label: '🎯 Headshot Rules' },
-          { id: 'game_rules', label: '🎮 Gun Restrictions' },
-          { id: 'screen_recording', label: '📹 Screen Recording & POV' },
+          { id: 'cs_headshot', label: '🎯 Headshot' },
+          { id: 'game_weapons', label: '🎮 Weapon Rules' },
+          { id: 'screen_recording', label: '📹 Screen & POV' },
           { id: 'match_limit', label: '⚠️ Match Limit' },
           { id: 'device', label: '📱 Device Rules' },
           { id: 'penalty', label: '🚫 Penalty & Ban' },
@@ -238,12 +281,12 @@ export default function RulesPage({ setCurrentView }) {
                   key={idx} 
                   style={{
                     fontSize: '0.84rem',
-                    color: item.includes('❌') || item.includes('🚫') || item.includes('⚠️') ? '#ff80ab' : 'var(--text-secondary)',
+                    color: item.includes('❌') || item.includes('🚫') || item.includes('⚠️') || item.includes('⛔') ? '#ff80ab' : 'var(--text-secondary)',
                     lineHeight: '1.5',
                     background: 'rgba(255, 255, 255, 0.02)',
                     padding: '8px 12px',
                     borderRadius: '8px',
-                    borderLeft: `3px solid ${item.includes('❌') || item.includes('🚫') ? 'var(--danger)' : item.includes('✅') ? 'var(--success)' : 'var(--primary)'}`
+                    borderLeft: `3px solid ${item.includes('❌') || item.includes('🚫') || item.includes('⛔') ? 'var(--danger)' : item.includes('✅') ? 'var(--success)' : item.includes('🔥') ? 'var(--secondary)' : 'var(--primary)'}`
                   }}
                 >
                   {item}

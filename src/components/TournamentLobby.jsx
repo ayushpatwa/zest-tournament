@@ -417,22 +417,50 @@ export default function TournamentLobby({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
             
-            {/* 1. CS / Lone Wolf Gameplay Rules */}
+            {/* 1. Account & Entry Rules */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: '#ff5252', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🔴</span> ◆ ACCOUNT & ENTRY RULES
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li><strong style={{ color: 'var(--secondary)' }}>ONLY FREE FIRE MAX ALLOWED</strong></li>
+                <li>Banned characters from all modes: ❌ Orion, ❌ A124, ❌ Ryden</li>
+                <li>Multiple name / multiple accounts = 🚫 DIRECT BAN (1 account only)</li>
+                <li>Bio me "I AM HACKER" likhne par kick/penalty host ke through</li>
+                <li>In-game name simple hona chahiye (No fancy symbols). Hack chat found = Direct Ban</li>
+                <li><strong style={{ color: 'var(--accent)' }}>MIN LEVEL-40 ALLOWED</strong> • HUD POV MUST for withdrawal/unban</li>
+              </ul>
+            </div>
+
+            {/* 2. ID & Password & Joining Rules */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: '#00e5ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🔑</span> ◆ ID, PASS & MATCH JOINING
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>Match ID & Password match start se pehle drop hoga (Waiting time ID share hone ke baad count hoga).</li>
+                <li>Time miss karne par <strong>Zest Tournament</strong> responsible nahi hoga.</li>
+                <li><strong style={{ color: '#ff4081' }}>ROOM JOIN SE PEHLE RECORDING COMPULSORY HAI.</strong></li>
+                <li>Match join karne ke baad apne allotted slot me hi rahein (Slot change/leave = Kick + No Refund).</li>
+                <li>Late join / missed match ka refund nahi milega.</li>
+              </ul>
+            </div>
+
+            {/* 3. CS / Lone Wolf Gameplay Rules */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: '#69f0ae', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>⚔️</span> ◆ CS / LONE WOLF FAIRPLAY
               </h4>
               <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                <li>Grenade NOT allowed.</li>
-                <li>Teaming, hacks, bugs aur glitches strictly NOT allowed.</li>
-                <li>Zone pack strictly NOT allowed.</li>
-                <li>Camping strictly NOT allowed.</li>
+                <li>Grenade NOT allowed • Teaming strictly NOT allowed.</li>
+                <li>Hacks, bugs aur glitches strictly NOT allowed.</li>
+                <li>Zone pack strictly NOT allowed • Camping NOT allowed.</li>
                 <li>Unregistered players ko invite karna allowed nahi hai.</li>
                 <li><strong style={{ color: '#ff80ab' }}>Cheating pakde jane par:</strong> 🚫 BAN + Penalty</li>
               </ul>
             </div>
 
-            {/* 2. CS Headshot Rule */}
+            {/* 4. CS Headshot Rule */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>🎯</span> ◆ CS HEADSHOT RULE
@@ -444,20 +472,19 @@ export default function TournamentLobby({
               </ul>
             </div>
 
-            {/* 3. Gun Restrictions & Survival */}
+            {/* 5. Gun Restrictions & Survival */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>🎮</span> ◆ GUN & CHARACTER RESTRICTIONS
+                <span>🎮</span> ◆ GUN & WEAPON RESTRICTIONS
               </h4>
               <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                 <li>SURVIVAL: Matches full na hone par prize pool rank change ho sakta hai (Top 10 to 7 or 6).</li>
-                <li>Restricted Characters: ❌ Orion, ❌ Ryden, ❌ A124.</li>
-                <li>❌ DOUBLE VECTOR AND M79 LAUNCHER STRICTLY NOT ALLOWED.</li>
+                <li>❌ Specific gun DOUBLE VECTOR AND M79 LAUNCHER STRICTLY NOT ALLOWED.</li>
                 <li>❌ Horses are banned • SURVIVAL: SNIPER NOT ALLOWED.</li>
               </ul>
             </div>
 
-            {/* 4. Screen Recording & POV */}
+            {/* 6. Screen Recording & POV */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: '#ff4081', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>📹</span> ◆ SCREEN RECORDING & POV RULES
@@ -470,7 +497,7 @@ export default function TournamentLobby({
               </ul>
             </div>
 
-            {/* 5. Match Limit Policy */}
+            {/* 7. Match Limit Policy */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>⚠️</span> ◆ MATCH LIMIT & HOST ST
@@ -478,11 +505,11 @@ export default function TournamentLobby({
               <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                 <li><strong style={{ color: 'var(--success)' }}>✅ Only 8 matches per day allowed.</strong> (Penalty: ₹8-₹25 per extra match).</li>
                 <li>Host wrong room ST karta hai to 1st round ke andar report karein (Remake hoga).</li>
-                <li><strong style={{ color: 'var(--secondary)' }}>MIN LEVEL-40 ALLOWED</strong></li>
+                <li>1st round ke baad No Refund / No Remake diya jayega.</li>
               </ul>
             </div>
 
-            {/* 6. Device & Penalty */}
+            {/* 8. Device & Penalty */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>🚫</span> ◆ DEVICE & PENALTY RULES
