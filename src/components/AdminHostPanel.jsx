@@ -320,9 +320,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
             <div className="form-group">
               <label>Match Mode</label>
               <select value={mode} onChange={(e) => setMode(e.target.value)} className="form-input">
-                <option value="Solo">Solo (1 vs 47)</option>
+                <option value="Solo">Solo (1 vs 1 / 1 vs 47)</option>
                 <option value="Duo">Duo (2 vs 2)</option>
-                <option value="Squad">Squad (4 vs 4)</option>
+                <option value="Squad">Squad (4 vs 4 / BR)</option>
               </select>
             </div>
 
@@ -331,7 +331,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
               <select value={type} onChange={(e) => setType(e.target.value)} className="form-input">
                 <option value="Classic">Classic Battle Royale</option>
                 <option value="Clash Squad">Clash Squad 4v4</option>
-                <option value="Lone Wolf">Lone Wolf 1v1</option>
+                <option value="Clash Squad Headshot">Clash Squad Headshot 4v4 🎯</option>
+                <option value="Lone Wolf Headshot 1v1">Lone Wolf Headshot 1v1 🎯</option>
+                <option value="Lone Wolf Headshot 2v2">Lone Wolf Headshot 2v2 🎯</option>
+                <option value="Lone Wolf 2v2">Lone Wolf 2v2 🐺</option>
+                <option value="Lone Wolf 1v1">Lone Wolf 1v1 🐺</option>
               </select>
             </div>
           </div>
@@ -341,6 +345,10 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
               <label>Map</label>
               <select value={mapName} onChange={(e) => setMapName(e.target.value)} className="form-input">
                 <option value="Bermuda">Bermuda</option>
+                <option value="Bermuda (CS)">Bermuda (CS)</option>
+                <option value="Iron Cage">Iron Cage (Lone Wolf)</option>
+                <option value="Iron Dome">Iron Dome (Lone Wolf)</option>
+                <option value="Science Center">Science Center (Lone Wolf)</option>
                 <option value="Purgatory">Purgatory</option>
                 <option value="Kalahari">Kalahari</option>
                 <option value="Alpine">Alpine</option>

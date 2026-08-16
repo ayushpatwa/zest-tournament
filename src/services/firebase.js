@@ -102,6 +102,90 @@ export const SEED_TOURNAMENTS = [
       { nickname: "Team_Inferno_Leader", uid: "772910481" }
     ],
     leaderboard: []
+  },
+  {
+    id: "ff_cs_headshot_04",
+    title: "Clash Squad 4v4 Headshot Masters",
+    mode: "Squad",
+    map: "Bermuda (CS)",
+    type: "Clash Squad Headshot",
+    entryFee: 100,
+    prizePool: 4500,
+    perKillPrize: 50,
+    maxSlots: 8,
+    slotsJoined: 4,
+    startTime: "Today, 09:15 PM",
+    serverStatus: "Registration Open",
+    status: "open",
+    roomId: "",
+    roomPassword: "",
+    joinedPlayers: [
+      { nickname: "HeadshotGod_OP", uid: "928374821" }
+    ],
+    leaderboard: []
+  },
+  {
+    id: "ff_lonewolf_hs_1v1_05",
+    title: "Lone Wolf 1v1 Headshot Showdown",
+    mode: "Solo",
+    map: "Iron Dome",
+    type: "Lone Wolf Headshot 1v1",
+    entryFee: 30,
+    prizePool: 1200,
+    perKillPrize: 20,
+    maxSlots: 16,
+    slotsJoined: 11,
+    startTime: "Today, 07:45 PM",
+    serverStatus: "Filling Fast",
+    status: "open",
+    roomId: "",
+    roomPassword: "",
+    joinedPlayers: [
+      { nickname: "AWM_King_1v1", uid: "482910392" }
+    ],
+    leaderboard: []
+  },
+  {
+    id: "ff_lonewolf_hs_2v2_06",
+    title: "Lone Wolf 2v2 Headshot Duo Clash",
+    mode: "Duo",
+    map: "Iron Cage",
+    type: "Lone Wolf Headshot 2v2",
+    entryFee: 60,
+    prizePool: 2500,
+    perKillPrize: 35,
+    maxSlots: 12,
+    slotsJoined: 6,
+    startTime: "Today, 08:45 PM",
+    serverStatus: "Registration Open",
+    status: "open",
+    roomId: "",
+    roomPassword: "",
+    joinedPlayers: [
+      { nickname: "Duo_Snipers", uid: "772910482" }
+    ],
+    leaderboard: []
+  },
+  {
+    id: "ff_lonewolf_2v2_07",
+    title: "Lone Wolf 2v2 Tactical Arena",
+    mode: "Duo",
+    map: "Science Center",
+    type: "Lone Wolf 2v2",
+    entryFee: 50,
+    prizePool: 2000,
+    perKillPrize: 30,
+    maxSlots: 12,
+    slotsJoined: 5,
+    startTime: "Tonight, 11:00 PM",
+    serverStatus: "Registration Open",
+    status: "open",
+    roomId: "",
+    roomPassword: "",
+    joinedPlayers: [
+      { nickname: "Tactical_Viper", uid: "582910398" }
+    ],
+    leaderboard: []
   }
 ];
 

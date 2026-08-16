@@ -93,9 +93,29 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
   }, []);
 
   const filteredTournaments = tournaments.filter(t => {
-    const matchesFilter = selectedFilter === 'All' || t.mode?.toLowerCase() === selectedFilter.toLowerCase();
+    const filter = selectedFilter.toLowerCase();
+    let matchesFilter = false;
+    
+    if (selectedFilter === 'All') {
+      matchesFilter = true;
+    } else if (selectedFilter === 'CS Headshot' || selectedFilter === 'CS Headshot 🎯') {
+      matchesFilter = (t.type?.toLowerCase().includes('headshot') && t.type?.toLowerCase().includes('clash')) || t.title?.toLowerCase().includes('headshot');
+    } else if (selectedFilter === 'Lone Wolf 1v1' || selectedFilter === 'Lone Wolf 1v1 🐺') {
+      matchesFilter = t.type?.toLowerCase().includes('lone wolf') && (t.type?.toLowerCase().includes('1v1') || t.mode?.toLowerCase() === 'solo');
+    } else if (selectedFilter === 'Lone Wolf 2v2' || selectedFilter === 'Lone Wolf 2v2 🐺') {
+      matchesFilter = t.type?.toLowerCase().includes('lone wolf') && (t.type?.toLowerCase().includes('2v2') || t.mode?.toLowerCase() === 'duo');
+    } else if (selectedFilter === 'Headshot Only' || selectedFilter === 'Headshot Only 🎯') {
+      matchesFilter = t.type?.toLowerCase().includes('headshot') || t.title?.toLowerCase().includes('headshot');
+    } else if (selectedFilter === 'Clash Squad' || selectedFilter === 'Clash Squad ⚔️') {
+      matchesFilter = t.type?.toLowerCase().includes('clash') || t.title?.toLowerCase().includes('clash');
+    } else {
+      matchesFilter = t.mode?.toLowerCase() === filter || t.type?.toLowerCase().includes(filter);
+    }
+
     const matchesSearch = t.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          t.map?.toLowerCase().includes(searchQuery.toLowerCase());
+                          t.map?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          t.type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          t.mode?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -261,7 +281,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
             <input 
               type="text" 
-              placeholder="🔍 Search tournament by map, title..." 
+              placeholder="🔍 Search matches by type, map, mode..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="form-input"
@@ -270,22 +290,35 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
 
             {/* Mode Filter Pills */}
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-              {['All', 'Solo', 'Duo', 'Squad'].map(mode => (
+              {[
+                'All', 
+                'CS Headshot 🎯', 
+                'Lone Wolf 1v1 🐺', 
+                'Lone Wolf 2v2 🐺', 
+                'Solo', 
+                'Duo', 
+                'Squad', 
+                'Clash Squad ⚔️', 
+                'Headshot Only 🎯'
+              ].map(mode => (
                 <button
                   key={mode}
                   onClick={() => setSelectedFilter(mode)}
                   style={{
-                    background: selectedFilter === mode ? 'var(--secondary)' : 'rgba(255, 255, 255, 0.05)',
+                    background: selectedFilter === mode 
+                      ? (mode.includes('🎯') ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' : 'var(--secondary)') 
+                      : 'rgba(255, 255, 255, 0.05)',
                     color: selectedFilter === mode ? '#000' : 'var(--text-primary)',
                     border: selectedFilter === mode ? 'none' : '1px solid var(--border-color)',
-                    padding: '8px 16px',
+                    padding: '8px 14px',
                     borderRadius: '20px',
-                    fontSize: '0.75rem',
+                    fontSize: '0.74rem',
                     fontWeight: '700',
                     fontFamily: 'var(--font-heading)',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
-                    transition: 'all 0.2s ease'
+                    transition: 'all 0.2s ease',
+                    boxShadow: selectedFilter === mode && mode.includes('🎯') ? '0 0 12px rgba(255,214,0,0.4)' : 'none'
                   }}
                 >
                   {mode}
@@ -325,16 +358,36 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                   >
                     {/* Header info */}
                     <div className="flex-between">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                         <span className={`badge ${
                           t.status === 'live' ? 'badge-live' : 
                           t.status === 'upcoming' ? 'badge-upcoming' : 'badge-completed'
                         }`}>
                           {t.status || 'open'}
                         </span>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          {t.mode} • {t.type}
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {t.mode}
                         </span>
+                        {t.type?.toLowerCase().includes('headshot') && (
+                          <span className="badge" style={{ background: 'linear-gradient(135deg, rgba(255,214,0,0.2) 0%, rgba(255,87,34,0.2) 100%)', color: 'var(--accent)', border: '1px solid rgba(255,214,0,0.4)', fontSize: '0.65rem', fontWeight: '900' }}>
+                            🎯 HEADSHOT ONLY
+                          </span>
+                        )}
+                        {t.type?.toLowerCase().includes('lone wolf') && (
+                          <span className="badge" style={{ background: 'rgba(0, 229, 255, 0.15)', color: 'var(--secondary)', border: '1px solid rgba(0, 229, 255, 0.3)', fontSize: '0.65rem', fontWeight: '700' }}>
+                            🐺 {t.type}
+                          </span>
+                        )}
+                        {t.type === 'Clash Squad' && (
+                          <span className="badge" style={{ background: 'rgba(255, 87, 34, 0.15)', color: 'var(--primary)', border: '1px solid rgba(255, 87, 34, 0.3)', fontSize: '0.65rem', fontWeight: '700' }}>
+                            ⚔️ CS 4v4
+                          </span>
+                        )}
+                        {t.type === 'Classic' && (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            • Battle Royale
+                          </span>
+                        )}
                       </div>
 
                       <div style={{ fontSize: '0.8rem' }}>
