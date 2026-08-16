@@ -7,6 +7,7 @@ import {
   getDoc,
   getDocs, 
   updateDoc, 
+  deleteDoc,
   onSnapshot, 
   arrayUnion, 
   increment,
@@ -246,6 +247,21 @@ export const saveTournamentRealtime = async (tournamentData) => {
     return { success: true, id: tourneyId };
   } catch (error) {
     console.error("[Firebase] Error saving tournament:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Deletes a tournament from Firestore in real-time
+ */
+export const deleteTournamentRealtime = async (tournamentId) => {
+  try {
+    const tourneyRef = doc(db, "tournaments", tournamentId);
+    await deleteDoc(tourneyRef);
+    console.log(`[Firebase] Deleted tournament: ${tournamentId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("[Firebase] Error deleting tournament:", error);
     return { success: false, error: error.message };
   }
 };

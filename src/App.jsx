@@ -11,6 +11,7 @@ import { sendToMakeWebhook } from './services/webhookService';
 import { 
   subscribeToTournamentsRealtime, 
   saveTournamentRealtime, 
+  deleteTournamentRealtime,
   joinTournamentRealtime, 
   updateRoomCredentialsRealtime,
   saveUserProfileRealtime,
@@ -177,6 +178,12 @@ export default function App() {
     await saveTournamentRealtime(newTourney);
   };
 
+  // Delete tournament via Admin Panel -> Direct to Firebase
+  const handleDeleteTournament = async (tournamentId) => {
+    setTournaments(prev => prev.filter(t => t.id !== tournamentId));
+    await deleteTournamentRealtime(tournamentId);
+  };
+
   // Broadcast Room ID in real-time
   const handleBroadcastRoomCredentials = async (tournamentId, roomId, roomPass) => {
     await updateRoomCredentialsRealtime(tournamentId, roomId, roomPass);
@@ -260,6 +267,7 @@ export default function App() {
           <AdminHostPanel 
             tournaments={tournaments}
             onAddTournament={handleAddTournament}
+            onDeleteTournament={handleDeleteTournament}
             onBroadcastRoomCredentials={handleBroadcastRoomCredentials}
             setCurrentView={setCurrentView}
           />

@@ -10,8 +10,8 @@ const MOCK_NICKNAMES = [
   "Ruler_OP", "GamerBoy", "SniperQueen", "Torn_Max", "GarenaX"
 ];
 
-export default function AdminHostPanel({ tournaments = [], onAddTournament, onBroadcastRoomCredentials, setCurrentView }) {
-  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'proofs' | 'razorpay' | 'webhook'
+export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView }) {
+  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'manage' | 'razorpay' | 'webhook'
   
   // Host Form states
   const [title, setTitle] = useState('');
@@ -23,6 +23,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
   const [slotsTotal, setSlotsTotal] = useState('48');
   const [startingIn, setStartingIn] = useState('30');
   const [errorMsg, setErrorMsg] = useState('');
+  const [deleteStatusMsg, setDeleteStatusMsg] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
 
   // Room ID Broadcast states
   const [selectedTourneyId, setSelectedTourneyId] = useState(tournaments[0]?.id || '');
@@ -154,6 +156,19 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
     }
   };
 
+  const handleDeleteMatch = async (tournamentId, tournamentTitle) => {
+    if (!window.confirm(`Are you sure you want to permanently delete "${tournamentTitle}"? This cannot be undone.`)) {
+      return;
+    }
+    setDeletingId(tournamentId);
+    if (onDeleteTournament) {
+      await onDeleteTournament(tournamentId);
+      setDeleteStatusMsg(`✅ Successfully deleted "${tournamentTitle}" in real-time.`);
+      setTimeout(() => setDeleteStatusMsg(''), 4000);
+    }
+    setDeletingId(null);
+  };
+
   const handleApprovePayout = async (proof) => {
     const placementPrize = proof.rank === 1 ? 500 : proof.rank === 2 ? 300 : proof.rank === 3 ? 150 : 50;
     const killPrize = (proof.kills || 0) * 25;
@@ -261,6 +276,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
             }}
           >
             🔑 Room ID Drop
+          </button>
+
+          <button
+            onClick={() => setActiveTab('manage')}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              background: activeTab === 'manage' ? 'var(--danger)' : 'rgba(255,255,255,0.05)',
+              color: '#fff',
+              border: '1px solid var(--border-color)',
+              fontWeight: '700'
+            }}
+          >
+            🗑️ Delete Matches ({tournaments.length})
           </button>
 
           <button
@@ -530,7 +561,88 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
         </form>
       )}
 
-      {/* MODE 3: RAZORPAY PAYMENT GATEWAY CONFIGURATION */}
+      {/* MODE 3: MANAGE & DELETE TOURNAMENTS */}
+      {activeTab === 'manage' && (
+        <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', color: 'var(--danger)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>🗑️</span> Manage & Delete Tournaments ({tournaments.length})
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+              Permanently remove tournament matches from the Arena and Firebase database in real-time.
+            </p>
+          </div>
+
+          {deleteStatusMsg && (
+            <div style={{ color: 'var(--success)', background: 'rgba(0,230,118,0.1)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--success)', fontSize: '0.85rem' }}>
+              {deleteStatusMsg}
+            </div>
+          )}
+
+          {tournaments.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0' }}>
+              No matches found in the catalog.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {tournaments.map(t => (
+                <div 
+                  key={t.id} 
+                  className="glass-panel flex-between"
+                  style={{
+                    padding: '14px 16px',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '10px',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#fff' }}>
+                        {t.title}
+                      </h4>
+                      <span className="badge" style={{ fontSize: '0.65rem' }}>
+                        {t.mode} • {t.type}
+                      </span>
+                      {t.roomId && (
+                        <span className="badge badge-live" style={{ fontSize: '0.65rem' }}>
+                          Room: {t.roomId}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '12px' }}>
+                      <span>🗺️ {t.map}</span>
+                      <span>💰 Prize: ₹{t.prizePool}</span>
+                      <span>👥 Slots: {t.slotsJoined || 0}/{t.slotsTotal || t.maxSlots || 48}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleDeleteMatch(t.id, t.title)}
+                    disabled={deletingId === t.id}
+                    className="btn btn-danger"
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: '0.78rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>🗑️</span> {deletingId === t.id ? 'Deleting...' : 'Delete Match'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MODE 4: RAZORPAY PAYMENT GATEWAY CONFIGURATION */}
       {activeTab === 'razorpay' && (
         <form onSubmit={handleSaveRazorpayConfig} className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
