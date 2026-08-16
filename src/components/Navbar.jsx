@@ -39,26 +39,27 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
       {/* Top Header Bar */}
       <header style={{
         width: '100%',
-        background: 'rgba(15, 18, 29, 0.95)',
+        background: 'rgba(15, 18, 29, 0.96)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         position: 'sticky',
         top: 0,
         zIndex: 1000,
-        paddingTop: 'calc(var(--safe-area-top) + 8px)',
-        paddingBottom: '8px',
-        paddingLeft: '16px',
-        paddingRight: '16px',
+        paddingTop: 'calc(var(--safe-area-top) + 6px)',
+        paddingBottom: '6px',
+        paddingLeft: '10px',
+        paddingRight: '10px',
         boxShadow: '0 4px 20px rgba(0,0,0,0.6)'
       }}>
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          height: '48px',
+          height: '42px',
           maxWidth: '1200px',
-          margin: '0 auto'
+          margin: '0 auto',
+          gap: '6px'
         }}>
           {/* Left: Brand Logo and Title */}
           <div 
@@ -66,40 +67,44 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              gap: '10px', 
-              cursor: 'pointer' 
+              gap: '7px', 
+              cursor: 'pointer',
+              minWidth: 0,
+              flexShrink: 0
             }}
           >
             <div style={{
               background: isAdmin 
                 ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' 
                 : 'linear-gradient(135deg, var(--primary) 0%, #ff1744 100%)',
-              width: '38px',
-              height: '38px',
-              borderRadius: '10px',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontFamily: 'var(--font-heading)',
               fontWeight: '900',
-              fontSize: '1.3rem',
+              fontSize: '1.1rem',
               color: '#fff',
-              boxShadow: isAdmin ? '0 0 15px rgba(255, 214, 0, 0.5)' : 'var(--glow-primary)'
+              boxShadow: isAdmin ? '0 0 12px rgba(255, 214, 0, 0.4)' : 'var(--glow-primary)',
+              flexShrink: 0
             }}>
               {isAdmin ? '👑' : '🔥'}
             </div>
 
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <h1 style={{ 
-                  fontSize: '1.15rem', 
+                  fontSize: '0.98rem', 
                   margin: 0,
                   fontFamily: 'var(--font-heading)',
                   fontWeight: '900',
                   background: 'linear-gradient(90deg, #ffffff 30%, var(--primary) 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
-                  letterSpacing: '1px'
+                  letterSpacing: '0.5px',
+                  lineHeight: '1.1'
                 }}>
                   ZEST
                 </h1>
@@ -108,10 +113,12 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                     background: 'rgba(255, 214, 0, 0.2)', 
                     color: 'var(--accent)', 
                     border: '1px solid rgba(255, 214, 0, 0.4)',
-                    fontSize: '0.6rem',
-                    padding: '2px 6px',
+                    fontSize: '0.52rem',
+                    padding: '1px 4px',
                     borderRadius: '4px',
-                    fontWeight: '900'
+                    fontWeight: '900',
+                    lineHeight: '1.1',
+                    whiteSpace: 'nowrap'
                   }}>
                     👑 ADMIN
                   </span>
@@ -120,53 +127,62 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                     background: 'rgba(255,87,34,0.15)', 
                     color: 'var(--primary)', 
                     border: '1px solid rgba(255,87,34,0.3)',
-                    fontSize: '0.6rem',
-                    padding: '2px 5px',
-                    borderRadius: '4px'
+                    fontSize: '0.52rem',
+                    padding: '1px 4px',
+                    borderRadius: '4px',
+                    lineHeight: '1.1',
+                    whiteSpace: 'nowrap'
                   }}>
                     FREE FIRE
                   </span>
                 )}
               </div>
               <span style={{ 
-                fontSize: '0.65rem', 
+                fontSize: '0.58rem', 
                 color: isAdmin ? 'var(--accent)' : 'var(--secondary)', 
                 fontFamily: 'var(--font-heading)',
-                letterSpacing: '0.5px',
-                fontWeight: '700'
+                letterSpacing: '0.3px',
+                fontWeight: '700',
+                display: 'block',
+                marginTop: '1px'
               }}>
                 ● {getPageTitle()}
               </span>
             </div>
           </div>
 
-          {/* Right: Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Right: Compact Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
             
-            {/* Telegram Contact Us Support Button */}
+            {/* Telegram Support Button */}
             <a
               href="https://t.me/zesttournament"
               target="_blank"
               rel="noopener noreferrer"
+              title="Official Telegram Support"
               style={{
                 background: 'linear-gradient(135deg, rgba(0, 136, 204, 0.25) 0%, rgba(0, 229, 255, 0.15) 100%)',
                 border: '1px solid #0088cc',
                 color: '#00e5ff',
-                padding: '5px 10px',
-                borderRadius: '16px',
+                height: '30px',
+                padding: '0 7px',
+                borderRadius: '15px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                fontSize: '0.72rem',
+                justifyContent: 'center',
+                gap: '3px',
+                fontSize: '0.68rem',
                 fontFamily: 'var(--font-heading)',
-                fontWeight: '700',
+                fontWeight: '800',
                 textDecoration: 'none',
                 cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0, 136, 204, 0.3)'
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(0, 136, 204, 0.25)',
+                flexShrink: 0
               }}
             >
-              <span>✈️</span>
-              <span>CONTACT US</span>
+              <span style={{ fontSize: '0.75rem' }}>✈️</span>
+              <span style={{ letterSpacing: '0.2px' }}>HELP</span>
             </a>
 
             {/* Wallet Cash Button */}
@@ -174,21 +190,24 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
               onClick={() => setCurrentView('wallet')}
               className="flex-center" 
               style={{ 
-                background: 'linear-gradient(135deg, rgba(255,214,0,0.1) 0%, rgba(255,87,34,0.1) 100%)',
-                border: '1px solid rgba(255, 214, 0, 0.3)',
-                padding: '6px 12px',
-                borderRadius: '20px',
-                gap: '6px',
+                background: 'linear-gradient(135deg, rgba(255,214,0,0.12) 0%, rgba(255,87,34,0.12) 100%)',
+                border: '1px solid rgba(255, 214, 0, 0.35)',
+                height: '30px',
+                padding: '0 8px',
+                borderRadius: '15px',
+                gap: '4px',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
             >
-              <span style={{ fontSize: '0.85rem' }}>🪙</span>
+              <span style={{ fontSize: '0.75rem' }}>🪙</span>
               <span style={{ 
                 fontFamily: 'var(--font-heading)', 
-                fontSize: '0.85rem', 
-                fontWeight: '700',
+                fontSize: '0.78rem', 
+                fontWeight: '900',
                 color: 'var(--accent)'
               }}>
                 ₹{walletBalance}
@@ -196,35 +215,36 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
             </div>
 
             {/* Notifications Button */}
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
               <button 
                 onClick={toggleNotifications}
                 style={{
                   background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid var(--border-color)',
-                  width: '36px',
-                  height: '36px',
+                  width: '30px',
+                  height: '30px',
                   borderRadius: '50%',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#fff',
-                  fontSize: '1rem',
-                  position: 'relative'
+                  fontSize: '0.85rem',
+                  position: 'relative',
+                  padding: 0
                 }}
               >
                 🔔
                 {unreadCount > 0 && (
                   <span style={{
                     position: 'absolute',
-                    top: '0px',
-                    right: '0px',
+                    top: '-1px',
+                    right: '-1px',
                     background: 'var(--danger)',
-                    width: '9px',
-                    height: '9px',
+                    width: '8px',
+                    height: '8px',
                     borderRadius: '50%',
-                    boxShadow: '0 0 8px var(--danger)'
+                    boxShadow: '0 0 6px var(--danger)'
                   }} />
                 )}
               </button>
@@ -235,22 +255,22 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                   className="glass-panel animate-slide-in" 
                   style={{
                     position: 'absolute',
-                    top: '46px',
-                    right: '0',
-                    width: '310px',
-                    padding: '14px',
+                    top: '38px',
+                    right: '-10px',
+                    width: '290px',
+                    padding: '12px',
                     zIndex: 2000,
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '10px',
-                    maxHeight: '360px',
+                    gap: '8px',
+                    maxHeight: '340px',
                     overflowY: 'auto',
                     border: '1px solid rgba(255,255,255,0.15)',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.85)'
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.9)'
                   }}
                 >
                   <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>
-                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
+                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.75rem', fontWeight: '700', color: 'var(--secondary)' }}>
                       📢 NOTIFICATIONS ({cloudNotifications.length})
                     </span>
                     <span 
@@ -259,14 +279,14 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                         setReadNotifIds(allIds);
                         localStorage.setItem('zest_read_notif_ids', JSON.stringify(allIds));
                       }} 
-                      style={{ fontSize: '0.7rem', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}
+                      style={{ fontSize: '0.65rem', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}
                     >
                       Mark all read
                     </span>
                   </div>
 
                   {cloudNotifications.length === 0 ? (
-                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', fontSize: '0.8rem' }}>
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', fontSize: '0.75rem' }}>
                       🔔 No announcements yet. When the admin posts tournament notices, they will appear here!
                     </div>
                   ) : (
@@ -274,9 +294,9 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                       const isUnread = !readNotifIds.includes(n.id);
                       return (
                         <div key={n.id} style={{
-                          fontSize: '0.78rem',
+                          fontSize: '0.74rem',
                           lineHeight: '1.35',
-                          padding: '10px 12px',
+                          padding: '8px 10px',
                           borderRadius: '8px',
                           background: isUnread ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255, 255, 255, 0.03)',
                           borderLeft: `3px solid ${n.type === 'alert' ? 'var(--danger)' : n.type === 'prize' ? 'var(--success)' : 'var(--primary)'}`,
@@ -284,17 +304,17 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                           color: 'var(--text-primary)',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '4px'
+                          gap: '3px'
                         }}>
                           <div className="flex-between" style={{ gap: '6px' }}>
-                            <strong style={{ color: '#fff', fontSize: '0.82rem' }}>
+                            <strong style={{ color: '#fff', fontSize: '0.78rem' }}>
                               {n.title || 'Match Notice'}
                             </strong>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                            <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
                               {n.createdTimeStr || 'Just now'}
                             </span>
                           </div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
                             {n.message}
                           </div>
                         </div>
@@ -309,8 +329,8 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
             <div 
               onClick={() => setCurrentView('profile')}
               style={{
-                width: '36px',
-                height: '36px',
+                width: '30px',
+                height: '30px',
                 borderRadius: '50%',
                 background: isAdmin 
                   ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' 
@@ -318,10 +338,11 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.1rem',
+                fontSize: '0.95rem',
                 cursor: 'pointer',
                 border: '1px solid rgba(255,255,255,0.2)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                flexShrink: 0
               }}
             >
               {isAdmin ? '👑' : '🦊'}
@@ -337,7 +358,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
           background: isAdmin 
             ? 'linear-gradient(90deg, #ffd600 0%, var(--primary) 50%, var(--secondary) 100%)' 
             : 'linear-gradient(90deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%)',
-          marginTop: '6px',
+          marginTop: '4px',
           opacity: 0.8
         }} />
       </header>
