@@ -479,7 +479,7 @@ export const subscribeToAllUsersRealtime = (onUpdate) => {
 /**
  * Credits money into a user's wallet in Firestore and updates cloud balance in real-time
  */
-export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tournament Prize Winnings') => {
+export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tournament Prize Winnings', reason = '') => {
   try {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -508,21 +508,36 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       }
     });
 
-    // 2. If doc exists in Firestore, atomically increment wallet & earnings
+    const dateStr = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const finalReason = reason || title || 'Tournament Prize / Winning';
+    const txRecord = {
+      id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      type: 'credit',
+      amount: numAmount,
+      title: title || 'Admin Coin Credit',
+      reason: finalReason,
+      date: dateStr,
+      status: 'Success',
+      createdAt: new Date().toISOString()
+    };
+
+    // 2. If doc exists in Firestore, atomically increment wallet & earnings and push transaction
     if (targetDocId) {
       const targetRef = doc(db, "users", targetDocId);
       await setDoc(targetRef, {
         wallet: increment(numAmount),
         "stats.earnings": increment(numAmount),
+        transactions: arrayUnion(txRecord),
         lastPrize: {
           amount: numAmount,
           title: title,
+          reason: finalReason,
           creditedAt: new Date().toISOString()
         },
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      console.log(`[Firebase Realtime] Successfully credited ₹${numAmount} to user ${targetDocId}`);
+      console.log(`[Firebase Realtime] Successfully credited ₹${numAmount} to user ${targetDocId} with reason: ${finalReason}`);
       return { success: true, user: { ...targetUserData, wallet: (targetUserData.wallet || 0) + numAmount } };
     }
 
@@ -532,6 +547,7 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       uid: rawQuery,
       nickname: rawQuery,
       wallet: numAmount,
+      transactions: [txRecord],
       stats: {
         matches: 1,
         wins: 1,
@@ -541,6 +557,7 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       lastPrize: {
         amount: numAmount,
         title: title,
+        reason: finalReason,
         creditedAt: new Date().toISOString()
       },
       updatedAt: serverTimestamp()
@@ -590,18 +607,32 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
       const currentWallet = typeof targetUserData.wallet === 'number' ? targetUserData.wallet : (parseFloat(targetUserData.wallet) || 0);
       const newBalance = Math.max(0, currentWallet - numAmount);
       const targetRef = doc(db, "users", targetDocId);
+
+      const dateStr = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      const finalReason = reason || 'Penalty / Balance Adjustment';
+      const txRecord = {
+        id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        type: 'penalty',
+        amount: numAmount,
+        title: `Deduction: ${finalReason}`,
+        reason: finalReason,
+        date: dateStr,
+        status: 'Deducted',
+        createdAt: new Date().toISOString()
+      };
       
       await setDoc(targetRef, {
         wallet: newBalance,
+        transactions: arrayUnion(txRecord),
         lastDeduction: {
           amount: numAmount,
-          reason: reason,
+          reason: finalReason,
           deductedAt: new Date().toISOString()
         },
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      console.log(`[Firebase Realtime] Successfully deducted ₹${numAmount} from user ${targetDocId}. New Balance: ₹${newBalance}`);
+      console.log(`[Firebase Realtime] Successfully deducted ₹${numAmount} from user ${targetDocId} with reason: ${finalReason}. New Balance: ₹${newBalance}`);
       return { success: true, user: { ...targetUserData, wallet: newBalance }, newBalance };
     }
 

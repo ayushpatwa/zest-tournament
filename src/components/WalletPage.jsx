@@ -227,43 +227,82 @@ export default function WalletPage({
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {transactions.map(tx => (
-              <div 
-                key={tx.id}
-                className="glass-panel flex-between animate-slide-in"
-                style={{
-                  padding: '12px 16px',
-                  background: 'rgba(24, 29, 48, 0.4)',
-                  border: '1px solid rgba(255,255,255,0.03)'
-                }}
-              >
-                <div>
-                  <h4 style={{ fontSize: '0.85rem', color: '#fff', fontWeight: '600', margin: 0 }}>
-                    {tx.title}
-                  </h4>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {tx.date}
-                  </span>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ 
-                    fontFamily: 'var(--font-heading)', 
-                    fontWeight: '700',
-                    fontSize: '0.95rem',
-                    color: tx.type === 'deposit' || tx.type === 'winning' ? 'var(--success)' : 'var(--danger)'
-                  }}>
-                    {tx.type === 'deposit' || tx.type === 'winning' ? '+' : '-'} ₹{tx.amount}
-                  </span>
-                  <div style={{ 
-                    fontSize: '0.65rem', 
-                    color: tx.status === 'Success' ? 'var(--success)' : 'var(--accent)', 
-                    marginTop: '2px' 
-                  }}>
-                    ● {tx.status}
+            {transactions.map(tx => {
+              const isCredit = tx.type === 'deposit' || tx.type === 'winning' || tx.type === 'credit';
+              const isPenalty = tx.type === 'penalty' || tx.type === 'deduction';
+              
+              return (
+                <div 
+                  key={tx.id}
+                  className="glass-panel flex-between animate-slide-in"
+                  style={{
+                    padding: '14px 16px',
+                    background: isPenalty 
+                      ? 'rgba(255, 23, 68, 0.05)' 
+                      : (isCredit ? 'rgba(0, 230, 118, 0.04)' : 'rgba(24, 29, 48, 0.5)'),
+                    border: isPenalty 
+                      ? '1px solid rgba(255, 23, 68, 0.25)' 
+                      : (isCredit ? '1px solid rgba(0, 230, 118, 0.2)' : '1px solid rgba(255,255,255,0.06)'),
+                    borderRadius: '12px',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '1rem' }}>
+                        {isPenalty ? '🔻' : (isCredit ? '🟢' : '📤')}
+                      </span>
+                      <h4 style={{ fontSize: '0.88rem', color: '#fff', fontWeight: '700', margin: 0 }}>
+                        {tx.title}
+                      </h4>
+                    </div>
+
+                    {/* Display Reason if present */}
+                    {tx.reason && (
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        fontSize: '0.74rem',
+                        color: isPenalty ? '#ff80ab' : '#80d8ff',
+                        background: isPenalty ? 'rgba(255, 23, 68, 0.12)' : 'rgba(0, 229, 255, 0.1)',
+                        border: `1px solid ${isPenalty ? 'rgba(255, 23, 68, 0.3)' : 'rgba(0, 229, 255, 0.25)'}`,
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        marginTop: '6px',
+                        fontWeight: '600'
+                      }}>
+                        <span>{isPenalty ? '⚠️' : '📝'} Reason:</span>
+                        <span>{tx.reason}</span>
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      🕒 {tx.date}
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right', minWidth: '75px' }}>
+                    <span style={{ 
+                      fontFamily: 'var(--font-heading)', 
+                      fontWeight: '900',
+                      fontSize: '1.05rem',
+                      color: isCredit ? 'var(--success)' : 'var(--danger)'
+                    }}>
+                      {isCredit ? '+' : '-'} ₹{tx.amount}
+                    </span>
+                    <div style={{ 
+                      fontSize: '0.68rem', 
+                      color: tx.status === 'Success' ? 'var(--success)' : (tx.status === 'Deducted' ? 'var(--danger)' : 'var(--accent)'), 
+                      marginTop: '3px',
+                      fontWeight: '700'
+                    }}>
+                      ● {tx.status || (isCredit ? 'Credited' : 'Deducted')}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

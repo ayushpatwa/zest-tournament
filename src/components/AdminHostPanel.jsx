@@ -919,15 +919,65 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             </div>
 
             <div className="form-group">
-              <label>{walletAction === 'credit' ? 'Prize Reason / Match Title' : 'Reason for Coin Deduction'}</label>
+              <label>{walletAction === 'credit' ? 'Prize Reason / Remarks' : 'Reason for Coin Deduction / Penalty'} <span style={{ color: 'var(--primary)' }}>*</span></label>
               <input 
                 type="text" 
                 value={payoutReason} 
                 onChange={(e) => setPayoutReason(e.target.value)} 
-                placeholder={walletAction === 'credit' ? "e.g. 1st Place Winner - CS 2v2" : "e.g. Penalty / Offline Payout Completed"}
+                placeholder={walletAction === 'credit' ? "e.g. 1st Place Winner - CS 2v2" : "e.g. DPI Penalty / Daily Match Limit Exceeded"}
                 className="form-input"
                 required
               />
+              <div style={{ display: 'flex', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                {walletAction === 'credit' ? [
+                  '1st Place Winner 🏆',
+                  '2nd Place Runner-Up 🥈',
+                  'Per-Kill Bounty 🎯',
+                  'Match Remake Refund 🔄',
+                  'Bonus Reward ⭐'
+                ].map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setPayoutReason(r)}
+                    style={{
+                      background: payoutReason === r ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255,255,255,0.06)',
+                      border: payoutReason === r ? '1px solid var(--success)' : '1px solid rgba(255,255,255,0.1)',
+                      color: payoutReason === r ? '#00e676' : 'var(--text-muted)',
+                      borderRadius: '12px',
+                      padding: '2px 8px',
+                      fontSize: '0.68rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {r}
+                  </button>
+                )) : [
+                  'DPI Violation Penalty (-₹20) 🚫',
+                  'Daily Match Limit Exceeded ⚠️',
+                  'No POV Submission Penalty 📹',
+                  'Teaming / Hack Violation ⛔',
+                  'Late Join / Missed Match 🔻',
+                  'Manual Balance Adjustment'
+                ].map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setPayoutReason(r)}
+                    style={{
+                      background: payoutReason === r ? 'rgba(255, 23, 68, 0.2)' : 'rgba(255,255,255,0.06)',
+                      border: payoutReason === r ? '1px solid var(--danger)' : '1px solid rgba(255,255,255,0.1)',
+                      color: payoutReason === r ? '#ff5252' : 'var(--text-muted)',
+                      borderRadius: '12px',
+                      padding: '2px 8px',
+                      fontSize: '0.68rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

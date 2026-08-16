@@ -126,6 +126,15 @@ export default function App() {
         if (typeof liveUserData.wallet === 'number') {
           setWalletBalance(liveUserData.wallet);
         }
+        if (Array.isArray(liveUserData.transactions) && liveUserData.transactions.length > 0) {
+          // Sort newest transactions first
+          const sorted = [...liveUserData.transactions].sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return timeB - timeA;
+          });
+          setTransactions(sorted);
+        }
         setUserProfile(prev => ({
           ...prev,
           ...liveUserData,
