@@ -555,3 +555,59 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Deducts / penalizes coins from a user's wallet in Firestore in real-time
+ */
+export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Penalty / Adjustment') => {
+  try {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return { success: false, error: 'Please enter a valid positive deduction amount.' };
+    }
+
+    const queryStr = String(uidOrEmail).trim().toLowerCase();
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    
+    let targetDocId = null;
+    let targetUserData = null;
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
+      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
+      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
+      const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
+
+      if (docIdMatch || uidMatch || emailMatch || nickMatch) {
+        targetDocId = docSnap.id;
+        targetUserData = data;
+      }
+    });
+
+    if (targetDocId) {
+      const currentWallet = typeof targetUserData.wallet === 'number' ? targetUserData.wallet : (parseFloat(targetUserData.wallet) || 0);
+      const newBalance = Math.max(0, currentWallet - numAmount);
+      const targetRef = doc(db, "users", targetDocId);
+      
+      await setDoc(targetRef, {
+        wallet: newBalance,
+        lastDeduction: {
+          amount: numAmount,
+          reason: reason,
+          deductedAt: new Date().toISOString()
+        },
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      console.log(`[Firebase Realtime] Successfully deducted ₹${numAmount} from user ${targetDocId}. New Balance: ₹${newBalance}`);
+      return { success: true, user: { ...targetUserData, wallet: newBalance }, newBalance };
+    }
+
+    return { success: false, error: 'Player account not found in Firebase database.' };
+  } catch (error) {
+    console.error("[Firebase] Error deducting user wallet:", error);
+    return { success: false, error: error.message };
+  }
+};

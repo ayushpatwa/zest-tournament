@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 import { getRazorpayConfig, setRazorpayConfig } from '../services/razorpayService';
-import { saveAppSettingsRealtime, creditUserWalletRealtime, subscribeToAllUsersRealtime } from '../services/firebase';
+import { 
+  saveAppSettingsRealtime, 
+  creditUserWalletRealtime, 
+  deductUserWalletRealtime, 
+  subscribeToAllUsersRealtime 
+} from '../services/firebase';
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView }) {
   const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'manage' | 'razorpay' | 'webhook' | 'app_update'
@@ -20,7 +25,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   const [deleteStatusMsg, setDeleteStatusMsg] = useState('');
   const [deletingId, setDeletingId] = useState(null);
 
-  // Prize Distribution states
+  // Prize & Wallet Manager states
+  const [walletAction, setWalletAction] = useState('credit'); // 'credit' | 'deduct'
   const [payoutPlayerIdentifier, setPayoutPlayerIdentifier] = useState('');
   const [payoutAmount, setPayoutAmount] = useState('500');
   const [payoutReason, setPayoutReason] = useState('1st Place Tournament Winner 🏆');
@@ -276,25 +282,46 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     setPayoutStatus('');
     const amt = parseFloat(payoutAmount);
     if (!payoutPlayerIdentifier.trim() || isNaN(amt) || amt <= 0) {
-      setPayoutStatus('⚠️ Please enter player UID/Email and a valid prize amount.');
+      setPayoutStatus('⚠️ Please enter player UID/Email and a valid amount.');
       return;
     }
     setPayoutLoading(true);
-    const res = await creditUserWalletRealtime(payoutPlayerIdentifier.trim(), amt, payoutReason.trim());
-    if (res.success) {
-      setPayoutStatus(`✅ Successfully credited ₹${amt} prize to player (${payoutPlayerIdentifier})!`);
-      await sendToMakeWebhook({
-        eventType: 'PRIZE_PAYOUT',
-        nickname: res.user?.nickname || payoutPlayerIdentifier,
-        ffUid: res.user?.uid || payoutPlayerIdentifier,
-        email: res.user?.email || 'N/A',
-        phone: res.user?.phone || 'N/A',
-        details: `Admin Credited Prize: ₹${amt} (${payoutReason})`
-      });
-      setPayoutPlayerIdentifier('');
+
+    if (walletAction === 'credit') {
+      const res = await creditUserWalletRealtime(payoutPlayerIdentifier.trim(), amt, payoutReason.trim());
+      if (res.success) {
+        setPayoutStatus(`✅ Successfully credited ₹${amt} coins to player (${payoutPlayerIdentifier})!`);
+        await sendToMakeWebhook({
+          eventType: 'PRIZE_PAYOUT',
+          nickname: res.user?.nickname || payoutPlayerIdentifier,
+          ffUid: res.user?.uid || payoutPlayerIdentifier,
+          email: res.user?.email || 'N/A',
+          phone: res.user?.phone || 'N/A',
+          details: `Admin Credited Coins: +₹${amt} (${payoutReason})`
+        });
+        setPayoutPlayerIdentifier('');
+      } else {
+        setPayoutStatus(`⚠️ ${res.error || 'Failed to credit coins'}`);
+      }
     } else {
-      setPayoutStatus(`⚠️ ${res.error || 'Failed to credit prize'}`);
+      // Deduct mode
+      const res = await deductUserWalletRealtime(payoutPlayerIdentifier.trim(), amt, payoutReason.trim());
+      if (res.success) {
+        setPayoutStatus(`✅ Successfully deducted ₹${amt} coins from player (${payoutPlayerIdentifier})! New Balance: ₹${res.newBalance}`);
+        await sendToMakeWebhook({
+          eventType: 'WALLET_DEDUCTION',
+          nickname: res.user?.nickname || payoutPlayerIdentifier,
+          ffUid: res.user?.uid || payoutPlayerIdentifier,
+          email: res.user?.email || 'N/A',
+          phone: res.user?.phone || 'N/A',
+          details: `Admin Deducted Coins: -₹${amt} (${payoutReason})`
+        });
+        setPayoutPlayerIdentifier('');
+      } else {
+        setPayoutStatus(`⚠️ ${res.error || 'Failed to deduct coins'}`);
+      }
     }
+
     setPayoutLoading(false);
     setTimeout(() => setPayoutStatus(''), 5000);
   };
@@ -696,16 +723,76 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
         </form>
       )}
 
-      {/* MODE 2.5: DIRECT PRIZE DISTRIBUTION TO USER WALLET */}
+      {/* MODE 2.5: DIRECT PRIZE DISTRIBUTION & COIN DEDUCTION TO USER WALLET */}
       {activeTab === 'payout' && (
         <form onSubmit={handleDirectPrizePayout} className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <h3 style={{ fontSize: '1.1rem', color: 'var(--success)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>💰</span> Distribute Winning Money to Player Wallet
+            <h3 style={{ fontSize: '1.1rem', color: walletAction === 'credit' ? 'var(--success)' : 'var(--danger)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>{walletAction === 'credit' ? '💰' : '🔻'}</span> {walletAction === 'credit' ? 'Distribute Winning Money / Credit Coins' : 'Deduct / Penalty Coins from Player Wallet'}
             </h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-              Credit winnings directly to any player's in-app wallet balance in real-time. Players can withdraw this to their UPI / Bank account anytime!
+              {walletAction === 'credit' 
+                ? 'Credit winnings directly to any player\'s in-app wallet balance in real-time across the cloud.' 
+                : 'Deduct coins from any player\'s account for penalties, offline payouts, or balance adjustments.'}
             </p>
+          </div>
+
+          {/* Action Selector: Credit (+) vs Deduct (-) */}
+          <div style={{
+            display: 'flex',
+            background: 'rgba(7, 9, 14, 0.6)',
+            borderRadius: '10px',
+            padding: '4px',
+            border: '1px solid var(--border-color)',
+            gap: '6px'
+          }}>
+            <button
+              type="button"
+              onClick={() => {
+                setWalletAction('credit');
+                setPayoutReason('1st Place Tournament Winner 🏆');
+                setPayoutStatus('');
+              }}
+              style={{
+                flex: 1,
+                padding: '10px 8px',
+                border: 'none',
+                borderRadius: '8px',
+                background: walletAction === 'credit' ? 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)' : 'transparent',
+                color: walletAction === 'credit' ? '#000' : 'var(--success)',
+                fontFamily: 'var(--font-heading)',
+                fontSize: '0.82rem',
+                fontWeight: '900',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              🟢 Add Coins / Give Prize (+)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setWalletAction('deduct');
+                setPayoutReason('Rule Penalty / Balance Adjustment 🔻');
+                setPayoutStatus('');
+              }}
+              style={{
+                flex: 1,
+                padding: '10px 8px',
+                border: 'none',
+                borderRadius: '8px',
+                background: walletAction === 'deduct' ? 'linear-gradient(135deg, #ff1744 0%, #ff9100 100%)' : 'transparent',
+                color: '#fff',
+                fontFamily: 'var(--font-heading)',
+                fontSize: '0.82rem',
+                fontWeight: '900',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              🔴 Deduct / Penalty Coins (-)
+            </button>
           </div>
 
           {payoutStatus && (
@@ -735,7 +822,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
 
           <div className="grid-2">
             <div className="form-group">
-              <label>Prize Amount to Credit (₹) <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <label>{walletAction === 'credit' ? 'Prize Amount to Credit (₹)' : 'Amount to Deduct (₹)'} <span style={{ color: 'var(--primary)' }}>*</span></label>
               <input 
                 type="number" 
                 value={payoutAmount} 
@@ -752,9 +839,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                     type="button"
                     onClick={() => setPayoutAmount(amt)}
                     style={{
-                      background: payoutAmount === amt ? 'var(--success)' : 'rgba(255,255,255,0.06)',
+                      background: payoutAmount === amt ? (walletAction === 'credit' ? 'var(--success)' : 'var(--danger)') : 'rgba(255,255,255,0.06)',
                       border: '1px solid rgba(255,255,255,0.1)',
-                      color: payoutAmount === amt ? '#000' : '#fff',
+                      color: payoutAmount === amt ? (walletAction === 'credit' ? '#000' : '#fff') : '#fff',
                       fontWeight: '700',
                       borderRadius: '12px',
                       padding: '2px 8px',
@@ -769,12 +856,12 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             </div>
 
             <div className="form-group">
-              <label>Prize Reason / Match Title</label>
+              <label>{walletAction === 'credit' ? 'Prize Reason / Match Title' : 'Reason for Coin Deduction'}</label>
               <input 
                 type="text" 
                 value={payoutReason} 
                 onChange={(e) => setPayoutReason(e.target.value)} 
-                placeholder="e.g. 1st Place Winner - CS 2v2"
+                placeholder={walletAction === 'credit' ? "e.g. 1st Place Winner - CS 2v2" : "e.g. Penalty / Offline Payout Completed"}
                 className="form-input"
                 required
               />
@@ -789,13 +876,15 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
               width: '100%', 
               height: '48px', 
               marginTop: '4px', 
-              background: 'linear-gradient(135deg, #00e676 0%, #ffd600 100%)', 
-              color: '#000', 
+              background: walletAction === 'credit' ? 'linear-gradient(135deg, #00e676 0%, #ffd600 100%)' : 'linear-gradient(135deg, #ff1744 0%, #ff9100 100%)', 
+              color: walletAction === 'credit' ? '#000' : '#fff', 
               fontWeight: '900',
               fontSize: '0.92rem'
             }}
           >
-            {payoutLoading ? '⚡ Processing Cloud Payout...' : '⚡ Credit Prize Money to Player Wallet Now'}
+            {payoutLoading 
+              ? '⚡ Processing Cloud Update...' 
+              : (walletAction === 'credit' ? `⚡ Credit ₹${payoutAmount || 0} Coins to Player Wallet` : `🔻 Deduct ₹${payoutAmount || 0} Coins from Player Wallet`)}
           </button>
 
           {/* Live Player Directory */}
