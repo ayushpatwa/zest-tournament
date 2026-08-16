@@ -298,22 +298,14 @@ export default function MyMatchesPage({
                   )}
                 </div>
 
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '8px' }}>
+                {/* Action Button */}
+                <div>
                   <button 
                     onClick={() => onSelectTournament(t.id)}
                     className="btn btn-primary" 
-                    style={{ flex: 2, padding: '10px', fontSize: '0.82rem', fontWeight: '700' }}
+                    style={{ width: '100%', padding: '12px', fontSize: '0.88rem', fontWeight: '700' }}
                   >
                     🎮 Enter Match Lobby ➔
-                  </button>
-
-                  <button 
-                    onClick={() => onSelectTournament(t.id)}
-                    className="btn btn-outline" 
-                    style={{ flex: 1, padding: '10px', fontSize: '0.8rem' }}
-                  >
-                    📸 Submit Score
                   </button>
                 </div>
 

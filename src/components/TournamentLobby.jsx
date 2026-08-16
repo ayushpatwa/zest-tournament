@@ -1,8 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  subscribeToLobbyChatRealtime, 
-  sendLobbyMessageRealtime 
-} from '../services/firebase';
+import React, { useState } from 'react';
 
 export default function TournamentLobby({ 
   tournament, 
@@ -13,65 +9,24 @@ export default function TournamentLobby({
   onBack, 
   onRegisterUser 
 }) {
-  const [activeTab, setActiveTab] = useState('details'); // 'details' | 'chat' | 'results' | 'brackets'
+  const [activeTab, setActiveTab] = useState('details'); // 'details' | 'brackets'
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinType, setJoinType] = useState('solo'); // 'solo' | 'create_squad' | 'join_squad'
-  const [squadName, setSquadName] = useState('');
   const [squadCodeInput, setSquadCodeInput] = useState('');
   
   const [ffUid, setFfUid] = useState(userProfile.uid || '');
   const [ffNickname, setFfNickname] = useState(userProfile.nickname || '');
-  
-  // Real-time Chat
-  const [chatMessages, setChatMessages] = useState([]);
-  const [userMessage, setUserMessage] = useState('');
-  const chatEndRef = useRef(null);
-
-  // Match Result Submission states
-  const [killsClaimed, setKillsClaimed] = useState('5');
-  const [rankClaimed, setRankClaimed] = useState('1');
-  const [screenshotPreview, setScreenshotPreview] = useState(null);
-  const [resultSubmitted, setResultSubmitted] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
 
   const isUserJoined = tournament.joinedPlayers?.some(p => p.isUser || p.uid === userProfile.uid);
   const isSquadMode = tournament.mode === 'Duo' || tournament.mode === 'Squad';
+  const isLoneWolf = tournament.type?.toLowerCase().includes('lone wolf');
 
-  // 1. Real-time Firebase Chat Listener
-  useEffect(() => {
-    const unsubscribe = subscribeToLobbyChatRealtime(tournament.id, (liveMessages) => {
-      if (liveMessages && liveMessages.length > 0) {
-        setChatMessages(liveMessages);
-      } else {
-        // Fallback default message
-        setChatMessages([
-          { id: 'sys1', sender: 'System', text: `Welcome to ${tournament.title} Lobby! Fair play rules applied.`, isSystem: true, time: 'Live' }
-        ]);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [tournament.id, tournament.title]);
-
-  // Auto-scroll chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
-
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!userMessage.trim()) return;
-
-    const msg = {
-      sender: userProfile.nickname || ffNickname || "Gamer",
-      text: userMessage.trim(),
-      isSystem: false,
-      isUser: true,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    await sendLobbyMessageRealtime(tournament.id, msg);
-    setUserMessage('');
+  const copyToClipboard = (text, key) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(key);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const handleJoin = (e) => {
@@ -101,48 +56,6 @@ export default function TournamentLobby({
 
     onRegisterUser(tournament.id, ffUid.trim(), ffNickname.trim(), tournament.entryFee, assignedSquadCode);
     setShowJoinModal(false);
-  };
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setScreenshotPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSubmitResult = (e) => {
-    e.preventDefault();
-    if (!screenshotPreview) {
-      setErrorMsg('Please upload a screenshot of your match result score.');
-      return;
-    }
-
-    // Save proof to local state and tournament submissions
-    const submission = {
-      id: `proof_${Date.now()}`,
-      tournamentId: tournament.id,
-      tournamentTitle: tournament.title,
-      playerNickname: userProfile.nickname || ffNickname,
-      playerUid: userProfile.uid || ffUid,
-      email: userProfile.email,
-      phone: userProfile.phone,
-      kills: parseInt(killsClaimed),
-      rank: parseInt(rankClaimed),
-      screenshot: screenshotPreview,
-      submittedAt: new Date().toLocaleString(),
-      status: 'pending' // pending -> approved
-    };
-
-    const existingProofs = JSON.parse(localStorage.getItem('zest_match_proofs') || '[]');
-    existingProofs.unshift(submission);
-    localStorage.setItem('zest_match_proofs', JSON.stringify(existingProofs));
-
-    setResultSubmitted(true);
-    setErrorMsg('');
   };
 
   return (
@@ -205,10 +118,8 @@ export default function TournamentLobby({
       {/* Lobby Navigation Tabs */}
       <div className="glass-panel" style={{ display: 'flex', padding: '4px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
         {[
-          { id: 'details', label: '📋 DETAILS' },
-          { id: 'chat', label: '💬 LIVE CHAT' },
-          { id: 'results', label: '📸 SUBMIT RESULT' },
-          { id: 'brackets', label: '🏆 BRACKET' }
+          { id: 'details', label: '📋 MATCH DETAILS & ROOM ID' },
+          { id: 'brackets', label: '🏆 PLAYERS & STANDINGS' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -217,9 +128,9 @@ export default function TournamentLobby({
               flex: 1,
               background: activeTab === tab.id ? 'var(--primary)' : 'transparent',
               border: 'none',
-              padding: '10px 4px',
+              padding: '10px 8px',
               fontFamily: 'var(--font-heading)',
-              fontSize: '0.72rem',
+              fontSize: '0.78rem',
               fontWeight: '700',
               color: activeTab === tab.id ? '#fff' : 'var(--text-muted)',
               borderRadius: '8px',
@@ -253,17 +164,17 @@ export default function TournamentLobby({
             </div>
             <div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {tournament.type?.toLowerCase().includes('lone wolf') ? 'Prize Structure:' : 'Per Kill Bounty:'}
+                {isLoneWolf ? 'Prize Structure:' : 'Per Kill Bounty:'}
               </span>
-              <p style={{ fontWeight: '700', color: tournament.type?.toLowerCase().includes('lone wolf') ? 'var(--accent)' : 'var(--secondary)', margin: '2px 0 0 0' }}>
-                {tournament.type?.toLowerCase().includes('lone wolf') ? '🏆 Winner Takes All' : `₹${tournament.perKillPrize || 25}`}
+              <p style={{ fontWeight: '700', color: isLoneWolf ? 'var(--accent)' : 'var(--secondary)', margin: '2px 0 0 0' }}>
+                {isLoneWolf ? '🏆 Winner Takes All' : `₹${tournament.perKillPrize || 25}`}
               </p>
             </div>
           </div>
 
           {/* Real-time Free Fire Room ID & Password Credentials Card */}
           <div 
-            className="glass-panel animate-slide-in"
+            className="glass-panel animate-slide-in" 
             style={{
               padding: '16px',
               background: tournament.roomId 
@@ -275,280 +186,166 @@ export default function TournamentLobby({
               borderRadius: '12px'
             }}
           >
-            <div className="flex-between" style={{ marginBottom: '8px' }}>
-              <span style={{ 
-                fontFamily: 'var(--font-heading)', 
-                fontSize: '0.85rem', 
-                color: tournament.roomId ? 'var(--success)' : 'var(--accent)',
-                fontWeight: '700',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                <span>🔑</span> {tournament.roomId ? 'FREE FIRE CUSTOM ROOM CREDENTIALS' : 'CUSTOM ROOM ID & PASSWORD'}
-              </span>
-              {tournament.roomId && <span className="badge badge-live">LIVE NOW</span>}
+            <div className="flex-between" style={{ marginBottom: '12px' }}>
+              <div>
+                <span style={{ 
+                  fontFamily: 'var(--font-heading)',
+                  fontSize: '0.88rem', 
+                  fontWeight: '700',
+                  color: tournament.roomId ? 'var(--success)' : 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span>🔑</span> {tournament.roomId ? 'ROOM ID & PASSWORD (LIVE)' : 'CUSTOM ROOM CREDENTIALS'}
+                </span>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                  {tournament.roomId 
+                    ? 'Room is now created in Free Fire! Join immediately.' 
+                    : 'Admin broadcasts credentials 15 minutes before the match start.'}
+                </p>
+              </div>
+
+              {tournament.roomId && (
+                <span className="badge badge-live" style={{ background: 'var(--success)', color: '#000' }}>
+                  ● LIVE
+                </span>
+              )}
             </div>
 
             {tournament.roomId ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
-                <div style={{ background: 'rgba(0,0,0,0.4)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ROOM ID:</div>
-                  <div style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: '900', color: 'var(--secondary)', letterSpacing: '1px' }}>
-                    {tournament.roomId}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px' }}>ROOM ID:</div>
+                  <div className="flex-between">
+                    <span style={{ fontFamily: 'monospace', fontSize: '1.2rem', fontWeight: '900', color: 'var(--secondary)' }}>
+                      {tournament.roomId}
+                    </span>
+                    <button 
+                      onClick={() => copyToClipboard(tournament.roomId, 'room')}
+                      className="btn"
+                      style={{ 
+                        padding: '4px 10px', 
+                        fontSize: '0.75rem', 
+                        background: copiedId === 'room' ? 'var(--success)' : 'rgba(255,255,255,0.1)',
+                        color: '#fff'
+                      }}
+                    >
+                      {copiedId === 'room' ? '✓ Copied' : 'Copy'}
+                    </button>
                   </div>
                 </div>
-                <div style={{ background: 'rgba(0,0,0,0.4)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>PASSWORD:</div>
-                  <div style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: '900', color: 'var(--accent)', letterSpacing: '1px' }}>
-                    {tournament.roomPassword || 'None'}
+
+                <div style={{ background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px' }}>PASSWORD:</div>
+                  <div className="flex-between">
+                    <span style={{ fontFamily: 'monospace', fontSize: '1.2rem', fontWeight: '900', color: 'var(--accent)' }}>
+                      {tournament.roomPassword || 'None'}
+                    </span>
+                    {tournament.roomPassword && (
+                      <button 
+                        onClick={() => copyToClipboard(tournament.roomPassword, 'pass')}
+                        className="btn"
+                        style={{ 
+                          padding: '4px 10px', 
+                          fontSize: '0.75rem', 
+                          background: copiedId === 'pass' ? 'var(--success)' : 'rgba(255,255,255,0.1)',
+                          color: '#fff'
+                        }}
+                      >
+                        {copiedId === 'pass' ? '✓ Copied' : 'Copy'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
             ) : (
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '4px 0 0 0', lineHeight: '1.4' }}>
-                ⏳ Room ID & Password will be dropped here by the Admin <strong>15 minutes</strong> before match start.
-              </p>
+              <div style={{ 
+                background: 'rgba(0,0,0,0.3)', 
+                padding: '16px', 
+                borderRadius: '8px', 
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                fontSize: '0.8rem'
+              }}>
+                🔒 Room ID & Password are locked. They will automatically appear here once published by host.
+              </div>
             )}
           </div>
 
-          {/* Registration State Bar */}
+          {/* Rules & Gameplay Guidelines */}
+          <div className="glass-panel" style={{ padding: '16px' }}>
+            <h3 style={{ fontSize: '0.95rem', marginBottom: '8px', color: 'var(--secondary)' }}>📜 Tournament Match Rules</h3>
+            <ul style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingLeft: '18px', margin: 0, lineHeight: '1.6' }}>
+              <li>Players must join the custom room using their registered Free Fire UID and Nickname.</li>
+              <li>Emulators / PC players are strictly prohibited unless stated otherwise.</li>
+              <li>Hacks, scripts, or teaming up with opponents results in permanent ban without refund.</li>
+              <li>Prizes are distributed automatically after match verification.</li>
+            </ul>
+          </div>
+
+          {/* Join / Registration Button */}
           <div>
             {isUserJoined ? (
-              <div 
-                className="glass-panel flex-between" 
-                style={{ 
-                  padding: '16px', 
-                  borderLeft: '4px solid var(--success)', 
-                  background: 'rgba(0, 230, 118, 0.05)' 
-                }}
-              >
-                <div>
-                  <h3 style={{ fontSize: '0.9rem', color: 'var(--success)', margin: 0 }}>Registered Successfully!</h3>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                    Slot confirmed for {userProfile.nickname} (UID: {userProfile.uid})
-                  </p>
-                </div>
-                <span className="badge badge-live">JOINED</span>
+              <div style={{
+                background: 'rgba(0, 230, 118, 0.1)',
+                border: '1px solid var(--success)',
+                padding: '14px',
+                borderRadius: '10px',
+                textAlign: 'center',
+                color: 'var(--success)',
+                fontWeight: '700',
+                fontSize: '0.9rem'
+              }}>
+                ✓ YOU ARE REGISTERED IN THIS MATCH
               </div>
             ) : (
               <button 
                 onClick={() => setShowJoinModal(true)}
                 className="btn btn-primary"
-                style={{ width: '100%', height: '48px', fontSize: '0.95rem' }}
-                disabled={tournament.slotsJoined >= tournament.slotsTotal}
+                style={{ width: '100%', padding: '14px', fontSize: '0.95rem', fontWeight: '900' }}
               >
-                {tournament.slotsJoined >= tournament.slotsTotal ? 'Lobby Full' : `Register Now (₹${tournament.entryFee})`}
+                🎮 REGISTER FOR TOURNAMENT (₹{tournament.entryFee})
               </button>
             )}
           </div>
 
-          {/* Registered Players List */}
-          <div>
-            <h3 style={{ fontSize: '0.95rem', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Registered Players ({tournament.slotsJoined || tournament.joinedPlayers?.length || 0})</span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--secondary)' }}>Max: {tournament.slotsTotal}</span>
-            </h3>
-            <div className="glass-panel" style={{ maxHeight: '220px', overflowY: 'auto', padding: '8px' }}>
-              {tournament.joinedPlayers?.map((player, idx) => (
-                <div 
-                  key={idx}
-                  className="flex-between"
-                  style={{
-                    padding: '8px 12px',
-                    borderBottom: idx === tournament.joinedPlayers.length - 1 ? 'none' : '1px solid var(--border-color)',
-                    background: player.isUser ? 'rgba(0, 229, 255, 0.08)' : 'transparent'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: '20px' }}>#{idx + 1}</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: player.isUser ? '700' : '400', color: player.isUser ? 'var(--secondary)' : '#fff' }}>
-                      {player.nickname} {player.isUser && '(You)'}
-                    </span>
-                    {player.squadCode && (
-                      <span className="badge" style={{ fontSize: '0.65rem', background: 'rgba(255,214,0,0.15)', color: 'var(--accent)' }}>
-                        {player.squadCode}
-                      </span>
-                    )}
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                    UID: {player.uid}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
         </div>
       )}
 
-      {/* TAB 2: LIVE LOBBY CHAT */}
-      {activeTab === 'chat' && (
-        <div className="glass-panel animate-slide-in" style={{ height: '420px', display: 'flex', flexDirection: 'column', padding: '12px' }}>
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
-            {chatMessages.map((msg, i) => (
-              <div 
-                key={msg.id || i}
-                style={{
-                  alignSelf: msg.isUser ? 'flex-end' : 'flex-start',
-                  maxWidth: '80%',
-                  background: msg.isSystem 
-                    ? 'rgba(255, 214, 0, 0.1)' 
-                    : msg.isUser ? 'var(--primary)' : 'rgba(255, 255, 255, 0.06)',
-                  padding: '8px 12px',
-                  borderRadius: '10px',
-                  border: msg.isSystem ? '1px solid rgba(255, 214, 0, 0.3)' : '1px solid rgba(255,255,255,0.05)'
-                }}
-              >
-                {!msg.isSystem && (
-                  <div style={{ fontSize: '0.7rem', color: msg.isUser ? '#fff' : 'var(--secondary)', fontWeight: '700', marginBottom: '2px' }}>
-                    {msg.sender}
-                  </div>
-                )}
-                <div style={{ fontSize: '0.82rem', color: msg.isSystem ? 'var(--accent)' : '#fff', lineHeight: '1.3' }}>
-                  {msg.text}
-                </div>
-                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', textAlign: 'right', marginTop: '2px' }}>
-                  {msg.time}
-                </div>
-              </div>
-            ))}
-            <div ref={chatEndRef} />
-          </div>
-
-          <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <input 
-              type="text" 
-              value={userMessage}
-              onChange={(e) => setUserMessage(e.target.value)}
-              placeholder="Send message to squad lobby..."
-              className="form-input"
-              style={{ fontSize: '0.85rem' }}
-            />
-            <button type="submit" className="btn btn-primary" style={{ padding: '0 16px' }}>
-              Send
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* TAB 3: SUBMIT MATCH RESULT & SCREENSHOT PROOF */}
-      {activeTab === 'results' && (
-        <div className="glass-panel animate-slide-in" style={{ padding: '20px' }}>
-          <h3 style={{ fontSize: '1.1rem', color: 'var(--secondary)', marginBottom: '6px' }}>
-            📸 Submit Match Score & Claim Prize
-          </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '16px' }}>
-            Upload your endgame victory / kill summary screenshot. Once verified by the Admin, prize money will be credited instantly to your Zest Wallet!
-          </p>
-
-          {resultSubmitted ? (
-            <div style={{
-              background: 'rgba(0, 230, 118, 0.1)',
-              border: '1px solid var(--success)',
-              padding: '20px',
-              borderRadius: '12px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '2rem', marginBottom: '8px' }}>✅</div>
-              <h4 style={{ color: 'var(--success)', margin: '0 0 6px 0' }}>Proof Submitted Successfully!</h4>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-                The Admin is reviewing your screenshot. Prize payout will be credited to your wallet shortly.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmitResult} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div className="grid-2">
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Your Placement Rank</label>
-                  <select value={rankClaimed} onChange={(e) => setRankClaimed(e.target.value)} className="form-input">
-                    <option value="1">Rank #1 (Booyah 🏆)</option>
-                    <option value="2">Rank #2 (Runner Up 🥈)</option>
-                    <option value="3">Rank #3 (3rd Place 🥉)</option>
-                    <option value="4">Rank #4 - #10 (Top 10)</option>
-                    <option value="11">Rank #11+</option>
-                  </select>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Total Kills Scored</label>
-                  <input 
-                    type="number" 
-                    value={killsClaimed}
-                    onChange={(e) => setKillsClaimed(e.target.value)}
-                    className="form-input"
-                    min="0"
-                    max="48"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Screenshot File Uploader */}
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Upload Endgame Scoreboard Screenshot <span style={{ color: 'var(--primary)' }}>*</span></label>
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="form-input"
-                  style={{ padding: '8px' }}
-                  required
-                />
-              </div>
-
-              {/* Live Image Preview */}
-              {screenshotPreview && (
-                <div style={{ textAlign: 'center', marginTop: '6px' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Screenshot Preview:</div>
-                  <img 
-                    src={screenshotPreview} 
-                    alt="Proof Preview" 
-                    style={{ maxHeight: '180px', maxWidth: '100%', borderRadius: '8px', border: '1px solid var(--border-color)' }}
-                  />
-                </div>
-              )}
-
-              {errorMsg && (
-                <div style={{ color: 'var(--danger)', fontSize: '0.8rem' }}>
-                  ⚠️ {errorMsg}
-                </div>
-              )}
-
-              <button 
-                type="submit" 
-                className="btn btn-secondary"
-                style={{ width: '100%', height: '46px', fontSize: '0.9rem', fontWeight: '700' }}
-              >
-                🚀 Submit Score for Admin Verification
-              </button>
-            </form>
-          )}
-        </div>
-      )}
-
-      {/* TAB 4: BRACKET & LEADERBOARD */}
+      {/* TAB 2: BRACKET & PLAYERS */}
       {activeTab === 'brackets' && (
         <div className="glass-panel animate-slide-in" style={{ padding: '16px' }}>
-          <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>🏆 Tournament Leaderboard</h3>
-          {tournament.leaderboard && tournament.leaderboard.length > 0 ? (
+          <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>👥 Joined Players ({tournament.joinedPlayers?.length || 0})</h3>
+          
+          {tournament.joinedPlayers && tournament.joinedPlayers.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {tournament.leaderboard.map((player, idx) => (
+              {tournament.joinedPlayers.map((player, idx) => (
                 <div key={idx} className="flex-between glass-panel" style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontWeight: '900', color: idx === 0 ? 'var(--accent)' : '#fff' }}>#{idx + 1}</span>
-                    <span>{player.nickname}</span>
+                    <span style={{ fontWeight: '900', color: player.isUser ? 'var(--secondary)' : 'var(--text-muted)' }}>
+                      #{idx + 1}
+                    </span>
+                    <div>
+                      <div style={{ fontWeight: '700', color: player.isUser ? 'var(--secondary)' : '#fff', fontSize: '0.85rem' }}>
+                        {player.nickname} {player.isUser && '(You)'}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        UID: {player.uid}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '16px', fontSize: '0.85rem' }}>
-                    <span style={{ color: 'var(--secondary)' }}>🎯 {player.kills} Kills</span>
-                    <span style={{ fontWeight: '700', color: 'var(--accent)' }}>{player.totalPoints} Pts</span>
-                  </div>
+                  {player.squadCode && (
+                    <span className="badge" style={{ background: 'rgba(255,214,0,0.15)', color: 'var(--accent)', fontSize: '0.68rem' }}>
+                      Squad: {player.squadCode}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           ) : (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0' }}>
-              Match is upcoming. Leaderboard will generate upon match conclusion.
+              No players joined yet. Be the first to register!
             </div>
           )}
         </div>
@@ -637,7 +434,7 @@ export default function TournamentLobby({
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>Captain's Squad Code <span style={{ color: 'var(--primary)' }}>*</span></label>
                   <input 
-                    type="text"
+                    type="text" 
                     value={squadCodeInput}
                     onChange={(e) => setSquadCodeInput(e.target.value)}
                     placeholder="e.g. ZEST-8492"
