@@ -2,14 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 import { getRazorpayConfig, setRazorpayConfig } from '../services/razorpayService';
 
-// Help generate mock players
-const MOCK_NICKNAMES = [
-  "Raptor_FF", "ViperStrike", "AWM_King", "HeadshotGod",
-  "Panda_OP", "NinjaGamer", "GarenaPro", "Zest_Destroyer",
-  "BermudaKing", "ClashGod", "Dynamo_FF", "FreeFireHero",
-  "Ruler_OP", "GamerBoy", "SniperQueen", "Torn_Max", "GarenaX"
-];
-
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView }) {
   const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'manage' | 'razorpay' | 'webhook'
   
@@ -101,18 +93,6 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
       return;
     }
 
-    const numMockJoined = is1v1 ? 1 : is2v2 ? 2 : isClashSquad4v4 ? 4 : Math.min(Math.floor(Math.random() * (slots / 2)) + 3, slots - 1);
-    const joinedPlayers = [];
-    
-    for (let i = 0; i < numMockJoined; i++) {
-      joinedPlayers.push({
-        nickname: MOCK_NICKNAMES[i % MOCK_NICKNAMES.length] + `_${Math.floor(Math.random()*90 + 10)}`,
-        uid: String(Math.floor(Math.random() * 900000000) + 100000000),
-        isUser: false
-      });
-    }
-
-    const leaderboard = [];
     const startTime = new Date(Date.now() + minutes * 60 * 1000).toISOString();
 
     const newTournament = {
@@ -126,13 +106,13 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
       entryFee: fee,
       slotsTotal: slots,
       maxSlots: slots,
-      slotsJoined: numMockJoined,
-      joinedPlayers: joinedPlayers,
+      slotsJoined: 0,
+      joinedPlayers: [],
       startTime: startTime,
       status: 'upcoming',
       roomId: '',
       roomPassword: '',
-      leaderboard: leaderboard
+      leaderboard: []
     };
 
     onAddTournament(newTournament);

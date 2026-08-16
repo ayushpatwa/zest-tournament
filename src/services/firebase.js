@@ -43,23 +43,16 @@ export const SEED_TOURNAMENTS = [
     entryFee: 50,
     prizePool: 2000,
     perKillPrize: 25,
+    slotsTotal: 48,
     maxSlots: 48,
-    slotsJoined: 14,
+    slotsJoined: 0,
     startTime: "Today, 06:00 PM",
     serverStatus: "Registration Open",
     status: "open",
     roomId: "",
     roomPassword: "",
-    joinedPlayers: [
-      { nickname: "SOUL_Viper", uid: "582910394" },
-      { nickname: "TotalGaming_Fan", uid: "910293847" },
-      { nickname: "Garena_Sniper", uid: "192837465" }
-    ],
-    leaderboard: [
-      { nickname: "SOUL_Viper", uid: "582910394", kills: 9, placementPoints: 12, totalPoints: 30 },
-      { nickname: "Garena_Sniper", uid: "192837465", kills: 6, placementPoints: 9, totalPoints: 21 },
-      { nickname: "TotalGaming_Fan", uid: "910293847", kills: 3, placementPoints: 7, totalPoints: 13 }
-    ]
+    joinedPlayers: [],
+    leaderboard: []
   },
   {
     id: "ff_purgatory_duo_02",
@@ -70,17 +63,15 @@ export const SEED_TOURNAMENTS = [
     entryFee: 80,
     prizePool: 3500,
     perKillPrize: 40,
+    slotsTotal: 24,
     maxSlots: 24,
-    slotsJoined: 8,
+    slotsJoined: 0,
     startTime: "Today, 08:30 PM",
     serverStatus: "Registration Open",
     status: "open",
     roomId: "",
     roomPassword: "",
-    joinedPlayers: [
-      { nickname: "ShadowHunter", uid: "482910283" },
-      { nickname: "Thunder_God", uid: "849201938" }
-    ],
+    joinedPlayers: [],
     leaderboard: []
   },
   {
@@ -94,15 +85,13 @@ export const SEED_TOURNAMENTS = [
     perKillPrize: 50,
     slotsTotal: 8,
     maxSlots: 8,
-    slotsJoined: 6,
+    slotsJoined: 0,
     startTime: "Tonight, 10:00 PM",
-    serverStatus: "Filling Fast (2 Slots Left)",
+    serverStatus: "Registration Open",
     status: "open",
     roomId: "",
     roomPassword: "",
-    joinedPlayers: [
-      { nickname: "Team_Inferno_Leader", uid: "772910481" }
-    ],
+    joinedPlayers: [],
     leaderboard: []
   },
   {
@@ -116,15 +105,13 @@ export const SEED_TOURNAMENTS = [
     perKillPrize: 40,
     slotsTotal: 8,
     maxSlots: 8,
-    slotsJoined: 4,
+    slotsJoined: 0,
     startTime: "Today, 09:15 PM",
     serverStatus: "Registration Open",
     status: "open",
     roomId: "",
     roomPassword: "",
-    joinedPlayers: [
-      { nickname: "HeadshotGod_OP", uid: "928374821" }
-    ],
+    joinedPlayers: [],
     leaderboard: []
   },
   {
@@ -138,15 +125,13 @@ export const SEED_TOURNAMENTS = [
     perKillPrize: 0,
     slotsTotal: 2,
     maxSlots: 2,
-    slotsJoined: 1,
+    slotsJoined: 0,
     startTime: "Today, 07:45 PM",
-    serverStatus: "1 Slot Left",
+    serverStatus: "Registration Open",
     status: "open",
     roomId: "",
     roomPassword: "",
-    joinedPlayers: [
-      { nickname: "AWM_King_1v1", uid: "482910392" }
-    ],
+    joinedPlayers: [],
     leaderboard: []
   },
   {
@@ -160,15 +145,13 @@ export const SEED_TOURNAMENTS = [
     perKillPrize: 0,
     slotsTotal: 4,
     maxSlots: 4,
-    slotsJoined: 2,
+    slotsJoined: 0,
     startTime: "Today, 08:45 PM",
-    serverStatus: "2 Slots Left",
+    serverStatus: "Registration Open",
     status: "open",
     roomId: "",
     roomPassword: "",
-    joinedPlayers: [
-      { nickname: "Duo_Snipers", uid: "772910482" }
-    ],
+    joinedPlayers: [],
     leaderboard: []
   },
   {
@@ -182,15 +165,13 @@ export const SEED_TOURNAMENTS = [
     perKillPrize: 0,
     slotsTotal: 4,
     maxSlots: 4,
-    slotsJoined: 2,
+    slotsJoined: 0,
     startTime: "Tonight, 11:00 PM",
     serverStatus: "Registration Open",
     status: "open",
     roomId: "",
     roomPassword: "",
-    joinedPlayers: [
-      { nickname: "Tactical_Viper", uid: "582910398" }
-    ],
+    joinedPlayers: [],
     leaderboard: []
   },
   {
@@ -204,15 +185,13 @@ export const SEED_TOURNAMENTS = [
     perKillPrize: 25,
     slotsTotal: 4,
     maxSlots: 4,
-    slotsJoined: 2,
+    slotsJoined: 0,
     startTime: "Tonight, 09:45 PM",
-    serverStatus: "2 Slots Left",
+    serverStatus: "Registration Open",
     status: "open",
     roomId: "",
     roomPassword: "",
-    joinedPlayers: [
-      { nickname: "Duo_Rushers", uid: "918273645" }
-    ],
+    joinedPlayers: [],
     leaderboard: []
   },
   {
@@ -226,15 +205,13 @@ export const SEED_TOURNAMENTS = [
     perKillPrize: 30,
     slotsTotal: 4,
     maxSlots: 4,
-    slotsJoined: 2,
+    slotsJoined: 0,
     startTime: "Tonight, 10:30 PM",
     serverStatus: "Registration Open",
     status: "open",
     roomId: "",
     roomPassword: "",
-    joinedPlayers: [
-      { nickname: "HeadshotDuo_OP", uid: "829102938" }
-    ],
+    joinedPlayers: [],
     leaderboard: []
   }
 ];
