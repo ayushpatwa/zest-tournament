@@ -12,6 +12,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   const [type, setType] = useState('Classic');
   const [mapName, setMapName] = useState('Bermuda');
   const [prizePool, setPrizePool] = useState('2000');
+  const [perKillPrize, setPerKillPrize] = useState('25');
   const [entryFee, setEntryFee] = useState('20');
   const [slotsTotal, setSlotsTotal] = useState('48');
   const [matchTiming, setMatchTiming] = useState('03:00 PM - 04:00 PM');
@@ -58,18 +59,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
       setSlotsTotal('2');
       setMode('Solo');
       setMapName('Iron Dome');
+      setPerKillPrize('0');
     } else if (newType.includes('2v2')) {
       setSlotsTotal('4');
       setMode('Duo');
       setMapName(newType.includes('Clash') ? 'Bermuda (CS)' : 'Iron Cage');
+      setPerKillPrize(newType.includes('Lone Wolf') ? '0' : '25');
     } else if (newType.includes('Clash Squad')) {
       setSlotsTotal('8');
       setMode('Squad');
       setMapName('Bermuda (CS)');
+      setPerKillPrize('25');
     } else {
       setSlotsTotal('48');
       setMode('Solo');
       setMapName('Bermuda');
+      setPerKillPrize('25');
     }
   };
 
@@ -87,6 +92,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     }
 
     const prize = parseFloat(prizePool);
+    const killBounty = parseFloat(perKillPrize);
     const fee = parseFloat(entryFee);
     let slots = parseInt(slotsTotal);
 
@@ -94,13 +100,12 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     const is1v1 = type.toLowerCase().includes('1v1');
     const is2v2 = type.toLowerCase().includes('2v2');
     const isClashSquad4v4 = type.toLowerCase().includes('clash') && !is2v2;
-    const isLoneWolf = type.toLowerCase().includes('lone wolf');
 
     if (is1v1) slots = 2;
     else if (is2v2) slots = 4;
     else if (isClashSquad4v4) slots = 8;
 
-    if (isNaN(prize) || prize < 0 || isNaN(fee) || fee < 0 || isNaN(slots) || slots < 2) {
+    if (isNaN(prize) || prize < 0 || isNaN(fee) || fee < 0 || isNaN(slots) || slots < 2 || isNaN(killBounty) || killBounty < 0) {
       setErrorMsg('Please enter valid numeric parameters.');
       return;
     }
@@ -112,7 +117,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
       type: type,
       map: mapName,
       prizePool: prize,
-      perKillPrize: isLoneWolf ? 0 : 25,
+      perKillPrize: killBounty,
       entryFee: fee,
       slotsTotal: slots,
       maxSlots: slots,
@@ -510,6 +515,21 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             </div>
 
             <div className="form-group">
+              <label>Per Kill Bounty (₹)</label>
+              <input 
+                type="number" 
+                value={perKillPrize} 
+                onChange={(e) => setPerKillPrize(e.target.value)} 
+                placeholder="e.g. 25 (0 for Lone Wolf)"
+                className="form-input"
+                min="0"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group">
               <label>Entry Fee (₹)</label>
               <input 
                 type="number" 
@@ -520,19 +540,19 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                 required
               />
             </div>
-          </div>
 
-          <div className="form-group">
-            <label>Total Slots ({type.includes('1v1') ? '2 for 1v1' : (type.includes('Lone Wolf') || type.includes('2v2')) ? '4 for 2v2' : type.includes('Clash') ? '8 for CS' : 'Slots'})</label>
-            <input 
-              type="number" 
-              value={slotsTotal} 
-              onChange={(e) => setSlotsTotal(e.target.value)} 
-              className="form-input"
-              min="2"
-              max="100"
-              required
-            />
+            <div className="form-group">
+              <label>Total Slots ({type.includes('1v1') ? '2 for 1v1' : (type.includes('Lone Wolf') || type.includes('2v2')) ? '4 for 2v2' : type.includes('Clash') ? '8 for CS' : 'Slots'})</label>
+              <input 
+                type="number" 
+                value={slotsTotal} 
+                onChange={(e) => setSlotsTotal(e.target.value)} 
+                className="form-input"
+                min="2"
+                max="100"
+                required
+              />
+            </div>
           </div>
 
           {errorMsg && (
