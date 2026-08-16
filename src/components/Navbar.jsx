@@ -143,30 +143,6 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
           {/* Right: Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             
-            {/* Rules & Fairplay Page Button */}
-            <button
-              onClick={() => setCurrentView('rules')}
-              style={{
-                background: currentView === 'rules' ? 'linear-gradient(135deg, var(--primary) 0%, #ff1744 100%)' : 'rgba(255, 255, 255, 0.06)',
-                border: currentView === 'rules' ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.15)',
-                color: '#fff',
-                padding: '5px 10px',
-                borderRadius: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '0.72rem',
-                fontFamily: 'var(--font-heading)',
-                fontWeight: '700',
-                cursor: 'pointer',
-                boxShadow: currentView === 'rules' ? 'var(--glow-primary)' : 'none',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <span>📜</span>
-              <span>RULES</span>
-            </button>
-
             {/* Telegram Contact Us Support Button */}
             <a
               href="https://t.me/zesttournament"
