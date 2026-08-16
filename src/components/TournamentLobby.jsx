@@ -305,10 +305,11 @@ export default function TournamentLobby({
               )}
             </div>
             <ul style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingLeft: '18px', margin: 0, lineHeight: '1.6' }}>
-              <li>Players must join the custom room using their registered Free Fire UID and Nickname.</li>
-              <li>Emulators / PC players are strictly prohibited unless stated otherwise.</li>
-              <li>Hacks, scripts, or teaming up with opponents results in permanent ban without refund.</li>
-              <li>Prizes are distributed automatically after match verification.</li>
+              <li>Sirf Android & iOS devices allowed hain. (Emulators / PC / Tablets strictly NOT allowed).</li>
+              <li>❌ DPI NOT ALLOWED: Agar DPI use karte hue pakde gaye toh penalty lagegi.</li>
+              <li>Opponent ka POV match ke 1 hour ke andar valid proof ke sath demand karna hoga. (No POV = Canceled withdrawal).</li>
+              <li>Only 8 matches per day allowed. Exceed hone par ₹8 se ₹25 per extra match penalty lagegi.</li>
+              <li>MIN LEVEL-40 ALLOWED. Sabhi rules follow karna mandatory hai.</li>
             </ul>
           </div>
 
@@ -325,13 +326,24 @@ export default function TournamentLobby({
                 fontWeight: '700',
                 fontSize: '0.9rem'
               }}>
-                ✓ YOU ARE REGISTERED IN THIS MATCH
+                ✅ You are Registered for this Tournament!
               </div>
             ) : (
               <button 
-                onClick={() => setShowJoinModal(true)}
+                onClick={() => {
+                  if (walletBalance < tournament.entryFee) {
+                    setErrorMsg('Insufficient balance! Please add funds in your wallet.');
+                  }
+                  setShowJoinModal(true);
+                }}
                 className="btn btn-primary"
-                style={{ width: '100%', padding: '14px', fontSize: '0.95rem', fontWeight: '900' }}
+                style={{ 
+                  width: '100%', 
+                  height: '52px', 
+                  fontSize: '1rem',
+                  letterSpacing: '1px',
+                  boxShadow: '0 4px 20px rgba(255, 87, 34, 0.4)'
+                }}
               >
                 🎮 REGISTER FOR TOURNAMENT (₹{tournament.entryFee})
               </button>
@@ -388,7 +400,7 @@ export default function TournamentLobby({
                 <span>📜</span> Match Rules & Fairplay Guidelines
               </h3>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
-                Rules specifically enforced for this {tournament.title} match ({tournament.mode} • {tournament.type}).
+                🔥 Zest Tournament – Play Fair, Win Fair
               </p>
             </div>
             {setCurrentView && (
@@ -405,52 +417,73 @@ export default function TournamentLobby({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
             
-            {/* Rule 1 */}
+            {/* 1. POV & Dispute */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>📱</span> Device & Hardware Policy
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: '#00e5ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📹</span> ◆ POV & DISPUTE RULES
               </h4>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                Strictly <strong>MOBILE DEVICES ONLY</strong> (Android & iOS). Emulators, PC clients (BlueStacks, LDPlayer), keymappers, and iPad tablets are strictly prohibited.
-              </p>
+              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>Opponent ka POV sirf valid proof ke saath hi demand kiya ja sakta hai.</li>
+                <li>POV request match ke 1 hour ke andar karni hogi (Late requests accept nahi hongi).</li>
+                <li><strong style={{ color: '#ff80ab' }}>POV Rule:</strong> No POV = Canceled withdrawal and coin loss.</li>
+              </ul>
             </div>
 
-            {/* Rule 2 */}
-            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>🛡️</span> Zero Tolerance for Cheats & Teaming
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                No Mod APKs, auto-aim scripts, or map glitch exploits. Teaming up with opponents in Solo/Duo results in immediate disqualification and permanent ban without refund.
-              </p>
-            </div>
-
-            {/* Rule 3 */}
+            {/* 2. Match Limit Policy */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>🔑</span> Room ID & Punctuality
+                <span>⚠️</span> ◆ MATCH LIMIT RULES
               </h4>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                Room ID & Password will be dropped here 15 minutes before the start time. You must join the custom room using your registered in-game nickname and numeric UID.
-              </p>
+              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li><strong style={{ color: 'var(--success)' }}>✅ Only 8 matches per day allowed.</strong></li>
+                <li>Daily limit exceed hone par har extra match par penalty charge lagega.</li>
+                <li><strong>Penalty Charges:</strong> ₹8 se ₹25 per extra match (mode ke hisaab se apply hoga).</li>
+              </ul>
             </div>
 
-            {/* Rule 4 */}
+            {/* 3. Host & Room Rules */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>💰</span> Prize Distribution & Proofs
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🔑</span> ◆ HOST & ROOM ENTRY RULES
               </h4>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                Always take a screenshot of the end scoreboard. Prize money is automatically credited to your in-app wallet within 15-30 minutes after match verification.
-              </p>
+              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>Agar host galti se wrong room me ST kar deta hai, to 1st round ke andar valid proof ke sath report karna hoga. Us case me match restart kiya jayega.</li>
+                <li>1st round ke baad report accept nahi hogi aur No Refund / No Remake diya jayega.</li>
+                <li><strong style={{ color: 'var(--secondary)' }}>MIN LEVEL-40 ALLOWED</strong></li>
+              </ul>
             </div>
 
+            {/* 4. Device & Penalty */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🚫</span> ◆ DEVICE & PENALTY RULES
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>Sirf Android & iOS devices allowed hain (PC/Emulator/Tablet strictly prohibited).</li>
+                <li><strong style={{ color: '#ff80ab' }}>❌ DPI NOT ALLOWED:</strong> Agar DPI use karte hue pakde gaye toh penalty lagegi.</li>
+                <li>Kisi bhi rule break par: ⚠️ Penalty | ❌ No Refund | 🚫 Permanent BAN.</li>
+              </ul>
+            </div>
+
+          </div>
+
+          {/* Final Note & Disclaimer */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '12px 14px', borderRadius: '8px', borderLeft: '3px solid var(--secondary)' }}>
+            <div style={{ fontWeight: '700', fontSize: '0.82rem', color: '#fff', marginBottom: '4px' }}>
+              ⚡ FINAL NOTE:
+            </div>
+            <p style={{ margin: '0 0 4px 0', fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+              • Sabhi rules follow karna mandatory hai • Admin ka decision final hoga • Fair play maintain karein.
+            </p>
+            <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              Disclaimer: Garena Free Fire glitches ke liye <strong>Zest Tournament</strong> zimmedar nahi hoga. Ye user ki khud ki responsibility hogi.
+            </p>
           </div>
 
           {/* Direct Support link */}
           <div className="flex-between" style={{ background: 'linear-gradient(135deg, rgba(0, 136, 204, 0.15) 0%, rgba(0, 229, 255, 0.08) 100%)', padding: '12px 16px', borderRadius: '10px', border: '1px solid #0088cc', flexWrap: 'wrap', gap: '8px' }}>
             <span style={{ fontSize: '0.78rem', color: '#fff' }}>
-              Need urgent assistance with room ID or referee help?
+              🔥 Zest Tournament – Play Fair, Win Fair
             </span>
             <a
               href="https://t.me/zesttournament"
@@ -467,7 +500,7 @@ export default function TournamentLobby({
                 gap: '4px'
               }}
             >
-              <span>💬</span> Contact Arbiter on Telegram ➔
+              <span>💬</span> Telegram: @zesttournament ➔
             </a>
           </div>
         </div>

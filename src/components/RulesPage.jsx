@@ -5,60 +5,67 @@ export default function RulesPage({ setCurrentView }) {
 
   const ruleSections = [
     {
-      id: 'general',
-      icon: '⚔️',
-      title: 'General Match & Lobby Rules',
-      rules: [
-        'All players must join the custom room using their registered numeric Free Fire UID and In-Game Nickname.',
-        'Room ID & Password will be dropped in the app exactly 15 minutes before the match start timing.',
-        'Players must occupy the exact slot/position assigned to them in Clash Squad / Squad matches.',
-        'Late entries will NOT be entertained once the room host starts the custom match.',
-        'If a match is cancelled by the host due to game update/server glitch, 100% of the entry fee will be refunded automatically.'
+      id: 'pov',
+      icon: '📹',
+      title: 'POV & DISPUTE RULES',
+      items: [
+        'Opponent ka POV sirf valid proof ke saath hi demand kiya ja sakta hai.',
+        'POV request match ke 1 hour ke andar karni hogi.',
+        'Late requests accept nahi ki jayengi.',
+        '⚠️ POV Rule: No POV = Canceled withdrawal and coin loss.'
       ]
     },
     {
-      id: 'devices',
+      id: 'match_limit',
+      icon: '⚠️',
+      title: 'MATCH LIMIT RULES',
+      subtitle: 'Daily Match Limit Policy',
+      items: [
+        '✅ Only 8 matches per day allowed.',
+        'Agar daily limit exceed hoti hai, toh uske baad har extra match par penalty charge lagega.',
+        'Penalty Charges: ₹8 se ₹25 per extra match (Penalty amount mode ke hisaab se apply hoga).'
+      ]
+    },
+    {
+      id: 'host_room',
+      icon: '🔑',
+      title: 'HOST & ROOM ENTRY RULES',
+      items: [
+        'Agar host galti se wrong room ya unregistered room me ST kar deta hai, to 1st round ke andar valid proof ke sath report karna hoga. Us case me match back (restart) kiya jayega.',
+        '1st round ke baad report accept nahi hogi aur No Refund / No Remake diya jayega.',
+        '🔥 MIN LEVEL-40 ALLOWED'
+      ]
+    },
+    {
+      id: 'device',
       icon: '📱',
-      title: 'Device & Emulator Policy',
-      rules: [
-        'All tournaments are strictly MOBILE ONLY (Android & iOS smartphones/tablets).',
-        'PC players, Emulators (BlueStacks, LDPlayer, Nox, MSI, etc.), and Keymappers are STRICTLY PROHIBITED.',
-        'Any player detected using an emulator will be kicked or banned instantly without any entry fee refund.',
-        'External trigger devices (mechanical physical buttons) are permitted, but third-party macro software is banned.'
+      title: 'DEVICE RULES',
+      items: [
+        'Sirf Android & iOS devices allowed hain.',
+        'Emulator / PC / Tablet players strictly NOT allowed any OTHER EXTERNAL USAGE OF MOUSE AND KEYBOARD IF NOT PERMITTED.'
       ]
     },
     {
-      id: 'fairplay',
-      icon: '🛡️',
-      title: 'Fairplay & Anti-Cheat Policy',
-      rules: [
-        'Zero tolerance for cheats: Mod APKs, auto-headshot scripts, wallhacks, speed hacks, antennas, or file modifications.',
-        'Teaming up with opponent players in Solo or Duo matches will result in immediate disqualification of both teams.',
-        'Glitch exploiting (getting inside rocks, underground map glitches) is strictly forbidden.',
-        'Any suspicious gameplay recorded by spectating admins or other players will lead to a permanent account blacklist.'
+      id: 'penalty',
+      icon: '🚫',
+      title: 'PENALTY & BAN RULES',
+      subtitle: 'Kisi bhi rule break par:',
+      items: [
+        '⚠️ Penalty',
+        '❌ No Refund',
+        '🚫 Permanent BAN (serious cases)',
+        '❌ DPI NOT ALLOWED: Agar DPI use karte hue pakde gaye toh penalty lagegi.'
       ]
     },
     {
-      id: 'payouts',
-      icon: '💰',
-      title: 'Prizes & UPI Wallet Withdrawals',
-      rules: [
-        'Prize Pool is distributed based on official tournament standings (Rank #1, #2, #3) + Per-Kill bounties.',
-        'Winning prize money is credited directly to your in-app wallet within 15 to 30 minutes after result verification.',
-        'You can withdraw your wallet balance anytime via UPI (Google Pay, PhonePe, Paytm, BHIM, Amazon Pay).',
-        'Minimum withdrawal threshold is ₹50. Payouts are processed smoothly into your bank account.',
-        'Providing an invalid or incorrect UPI ID may cause payout delays.'
-      ]
-    },
-    {
-      id: 'proofs',
-      icon: '📸',
-      title: 'Scoreboard Proof & Dispute Resolution',
-      rules: [
-        'Always take a full, clear screenshot of the end-game match summary scoreboard showing your placement and kill count.',
-        'If you experience any dispute regarding kills or rank, upload your screenshot proof in the match lobby or send it to Telegram support.',
-        'Admin decisions regarding rule violations, cheaters, and final standings are final and binding.',
-        'For fast 24/7 assistance, reach out directly to the official Telegram channel: @zesttournament.'
+      id: 'final_note',
+      icon: '⚡',
+      title: 'FINAL NOTE & DISCLAIMER',
+      items: [
+        'Sabhi rules follow karna mandatory hai.',
+        'Admin ka decision final hoga.',
+        'Fair play maintain karein.',
+        'Disclaimer: Garena Free Fire glitches ke liye Zest Tournament zimmedar nahi hoga. Ye user ki khud ki responsibility hogi.'
       ]
     }
   ];
@@ -70,7 +77,7 @@ export default function RulesPage({ setCurrentView }) {
   return (
     <div className="animate-slide-in" style={{ display: 'flex', flexDirection: 'column', gap: '18px', paddingBottom: '40px' }}>
       
-      {/* Header Bar */}
+      {/* Top Navigation & Header */}
       <div className="flex-between" style={{ flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <button 
@@ -81,7 +88,7 @@ export default function RulesPage({ setCurrentView }) {
             ← Back to Arena
           </button>
           <h2 style={{ 
-            fontSize: '1.4rem', 
+            fontSize: '1.35rem', 
             margin: 0, 
             fontFamily: 'var(--font-heading)',
             fontWeight: '900',
@@ -90,10 +97,10 @@ export default function RulesPage({ setCurrentView }) {
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent'
           }}>
-            📜 TOURNAMENT RULES & CODE OF CONDUCT
+            📜 MATCH DETAILS & TOURNAMENT RULES
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-            Official competitive guidelines and fairplay policies for all Free Fire esports matches on Zest.
+            🔥 Zest Tournament – Play Fair, Win Fair
           </p>
         </div>
 
@@ -122,15 +129,16 @@ export default function RulesPage({ setCurrentView }) {
         </a>
       </div>
 
-      {/* Category Pills */}
+      {/* Category Filter Pills */}
       <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
         {[
           { id: 'all', label: '🌟 All Rules' },
-          { id: 'general', label: '⚔️ Match Rules' },
-          { id: 'devices', label: '📱 Devices' },
-          { id: 'fairplay', label: '🛡️ Anti-Cheat' },
-          { id: 'payouts', label: '💰 Prize Money' },
-          { id: 'proofs', label: '📸 Proofs' }
+          { id: 'pov', label: '📹 POV Rules' },
+          { id: 'match_limit', label: '⚠️ Match Limit' },
+          { id: 'host_room', label: '🔑 Host & Room' },
+          { id: 'device', label: '📱 Device Rules' },
+          { id: 'penalty', label: '🚫 Penalty & Ban' },
+          { id: 'final_note', label: '⚡ Final Note' }
         ].map(cat => (
           <button
             key={cat.id}
@@ -155,7 +163,7 @@ export default function RulesPage({ setCurrentView }) {
         ))}
       </div>
 
-      {/* Rules Cards */}
+      {/* Rules Display Cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {filteredSections.map(sec => (
           <div 
@@ -165,70 +173,80 @@ export default function RulesPage({ setCurrentView }) {
               padding: '18px 20px',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '12px',
-              background: 'rgba(15, 18, 29, 0.7)'
+              background: 'rgba(15, 18, 29, 0.75)'
             }}
           >
-            <h3 style={{ 
-              fontSize: '1rem', 
-              color: 'var(--secondary)', 
-              margin: '0 0 12px 0', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              fontFamily: 'var(--font-heading)'
-            }}>
-              <span style={{ fontSize: '1.2rem' }}>{sec.icon}</span> {sec.title}
-            </h3>
+            <div style={{ marginBottom: '12px' }}>
+              <h3 style={{ 
+                fontSize: '1rem', 
+                color: 'var(--secondary)', 
+                margin: 0, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                fontFamily: 'var(--font-heading)'
+              }}>
+                <span style={{ fontSize: '1.15rem' }}>{sec.icon}</span> ◆ {sec.title}
+              </h3>
+              {sec.subtitle && (
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  {sec.subtitle}
+                </p>
+              )}
+            </div>
 
-            <ul style={{ 
-              margin: 0, 
-              paddingLeft: '20px', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '10px', 
-              color: 'var(--text-secondary)',
-              fontSize: '0.82rem',
-              lineHeight: '1.5'
-            }}>
-              {sec.rules.map((r, idx) => (
-                <li key={idx} style={{ paddingLeft: '4px' }}>
-                  {r}
-                </li>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {sec.items.map((item, idx) => (
+                <div 
+                  key={idx} 
+                  style={{
+                    fontSize: '0.84rem',
+                    color: item.includes('❌') || item.includes('🚫') || item.includes('⚠️') ? '#ff80ab' : 'var(--text-secondary)',
+                    lineHeight: '1.5',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    borderLeft: `3px solid ${item.includes('❌') || item.includes('🚫') ? 'var(--danger)' : item.includes('✅') ? 'var(--success)' : 'var(--primary)'}`
+                  }}
+                >
+                  {item}
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Bottom Help Banner */}
+      {/* Final Disclaimer & Branding Footer */}
       <div 
-        className="glass-panel flex-between"
+        className="glass-panel"
         style={{
-          padding: '18px 20px',
-          background: 'linear-gradient(135deg, rgba(255, 87, 34, 0.1) 0%, rgba(0, 229, 255, 0.1) 100%)',
-          border: '1px solid rgba(255, 87, 34, 0.3)',
+          padding: '20px',
+          background: 'linear-gradient(135deg, rgba(255, 87, 34, 0.12) 0%, rgba(0, 229, 255, 0.1) 100%)',
+          border: '1px solid rgba(255, 87, 34, 0.35)',
           borderRadius: '12px',
-          flexWrap: 'wrap',
-          gap: '12px'
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px'
         }}
       >
-        <div>
-          <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', color: '#fff' }}>
-            Have a question or need to report a cheater?
-          </h4>
-          <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            Our match arbiters and tournament hosts are available 24/7 on Telegram.
-          </p>
+        <div style={{ fontSize: '1rem', fontWeight: '900', fontFamily: 'var(--font-heading)', color: '#fff' }}>
+          🔥 Zest Tournament – Play Fair, Win Fair
         </div>
-
+        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', maxWidth: '600px', lineHeight: '1.4' }}>
+          Disclaimer: Garena Free Fire glitches ke liye Zest Tournament zimmedar nahi hoga. Ye user ki khud ki responsibility hogi.
+        </p>
         <a
           href="https://t.me/zesttournament"
           target="_blank"
           rel="noopener noreferrer"
           className="btn btn-primary"
           style={{
-            padding: '10px 18px',
-            fontSize: '0.82rem',
+            marginTop: '6px',
+            padding: '8px 18px',
+            fontSize: '0.8rem',
             fontWeight: '800',
             textDecoration: 'none',
             display: 'inline-flex',
@@ -236,7 +254,7 @@ export default function RulesPage({ setCurrentView }) {
             gap: '6px'
           }}
         >
-          <span>💬</span> Contact Us: @zesttournament
+          <span>💬</span> Telegram: @zesttournament
         </a>
       </div>
 
