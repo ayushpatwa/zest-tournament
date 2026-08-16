@@ -7,9 +7,12 @@ import ProfilePage from './components/ProfilePage';
 import AdminHostPanel from './components/AdminHostPanel';
 import LoginPage from './components/LoginPage';
 import MyMatchesPage from './components/MyMatchesPage';
-import { sendToMakeWebhook } from './services/webhookService';
+import { sendToMakeWebhook, updateLiveWebhookUrl } from './services/webhookService';
+import { updateLiveRazorpayConfig } from './services/razorpayService';
 import { 
   subscribeToTournamentsRealtime, 
+  subscribeToAppSettingsRealtime,
+  saveAppSettingsRealtime,
   saveTournamentRealtime, 
   deleteTournamentRealtime,
   joinTournamentRealtime, 
@@ -65,16 +68,36 @@ export default function App() {
     };
   });
 
-  // 1. Subscribe to Real-Time Firebase Firestore Tournaments Collection
+  // 1. Subscribe to Real-Time Firebase Firestore Tournaments & App Settings
   useEffect(() => {
-    console.log('[Firebase Realtime] Subscribing to live tournaments...');
-    const unsubscribe = subscribeToTournamentsRealtime((liveTournaments) => {
+    console.log('[Firebase Realtime] Subscribing to live tournaments and app config...');
+    
+    // Subscribe to tournaments
+    const unsubscribeTourneys = subscribeToTournamentsRealtime((liveTournaments) => {
       if (liveTournaments && liveTournaments.length > 0) {
         setTournaments(liveTournaments);
       }
     });
 
-    return () => unsubscribe();
+    // Subscribe to dynamic cloud app settings (Razorpay Key ID & Webhook)
+    const unsubscribeSettings = subscribeToAppSettingsRealtime((settings) => {
+      if (settings) {
+        if (settings.razorpayKeyId) {
+          updateLiveRazorpayConfig({
+            keyId: settings.razorpayKeyId,
+            merchantName: settings.razorpayMerchantName || 'Zest Tournament Esports'
+          });
+        }
+        if (settings.webhookUrl) {
+          updateLiveWebhookUrl(settings.webhookUrl);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeTourneys();
+      unsubscribeSettings();
+    };
   }, []);
 
   // Sync user profile & wallet to local storage

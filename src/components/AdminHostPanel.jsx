@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 import { getRazorpayConfig, setRazorpayConfig } from '../services/razorpayService';
+import { saveAppSettingsRealtime } from '../services/firebase';
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView }) {
   const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'manage' | 'razorpay' | 'webhook'
@@ -178,18 +179,26 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     setTimeout(() => setPayoutSuccessMsg(''), 4000);
   };
 
-  const handleSaveRazorpayConfig = (e) => {
+  const handleSaveRazorpayConfig = async (e) => {
     e.preventDefault();
     setRazorpayConfig(razorpaySettings);
-    setRazorpaySavedStatus('✅ Razorpay Gateway configurations updated successfully.');
-    setTimeout(() => setRazorpaySavedStatus(''), 3000);
+    await saveAppSettingsRealtime({
+      razorpayKeyId: razorpaySettings.keyId,
+      razorpayMerchantName: razorpaySettings.merchantName,
+      razorpayThemeColor: razorpaySettings.themeColor
+    });
+    setRazorpaySavedStatus('✅ Razorpay Gateway configurations synced to cloud and all APK/Web players in real-time!');
+    setTimeout(() => setRazorpaySavedStatus(''), 4000);
   };
 
-  const handleSaveWebhook = (e) => {
+  const handleSaveWebhook = async (e) => {
     e.preventDefault();
     setWebhookUrl(webhookInput);
-    setWebhookStatus('✅ Webhook URL successfully saved to local system.');
-    setTimeout(() => setWebhookStatus(''), 3000);
+    await saveAppSettingsRealtime({
+      webhookUrl: webhookInput.trim()
+    });
+    setWebhookStatus('✅ Webhook URL successfully synced to cloud and all devices!');
+    setTimeout(() => setWebhookStatus(''), 4000);
   };
 
   const handleTestWebhook = async () => {

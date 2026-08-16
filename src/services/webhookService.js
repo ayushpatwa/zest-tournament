@@ -1,4 +1,5 @@
 // Service to handle Make.com Webhook integrations for Google Sheets logging
+let dynamicWebhookUrl = null;
 
 const WEBHOOK_STORAGE_KEY = 'zest_make_webhook_url';
 export const DEFAULT_MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/ljeqrnyu7aeyzqzimj5dtm3ei29eq24j';
@@ -19,7 +20,17 @@ export const sanitizeWebhookUrl = (input) => {
   return url;
 };
 
+export const updateLiveWebhookUrl = (url) => {
+  if (url) {
+    dynamicWebhookUrl = sanitizeWebhookUrl(url);
+    console.log('[Webhook Service] Dynamic cloud webhook updated:', dynamicWebhookUrl);
+  }
+};
+
 export const getWebhookUrl = () => {
+  if (dynamicWebhookUrl) {
+    return dynamicWebhookUrl;
+  }
   const saved = localStorage.getItem(WEBHOOK_STORAGE_KEY);
   if (saved) {
     if (saved.includes('d7lav19d6j4mxvuittql3pkdb8vwzs55')) {
@@ -33,9 +44,11 @@ export const getWebhookUrl = () => {
 
 export const setWebhookUrl = (url) => {
   if (!url || !url.trim()) {
+    dynamicWebhookUrl = null;
     localStorage.removeItem(WEBHOOK_STORAGE_KEY);
   } else {
     const sanitized = sanitizeWebhookUrl(url);
+    dynamicWebhookUrl = sanitized;
     localStorage.setItem(WEBHOOK_STORAGE_KEY, sanitized);
   }
 };

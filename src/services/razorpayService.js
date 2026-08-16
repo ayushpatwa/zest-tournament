@@ -1,4 +1,5 @@
 // Razorpay Payment Gateway Integration Service for Zest Tournament
+let dynamicRazorpayConfig = null;
 
 const RAZORPAY_STORAGE_KEY = 'zest_razorpay_gateway_config';
 
@@ -8,7 +9,21 @@ export const DEFAULT_RAZORPAY_CONFIG = {
   themeColor: '#00e5ff'
 };
 
+export const updateLiveRazorpayConfig = (config) => {
+  if (config && config.keyId) {
+    dynamicRazorpayConfig = {
+      keyId: config.keyId,
+      merchantName: config.merchantName || DEFAULT_RAZORPAY_CONFIG.merchantName,
+      themeColor: config.themeColor || DEFAULT_RAZORPAY_CONFIG.themeColor
+    };
+    console.log('[Razorpay Service] Dynamic cloud key updated:', config.keyId);
+  }
+};
+
 export const getRazorpayConfig = () => {
+  if (dynamicRazorpayConfig && dynamicRazorpayConfig.keyId) {
+    return dynamicRazorpayConfig;
+  }
   const saved = localStorage.getItem(RAZORPAY_STORAGE_KEY);
   if (saved) {
     try {
@@ -21,6 +36,7 @@ export const getRazorpayConfig = () => {
 };
 
 export const setRazorpayConfig = (config) => {
+  dynamicRazorpayConfig = config;
   localStorage.setItem(RAZORPAY_STORAGE_KEY, JSON.stringify(config));
 };
 

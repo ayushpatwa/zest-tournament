@@ -273,6 +273,45 @@ export const saveTournamentRealtime = async (tournamentData) => {
 };
 
 /**
+ * Real-time listener for app configurations (Razorpay keys, Webhook URLs)
+ * Automatically syncs live keys to all installed APKs and Web users in real-time!
+ */
+export const subscribeToAppSettingsRealtime = (onUpdate, onError) => {
+  try {
+    const configDocRef = doc(db, "settings", "app_config");
+    const unsubscribe = onSnapshot(configDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        console.log("[Firebase Realtime] Received updated app settings from cloud:", data);
+        if (onUpdate) onUpdate(data);
+      }
+    }, (error) => {
+      console.warn("[Firebase] Settings listener warning:", error);
+      if (onError) onError(error);
+    });
+    return unsubscribe;
+  } catch (err) {
+    console.error("[Firebase] App settings listener error:", err);
+    return () => {};
+  }
+};
+
+/**
+ * Saves app configurations (Razorpay keys, Webhooks) to Firestore cloud
+ */
+export const saveAppSettingsRealtime = async (settings) => {
+  try {
+    const configDocRef = doc(db, "settings", "app_config");
+    await setDoc(configDocRef, { ...settings, updatedAt: serverTimestamp() }, { merge: true });
+    console.log("[Firebase] App settings saved to cloud in real-time:", settings);
+    return { success: true };
+  } catch (error) {
+    console.error("[Firebase] Error saving app settings to cloud:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
  * Deletes a tournament from Firestore in real-time
  */
 export const deleteTournamentRealtime = async (tournamentId) => {
