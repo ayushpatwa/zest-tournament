@@ -5,7 +5,8 @@ import {
   saveAppSettingsRealtime, 
   creditUserWalletRealtime, 
   deductUserWalletRealtime, 
-  subscribeToAllUsersRealtime 
+  subscribeToAllUsersRealtime,
+  resetUserPasswordRealtime
 } from '../services/firebase';
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView }) {
@@ -926,21 +927,50 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => setPayoutPlayerIdentifier(u.uid || u.id)}
-                      style={{
-                        padding: '6px 12px',
-                        fontSize: '0.72rem',
-                        background: payoutPlayerIdentifier === (u.uid || u.id) ? 'var(--success)' : 'rgba(255,255,255,0.1)',
-                        color: payoutPlayerIdentifier === (u.uid || u.id) ? '#000' : '#fff',
-                        fontWeight: '700',
-                        borderRadius: '6px'
-                      }}
-                    >
-                      {payoutPlayerIdentifier === (u.uid || u.id) ? '✓ Selected' : '👉 Select Player'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setPayoutPlayerIdentifier(u.uid || u.id)}
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.72rem',
+                          background: payoutPlayerIdentifier === (u.uid || u.id) ? 'var(--success)' : 'rgba(255,255,255,0.1)',
+                          color: payoutPlayerIdentifier === (u.uid || u.id) ? '#000' : '#fff',
+                          fontWeight: '700',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        {payoutPlayerIdentifier === (u.uid || u.id) ? '✓ Selected' : '👉 Select'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={async () => {
+                          const newPass = window.prompt(`Enter new password for player "${u.nickname || u.uid}":`, '123456');
+                          if (newPass && newPass.trim().length >= 4) {
+                            const res = await resetUserPasswordRealtime(u.uid || u.id, '', newPass.trim());
+                            if (res.success) {
+                              alert(`✅ Password updated to "${newPass.trim()}" for player ${u.nickname || u.uid}!`);
+                            } else {
+                              alert(`⚠️ Failed: ${res.error}`);
+                            }
+                          }
+                        }}
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.72rem',
+                          background: 'rgba(255, 214, 0, 0.15)',
+                          color: 'var(--accent)',
+                          border: '1px solid rgba(255, 214, 0, 0.4)',
+                          fontWeight: '700',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        🔑 Reset Pass
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

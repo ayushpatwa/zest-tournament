@@ -611,3 +611,85 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Resets a user's password in Firestore after verifying their UID/Email and Phone
+ */
+export const resetUserPasswordRealtime = async (identifier, verificationPhone, newPassword) => {
+  try {
+    if (!newPassword || newPassword.length < 4) {
+      return { success: false, error: 'New password must be at least 4 characters long.' };
+    }
+
+    const queryStr = String(identifier).trim().toLowerCase();
+    const phoneQuery = verificationPhone ? String(verificationPhone).replace(/[^0-9]/g, '') : '';
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    
+    let targetDocId = null;
+    let targetUserData = null;
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
+      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
+      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
+      
+      if (docIdMatch || uidMatch || emailMatch) {
+        targetDocId = docSnap.id;
+        targetUserData = data;
+      }
+    });
+
+    if (!targetDocId) {
+      // Check localStorage fallback
+      const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+      const foundLocal = localUsers.find(u => 
+        u.uid?.trim().toLowerCase() === queryStr || 
+        u.email?.trim().toLowerCase() === queryStr
+      );
+      if (foundLocal) {
+        targetUserData = foundLocal;
+        targetDocId = String(foundLocal.uid || foundLocal.id).trim();
+      }
+    }
+
+    if (!targetUserData && !targetDocId) {
+      return { success: false, error: 'No account found with this Free Fire UID or Email.' };
+    }
+
+    // Verify phone number (if provided)
+    if (targetUserData && targetUserData.phone && phoneQuery) {
+      const userPhoneClean = String(targetUserData.phone).replace(/[^0-9]/g, '');
+      if (!userPhoneClean.includes(phoneQuery) && !phoneQuery.includes(userPhoneClean.slice(-4))) {
+        return { success: false, error: 'Registered phone number does not match this account.' };
+      }
+    }
+
+    // Update password in Firestore
+    const finalDocId = targetDocId || String(targetUserData.uid || identifier).trim();
+    const targetRef = doc(db, "users", finalDocId);
+    await setDoc(targetRef, {
+      password: newPassword,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    // Also update local cache
+    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const updated = existingUsers.map(u => {
+      if (u.uid === queryStr || u.email?.toLowerCase() === queryStr) {
+        return { ...u, password: newPassword };
+      }
+      return u;
+    });
+    localStorage.setItem('zest_registered_users', JSON.stringify(updated));
+
+    return { 
+      success: true, 
+      user: { ...(targetUserData || {}), password: newPassword, uid: targetUserData?.uid || finalDocId } 
+    };
+  } catch (err) {
+    console.error("[Firebase] Error resetting password:", err);
+    return { success: false, error: err.message };
+  }
+};

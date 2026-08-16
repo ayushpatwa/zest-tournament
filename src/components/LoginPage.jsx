@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { sendToMakeWebhook } from '../services/webhookService';
+import { resetUserPasswordRealtime } from '../services/firebase';
 
 export default function LoginPage({ onLoginSuccess }) {
-  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'admin'
+  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'admin' | 'forgot'
   
   // Sign Up form state
   const [nickname, setNickname] = useState('');
@@ -13,6 +14,12 @@ export default function LoginPage({ onLoginSuccess }) {
   
   // Player Sign In state
   const [loginIdentifier, setLoginIdentifier] = useState('');
+  
+  // Account Recovery state
+  const [recoverIdentifier, setRecoverIdentifier] = useState('');
+  const [recoverPhone, setRecoverPhone] = useState('');
+  const [newResetPassword, setNewResetPassword] = useState('');
+  const [resetSuccessMsg, setResetSuccessMsg] = useState('');
   
   // Admin Login state
   const [adminUsername, setAdminUsername] = useState('admin');
@@ -179,6 +186,42 @@ export default function LoginPage({ onLoginSuccess }) {
     }
 
     setErrorMsg('Invalid Admin username or password. (Default: admin / admin123)');
+  };
+
+  const handleRecoverPassword = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setResetSuccessMsg('');
+
+    if (!recoverIdentifier.trim()) {
+      setErrorMsg('Please enter your Free Fire UID or Email.');
+      return;
+    }
+    if (!newResetPassword.trim() || newResetPassword.length < 4) {
+      setErrorMsg('New password must be at least 4 characters long.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await resetUserPasswordRealtime(recoverIdentifier.trim(), recoverPhone.trim(), newResetPassword.trim());
+    
+    if (res.success) {
+      setResetSuccessMsg('✅ Password reset successfully! Logging into your account...');
+      await sendToMakeWebhook({
+        eventType: 'PASSWORD_RESET',
+        nickname: res.user?.nickname || 'Player',
+        ffUid: res.user?.uid || recoverIdentifier,
+        email: res.user?.email || 'N/A',
+        phone: res.user?.phone || recoverPhone,
+        details: 'Player self-service password reset'
+      });
+      setTimeout(() => {
+        onLoginSuccess(res.user);
+      }, 1500);
+    } else {
+      setErrorMsg(res.error || 'Failed to verify account.');
+    }
+    setLoading(false);
   };
 
   return (
@@ -365,6 +408,104 @@ export default function LoginPage({ onLoginSuccess }) {
               />
             </div>
 
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-6px' }}>
+              <button
+                type="button"
+                onClick={() => { setAuthMode('forgot'); setErrorMsg(''); setResetSuccessMsg(''); setRecoverIdentifier(loginIdentifier); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--secondary)',
+                  fontSize: '0.74rem',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                🔑 Forgot Password?
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+              style={{
+                width: '100%',
+                height: '46px',
+                marginTop: '2px',
+                fontSize: '0.9rem'
+              }}
+            >
+              {loading ? 'Signing In...' : '🚀 Sign In as Player'}
+            </button>
+          </form>
+        )}
+
+        {/* MODE 4: FORGOT PASSWORD / ACCOUNT RECOVERY */}
+        {authMode === 'forgot' && (
+          <form onSubmit={handleRecoverPassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{
+              background: 'rgba(0, 229, 255, 0.08)',
+              border: '1px solid rgba(0, 229, 255, 0.25)',
+              padding: '10px',
+              borderRadius: '8px',
+              fontSize: '0.75rem',
+              color: 'var(--secondary)',
+              lineHeight: '1.4'
+            }}>
+              🔑 <strong>Recover Account:</strong> Enter your Free Fire UID or Email and registered phone number to reset your password.
+            </div>
+
+            {resetSuccessMsg && (
+              <div style={{
+                background: 'rgba(0, 230, 118, 0.15)',
+                border: '1px solid var(--success)',
+                color: 'var(--success)',
+                fontSize: '0.8rem',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                lineHeight: '1.4'
+              }}>
+                {resetSuccessMsg}
+              </div>
+            )}
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Free Fire UID or Email <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <input
+                type="text"
+                value={recoverIdentifier}
+                onChange={(e) => setRecoverIdentifier(e.target.value)}
+                placeholder="Enter UID or Email"
+                className="form-input"
+                required
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Registered Phone Number <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <input
+                type="tel"
+                value={recoverPhone}
+                onChange={(e) => setRecoverPhone(e.target.value)}
+                placeholder="e.g. 9876543210"
+                className="form-input"
+                required
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>New Password <span style={{ color: 'var(--primary)' }}>* (Min 4 chars)</span></label>
+              <input
+                type="password"
+                value={newResetPassword}
+                onChange={(e) => setNewResetPassword(e.target.value)}
+                placeholder="Enter new password"
+                className="form-input"
+                required
+              />
+            </div>
+
             <button
               type="submit"
               className="btn btn-primary"
@@ -373,10 +514,22 @@ export default function LoginPage({ onLoginSuccess }) {
                 width: '100%',
                 height: '46px',
                 marginTop: '4px',
-                fontSize: '0.9rem'
+                fontSize: '0.9rem',
+                background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)',
+                color: '#000',
+                fontWeight: '900'
               }}
             >
-              {loading ? 'Signing In...' : '🚀 Sign In as Player'}
+              {loading ? 'Verifying & Resetting...' : '⚡ Reset Password & Log In'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setAuthMode('signin'); setErrorMsg(''); setResetSuccessMsg(''); }}
+              className="btn btn-outline"
+              style={{ width: '100%', height: '40px', fontSize: '0.8rem', marginTop: '2px' }}
+            >
+              ← Back to Sign In
             </button>
           </form>
         )}
