@@ -7,6 +7,8 @@ import ProfilePage from './components/ProfilePage';
 import AdminHostPanel from './components/AdminHostPanel';
 import LoginPage from './components/LoginPage';
 import MyMatchesPage from './components/MyMatchesPage';
+import AppUpdateModal from './components/AppUpdateModal';
+import { isNewVersionAvailable, CURRENT_APP_VERSION } from './services/appUpdateService';
 import { sendToMakeWebhook, updateLiveWebhookUrl } from './services/webhookService';
 import { updateLiveRazorpayConfig } from './services/razorpayService';
 import { 
@@ -68,6 +70,10 @@ export default function App() {
     };
   });
 
+  // App update states
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+
   // 1. Subscribe to Real-Time Firebase Firestore Tournaments & App Settings
   useEffect(() => {
     console.log('[Firebase Realtime] Subscribing to live tournaments and app config...');
@@ -79,7 +85,7 @@ export default function App() {
       }
     });
 
-    // Subscribe to dynamic cloud app settings (Razorpay Key ID & Webhook)
+    // Subscribe to dynamic cloud app settings (Razorpay Key ID, Webhook, App Version Updates)
     const unsubscribeSettings = subscribeToAppSettingsRealtime((settings) => {
       if (settings) {
         if (settings.razorpayKeyId) {
@@ -90,6 +96,11 @@ export default function App() {
         }
         if (settings.webhookUrl) {
           updateLiveWebhookUrl(settings.webhookUrl);
+        }
+        if (settings.appUpdate && isNewVersionAvailable(CURRENT_APP_VERSION, settings.appUpdate.latestVersion)) {
+          console.log('[App Update] New version detected:', settings.appUpdate.latestVersion);
+          setUpdateInfo(settings.appUpdate);
+          setShowUpdateModal(true);
         }
       }
     });
@@ -296,6 +307,14 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Real-time In-App Update Notice Modal (Option C) */}
+      {showUpdateModal && updateInfo && (
+        <AppUpdateModal 
+          updateInfo={updateInfo} 
+          onDismiss={() => setShowUpdateModal(false)} 
+        />
+      )}
     </div>
   );
 }

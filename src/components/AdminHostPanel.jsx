@@ -39,6 +39,14 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   const [webhookStatus, setWebhookStatus] = useState('');
   const [testingWebhook, setTestingWebhook] = useState(false);
 
+  // App Update Publisher states
+  const [updateVersion, setUpdateVersion] = useState('1.1.0');
+  const [updateTitle, setUpdateTitle] = useState('🔥 New Tournament Updates & Features!');
+  const [updateNotes, setUpdateNotes] = useState('• Added Clash Squad 2v2 & Headshot Modes\n• Instant Room ID updates\n• Seamless Razorpay deposits');
+  const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
+  const [forceUpdate, setForceUpdate] = useState(false);
+  const [updatePublishStatus, setUpdatePublishStatus] = useState('');
+
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('zest_match_proofs') || '[]');
     setMatchProofs(saved);
@@ -222,6 +230,26 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     }
   };
 
+  const handlePublishAppUpdate = async (e) => {
+    e.preventDefault();
+    if (!updateDownloadUrl.trim()) {
+      setUpdatePublishStatus('⚠️ Please enter an APK Download URL (Google Drive, Website link, etc.)');
+      return;
+    }
+    await saveAppSettingsRealtime({
+      appUpdate: {
+        latestVersion: updateVersion.trim(),
+        title: updateTitle.trim(),
+        notes: updateNotes.trim(),
+        downloadUrl: updateDownloadUrl.trim(),
+        forceUpdate: forceUpdate,
+        publishedAt: new Date().toISOString()
+      }
+    });
+    setUpdatePublishStatus(`✅ In-App Update Notice (v${updateVersion}) published to all players in real-time!`);
+    setTimeout(() => setUpdatePublishStatus(''), 4000);
+  };
+
   return (
     <div className="animate-slide-in" style={{ paddingBottom: '32px' }}>
       
@@ -313,6 +341,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             }}
           >
             📊 Google Sheet
+          </button>
+
+          <button
+            onClick={() => setActiveTab('app_update')}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              background: activeTab === 'app_update' ? 'linear-gradient(135deg, #00e5ff 0%, #7c4dff 100%)' : 'rgba(255,255,255,0.05)',
+              color: '#fff',
+              border: '1px solid var(--border-color)',
+              fontWeight: '900'
+            }}
+          >
+            🚀 App Update (APK)
           </button>
         </div>
       </div>
@@ -738,6 +782,98 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             </div>
           </form>
         </div>
+      )}
+
+      {/* MODE 6: IN-APP UPDATE NOTICES (OPTION C) */}
+      {activeTab === 'app_update' && (
+        <form onSubmit={handlePublishAppUpdate} className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', color: 'var(--secondary)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🚀</span> In-App Update Publisher (Option C)
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+              When you build and upload a new APK (e.g. to Google Drive, MediaFire, or your Website), publish an update notice here. All players using older APK versions will automatically see a popup prompt to download the latest version!
+            </p>
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Latest App Version (e.g. 1.1.0)</label>
+              <input 
+                type="text"
+                value={updateVersion}
+                onChange={(e) => setUpdateVersion(e.target.value)}
+                placeholder="1.1.0"
+                className="form-input"
+                required
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Update Headline</label>
+              <input 
+                type="text"
+                value={updateTitle}
+                onChange={(e) => setUpdateTitle(e.target.value)}
+                placeholder="🔥 Major Update Available!"
+                className="form-input"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>APK Download Link (Google Drive / Website / GitHub)</label>
+            <input 
+              type="url"
+              value={updateDownloadUrl}
+              onChange={(e) => setUpdateDownloadUrl(e.target.value)}
+              placeholder="https://drive.google.com/file/d/xxxx/view or https://yourdomain.com/app.apk"
+              className="form-input"
+              required
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>What's New / Release Notes</label>
+            <textarea 
+              value={updateNotes}
+              onChange={(e) => setUpdateNotes(e.target.value)}
+              placeholder="• New tournaments added&#10;• Faster room ID updates&#10;• Bug fixes"
+              className="form-input"
+              rows={4}
+              style={{ resize: 'vertical', fontSize: '0.82rem' }}
+              required
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <input 
+              type="checkbox"
+              id="forceUpdateCheck"
+              checked={forceUpdate}
+              onChange={(e) => setForceUpdate(e.target.checked)}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }}
+            />
+            <label htmlFor="forceUpdateCheck" style={{ fontSize: '0.82rem', color: '#fff', cursor: 'pointer', margin: 0 }}>
+              <strong>Mandatory / Force Update:</strong> Block access until the player downloads the new APK.
+            </label>
+          </div>
+
+          {updatePublishStatus && (
+            <div style={{ color: 'var(--success)', background: 'rgba(0,230,118,0.1)', padding: '10px', borderRadius: '8px', border: '1px solid var(--success)', fontSize: '0.85rem' }}>
+              {updatePublishStatus}
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            className="btn btn-secondary"
+            style={{ width: '100%', height: '48px', fontWeight: '900', background: 'linear-gradient(135deg, #00e5ff 0%, #7c4dff 100%)', color: '#fff' }}
+          >
+            🚀 Publish Update Alert to All Players Now
+          </button>
+        </form>
       )}
 
     </div>
