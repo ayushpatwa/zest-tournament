@@ -64,7 +64,7 @@ export default function LoginPage({ onLoginSuccess }) {
       phone: phone.trim(),
       password: password,
       role: 'player', // Standard player
-      wallet: 250,
+      wallet: 0,
       stats: {
         matches: 0,
         wins: 0,
@@ -92,7 +92,7 @@ export default function LoginPage({ onLoginSuccess }) {
       ffUid: newUser.uid,
       email: newUser.email,
       phone: newUser.phone,
-      details: 'New Player Registration + ₹250 Welcome Bonus'
+      details: 'New Player Registration'
     });
 
     setLoading(false);
@@ -455,7 +455,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 fontSize: '0.9rem'
               }}
             >
-              {loading ? 'Registering...' : '🔥 Register & Get ₹250'}
+              {loading ? 'Registering...' : '🔥 Register Account'}
             </button>
           </form>
         )}

@@ -35,19 +35,10 @@ export default function App() {
   
   // Wallet state
   const [walletBalance, setWalletBalance] = useState(() => {
-    return currentUser?.wallet || 250;
+    return currentUser?.wallet || 0;
   });
 
-  const [transactions, setTransactions] = useState([
-    {
-      id: 1,
-      type: 'deposit',
-      amount: 250,
-      title: 'Welcome Signup Bonus',
-      date: 'Aug 14, 10:00 AM',
-      status: 'Success'
-    }
-  ]);
+  const [transactions, setTransactions] = useState([]);
 
   // Real-time Firestore Tournaments State
   const [tournaments, setTournaments] = useState(SEED_TOURNAMENTS);
@@ -61,6 +52,7 @@ export default function App() {
       email: '',
       phone: '',
       role: 'player',
+      wallet: 0,
       stats: {
         matches: 0,
         wins: 0,
@@ -127,7 +119,7 @@ export default function App() {
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
     setUserProfile(user);
-    setWalletBalance(user.wallet || 250);
+    setWalletBalance(user.wallet ?? 0);
     localStorage.setItem('zest_current_user', JSON.stringify(user));
     saveUserProfileRealtime(user);
     setCurrentView('dashboard');

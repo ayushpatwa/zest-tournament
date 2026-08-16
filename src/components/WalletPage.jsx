@@ -3,7 +3,7 @@ import { openRazorpayCheckout } from '../services/razorpayService';
 import { sendToMakeWebhook } from '../services/webhookService';
 
 export default function WalletPage({ 
-  walletBalance = 250, 
+  walletBalance = 0, 
   setWalletBalance, 
   transactions = [], 
   setTransactions,
