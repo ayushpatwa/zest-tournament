@@ -417,51 +417,80 @@ export default function TournamentLobby({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
             
-            {/* 1. POV & Dispute */}
+            {/* 1. CS / Lone Wolf Gameplay Rules */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: '#00e5ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>📹</span> ◆ POV & DISPUTE RULES
+                <span>⚔️</span> ◆ CS / LONE WOLF FAIRPLAY
               </h4>
               <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                <li>Opponent ka POV sirf valid proof ke saath hi demand kiya ja sakta hai.</li>
-                <li>POV request match ke 1 hour ke andar karni hogi (Late requests accept nahi hongi).</li>
-                <li><strong style={{ color: '#ff80ab' }}>POV Rule:</strong> No POV = Canceled withdrawal and coin loss.</li>
+                <li>Grenade NOT allowed.</li>
+                <li>Teaming, hacks, bugs aur glitches strictly NOT allowed.</li>
+                <li>Zone pack strictly NOT allowed.</li>
+                <li>Camping strictly NOT allowed.</li>
+                <li>Unregistered players ko invite karna allowed nahi hai.</li>
+                <li><strong style={{ color: '#ff80ab' }}>Cheating pakde jane par:</strong> 🚫 BAN + Penalty</li>
               </ul>
             </div>
 
-            {/* 2. Match Limit Policy */}
+            {/* 2. CS Headshot Rule */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>⚠️</span> ◆ MATCH LIMIT RULES
+                <span>🎯</span> ◆ CS HEADSHOT RULE
               </h4>
               <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                <li><strong style={{ color: 'var(--success)' }}>✅ Only 8 matches per day allowed.</strong></li>
-                <li>Daily limit exceed hone par har extra match par penalty charge lagega.</li>
-                <li><strong>Penalty Charges:</strong> ₹8 se ₹25 per extra match (mode ke hisaab se apply hoga).</li>
+                <li>CS matches me sirf Headshot kills allowed honge.</li>
+                <li>Character skills aur gun attributes OFF rahenge.</li>
+                <li><strong style={{ color: 'var(--success)' }}>ONLY HEAD GUNS ALLOWED H</strong></li>
               </ul>
             </div>
 
-            {/* 3. Host & Room Rules */}
+            {/* 3. Gun Restrictions & Survival */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>🔑</span> ◆ HOST & ROOM ENTRY RULES
+                <span>🎮</span> ◆ GUN & CHARACTER RESTRICTIONS
               </h4>
               <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                <li>Agar host galti se wrong room me ST kar deta hai, to 1st round ke andar valid proof ke sath report karna hoga. Us case me match restart kiya jayega.</li>
-                <li>1st round ke baad report accept nahi hogi aur No Refund / No Remake diya jayega.</li>
+                <li>SURVIVAL: Matches full na hone par prize pool rank change ho sakta hai (Top 10 to 7 or 6).</li>
+                <li>Restricted Characters: ❌ Orion, ❌ Ryden, ❌ A124.</li>
+                <li>❌ DOUBLE VECTOR AND M79 LAUNCHER STRICTLY NOT ALLOWED.</li>
+                <li>❌ Horses are banned • SURVIVAL: SNIPER NOT ALLOWED.</li>
+              </ul>
+            </div>
+
+            {/* 4. Screen Recording & POV */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: '#ff4081', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📹</span> ◆ SCREEN RECORDING & POV RULES
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>Screen recording ON hona compulsory hai (ID/Pass share hone se pehle).</li>
+                <li>HUD AND FREE FIRE POV MUST (24 hours tak save rakhna compulsory hai).</li>
+                <li>Proof provide na karne par: ❌ No Prize, ❌ No Refund.</li>
+                <li>Opponent POV 1 hour ke andar demand karein. (No POV = Canceled withdrawal).</li>
+              </ul>
+            </div>
+
+            {/* 5. Match Limit Policy */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>⚠️</span> ◆ MATCH LIMIT & HOST ST
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li><strong style={{ color: 'var(--success)' }}>✅ Only 8 matches per day allowed.</strong> (Penalty: ₹8-₹25 per extra match).</li>
+                <li>Host wrong room ST karta hai to 1st round ke andar report karein (Remake hoga).</li>
                 <li><strong style={{ color: 'var(--secondary)' }}>MIN LEVEL-40 ALLOWED</strong></li>
               </ul>
             </div>
 
-            {/* 4. Device & Penalty */}
+            {/* 6. Device & Penalty */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
               <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>🚫</span> ◆ DEVICE & PENALTY RULES
               </h4>
               <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                <li>Sirf Android & iOS devices allowed hain (PC/Emulator/Tablet strictly prohibited).</li>
-                <li><strong style={{ color: '#ff80ab' }}>❌ DPI NOT ALLOWED:</strong> Agar DPI use karte hue pakde gaye toh penalty lagegi.</li>
-                <li>Kisi bhi rule break par: ⚠️ Penalty | ❌ No Refund | 🚫 Permanent BAN.</li>
+                <li>Sirf Android & iOS devices allowed hain (PC/Emulator/Tablet prohibited).</li>
+                <li><strong style={{ color: '#ff80ab' }}>❌ DPI NOT ALLOWED:</strong> Agar DPI use karte pakde gaye toh penalty lagegi.</li>
+                <li>Rule break par: ⚠️ Penalty | ❌ No Refund | 🚫 Permanent BAN.</li>
               </ul>
             </div>
 

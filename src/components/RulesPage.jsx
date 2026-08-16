@@ -5,33 +5,67 @@ export default function RulesPage({ setCurrentView }) {
 
   const ruleSections = [
     {
-      id: 'pov',
-      icon: '📹',
-      title: 'POV & DISPUTE RULES',
+      id: 'cs_lonewolf',
+      icon: '⚔️',
+      title: 'FAIR GAMEPLAY RULES FOR CS / LONE WOLF ETC.',
       items: [
-        'Opponent ka POV sirf valid proof ke saath hi demand kiya ja sakta hai.',
-        'POV request match ke 1 hour ke andar karni hogi.',
-        'Late requests accept nahi ki jayengi.',
+        'Grenade NOT allowed.',
+        'Teaming strictly NOT allowed.',
+        'Hacks, bugs aur glitches strictly NOT allowed.',
+        'Zone pack strictly NOT allowed.',
+        'Camping strictly NOT allowed.',
+        'Unregistered players ko invite karna allowed nahi hai.',
+        '🚫 Cheating pakde jane par: BAN + Penalty'
+      ]
+    },
+    {
+      id: 'cs_headshot',
+      icon: '🎯',
+      title: 'CS HEADSHOT RULE',
+      items: [
+        'CS matches me sirf Headshot kills allowed honge.',
+        'Character skills aur gun attributes OFF rahenge.',
+        '🔥 ONLY HEAD GUNS ALLOWED H.'
+      ]
+    },
+    {
+      id: 'game_rules',
+      icon: '🎮',
+      title: 'GAME RULES & GUN RESTRICTIONS',
+      items: [
+        'SURVIVAL: Agr matches full nhi hote to uske according prize pool change ho sakta hai (Example: TOP 10 TO 7 OR 6).',
+        'SOLO PER KILL: Sab characters allowed hain except restricted characters (❌ Orion, ❌ Ryden, ❌ A124).',
+        'Guns aur attributes match settings ke according honge.',
+        'Vehicles allowed rahenge (unless specified otherwise).',
+        '❌ Specific gun DOUBLE VECTOR AND M79 LAUNCHER STRICTLY NOT ALLOWED.',
+        '❌ Horses are banned.',
+        '❌ SURVIVAL: SNIPER NOT ALLOWED.'
+      ]
+    },
+    {
+      id: 'screen_recording',
+      icon: '📹',
+      title: 'SCREEN RECORDING & POV RULES (VERY IMPORTANT)',
+      items: [
+        'Screen recording ON hona compulsory hai.',
+        'Recording ID & Password share hone se pehle start honi chahiye.',
+        'POV minimum 24 hours tak save rakhna mandatory hai.',
+        'HUD AND FREE FIRE POV MUST (24 hour tak save rakhna compulsory hai, otherwise DIRECT BAN).',
+        'Proof provide na karne par: ❌ No Prize, ❌ No Refund.',
+        'Opponent ka POV sirf valid proof ke saath hi demand kiya ja sakta hai (match ke 1 hour ke andar). Late requests accept nahi hongi.',
         '⚠️ POV Rule: No POV = Canceled withdrawal and coin loss.'
       ]
     },
     {
       id: 'match_limit',
       icon: '⚠️',
-      title: 'MATCH LIMIT RULES',
-      subtitle: 'Daily Match Limit Policy',
+      title: 'MATCH LIMIT & HOST RULES',
+      subtitle: 'Daily Match Limit & Room ST Policy',
       items: [
         '✅ Only 8 matches per day allowed.',
         'Agar daily limit exceed hoti hai, toh uske baad har extra match par penalty charge lagega.',
-        'Penalty Charges: ₹8 se ₹25 per extra match (Penalty amount mode ke hisaab se apply hoga).'
-      ]
-    },
-    {
-      id: 'host_room',
-      icon: '🔑',
-      title: 'HOST & ROOM ENTRY RULES',
-      items: [
-        'Agar host galti se wrong room ya unregistered room me ST kar deta hai, to 1st round ke andar valid proof ke sath report karna hoga. Us case me match back (restart) kiya jayega.',
+        'Penalty Charges: ₹8 se ₹25 per extra match (Penalty amount mode ke hisaab se apply hoga).',
+        'Agar host galti se wrong room ya unregistered room me ST kar deta hai, to 1st round ke andar valid proof ke sath report karna hoga (Us case me match remake kiya jayega).',
         '1st round ke baad report accept nahi hogi aur No Refund / No Remake diya jayega.',
         '🔥 MIN LEVEL-40 ALLOWED'
       ]
@@ -65,7 +99,8 @@ export default function RulesPage({ setCurrentView }) {
         'Sabhi rules follow karna mandatory hai.',
         'Admin ka decision final hoga.',
         'Fair play maintain karein.',
-        'Disclaimer: Garena Free Fire glitches ke liye Zest Tournament zimmedar nahi hoga. Ye user ki khud ki responsibility hogi.'
+        'Disclaimer: Garena Free Fire glitches ke liye Zest Tournament zimmedar nahi hoga. Ye user ki khud ki responsibility hogi.',
+        '🔥 Zest Tournament – Play Fair, Win Fair'
       ]
     }
   ];
@@ -133,9 +168,11 @@ export default function RulesPage({ setCurrentView }) {
       <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
         {[
           { id: 'all', label: '🌟 All Rules' },
-          { id: 'pov', label: '📹 POV Rules' },
+          { id: 'cs_lonewolf', label: '⚔️ CS / Lone Wolf' },
+          { id: 'cs_headshot', label: '🎯 Headshot Rules' },
+          { id: 'game_rules', label: '🎮 Gun Restrictions' },
+          { id: 'screen_recording', label: '📹 Screen Recording & POV' },
           { id: 'match_limit', label: '⚠️ Match Limit' },
-          { id: 'host_room', label: '🔑 Host & Room' },
           { id: 'device', label: '📱 Device Rules' },
           { id: 'penalty', label: '🚫 Penalty & Ban' },
           { id: 'final_note', label: '⚡ Final Note' }
