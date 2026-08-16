@@ -680,6 +680,34 @@ export default function LoginPage({ onLoginSuccess }) {
 
       </div>
 
+      {/* Contact Us / Support Telegram Link */}
+      <div style={{ marginTop: '16px', textAlign: 'center' }}>
+        <a
+          href="https://t.me/zesttournament"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#00e5ff',
+            fontSize: '0.8rem',
+            fontFamily: 'var(--font-heading)',
+            fontWeight: '700',
+            textDecoration: 'none',
+            background: 'linear-gradient(135deg, rgba(0, 136, 204, 0.25) 0%, rgba(0, 229, 255, 0.1) 100%)',
+            border: '1px solid #0088cc',
+            padding: '8px 18px',
+            borderRadius: '24px',
+            boxShadow: '0 4px 15px rgba(0, 136, 204, 0.25)',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <span>💬</span>
+          <span>Contact Us on Telegram (@zesttournament)</span>
+        </a>
+      </div>
+
     </div>
   );
 }

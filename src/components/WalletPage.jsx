@@ -268,6 +268,33 @@ export default function WalletPage({
         )}
       </div>
 
+      {/* Telegram 24/7 Support Banner */}
+      <div style={{ marginTop: '16px', textAlign: 'center' }}>
+        <a
+          href="https://t.me/zesttournament"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#00e5ff',
+            fontSize: '0.8rem',
+            fontFamily: 'var(--font-heading)',
+            fontWeight: '700',
+            textDecoration: 'none',
+            background: 'linear-gradient(135deg, rgba(0, 136, 204, 0.2) 0%, rgba(0, 229, 255, 0.1) 100%)',
+            border: '1px solid #0088cc',
+            padding: '10px 20px',
+            borderRadius: '24px',
+            boxShadow: '0 4px 15px rgba(0, 136, 204, 0.2)'
+          }}
+        >
+          <span>✈️</span>
+          <span>Need Help with Deposit/Withdrawal? Contact @zesttournament</span>
+        </a>
+      </div>
+
       {/* 1. RAZORPAY DEPOSIT MODAL */}
       {showAddModal && (
         <div 

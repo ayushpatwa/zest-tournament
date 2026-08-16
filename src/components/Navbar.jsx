@@ -136,8 +136,34 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
           </div>
 
           {/* Right: Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             
+            {/* Telegram Contact Us Support Button */}
+            <a
+              href="https://t.me/zesttournament"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                background: 'linear-gradient(135deg, rgba(0, 136, 204, 0.25) 0%, rgba(0, 229, 255, 0.15) 100%)',
+                border: '1px solid #0088cc',
+                color: '#00e5ff',
+                padding: '5px 10px',
+                borderRadius: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '0.72rem',
+                fontFamily: 'var(--font-heading)',
+                fontWeight: '700',
+                textDecoration: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 136, 204, 0.3)'
+              }}
+            >
+              <span>✈️</span>
+              <span>CONTACT US</span>
+            </a>
+
             {/* Wallet Cash Button */}
             <div 
               onClick={() => setCurrentView('wallet')}
