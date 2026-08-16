@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 import { getRazorpayConfig, setRazorpayConfig } from '../services/razorpayService';
-import { saveAppSettingsRealtime } from '../services/firebase';
+import { saveAppSettingsRealtime, creditUserWalletRealtime } from '../services/firebase';
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView }) {
-  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'manage' | 'razorpay' | 'webhook'
+  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'manage' | 'razorpay' | 'webhook' | 'app_update'
   
   // Host Form states
   const [title, setTitle] = useState('');
@@ -19,6 +19,13 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   const [errorMsg, setErrorMsg] = useState('');
   const [deleteStatusMsg, setDeleteStatusMsg] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+
+  // Prize Distribution states
+  const [payoutPlayerIdentifier, setPayoutPlayerIdentifier] = useState('');
+  const [payoutAmount, setPayoutAmount] = useState('500');
+  const [payoutReason, setPayoutReason] = useState('1st Place Tournament Winner 🏆');
+  const [payoutStatus, setPayoutStatus] = useState('');
+  const [payoutLoading, setPayoutLoading] = useState(false);
 
   // Room ID Broadcast states
   const [selectedTourneyId, setSelectedTourneyId] = useState(tournaments[0]?.id || '');
@@ -256,6 +263,34 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     setTimeout(() => setUpdatePublishStatus(''), 4000);
   };
 
+  const handleDirectPrizePayout = async (e) => {
+    e.preventDefault();
+    setPayoutStatus('');
+    const amt = parseFloat(payoutAmount);
+    if (!payoutPlayerIdentifier.trim() || isNaN(amt) || amt <= 0) {
+      setPayoutStatus('⚠️ Please enter player UID/Email and a valid prize amount.');
+      return;
+    }
+    setPayoutLoading(true);
+    const res = await creditUserWalletRealtime(payoutPlayerIdentifier.trim(), amt, payoutReason.trim());
+    if (res.success) {
+      setPayoutStatus(`✅ Successfully credited ₹${amt} prize to player (${payoutPlayerIdentifier})!`);
+      await sendToMakeWebhook({
+        eventType: 'PRIZE_PAYOUT',
+        nickname: res.user?.nickname || payoutPlayerIdentifier,
+        ffUid: res.user?.uid || payoutPlayerIdentifier,
+        email: res.user?.email || 'N/A',
+        phone: res.user?.phone || 'N/A',
+        details: `Admin Credited Prize: ₹${amt} (${payoutReason})`
+      });
+      setPayoutPlayerIdentifier('');
+    } else {
+      setPayoutStatus(`⚠️ ${res.error || 'Failed to credit prize'}`);
+    }
+    setPayoutLoading(false);
+    setTimeout(() => setPayoutStatus(''), 5000);
+  };
+
   return (
     <div className="animate-slide-in" style={{ paddingBottom: '32px' }}>
       
@@ -300,6 +335,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             }}
           >
             🔑 Room ID Drop
+          </button>
+
+          <button
+            onClick={() => setActiveTab('payout')}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              background: activeTab === 'payout' ? 'linear-gradient(135deg, #00e676 0%, #ffd600 100%)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'payout' ? '#000' : 'var(--success)',
+              border: '1px solid var(--border-color)',
+              fontWeight: '900'
+            }}
+          >
+            💰 Give Prize Money
           </button>
 
           <button
@@ -633,6 +684,110 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             style={{ width: '100%', height: '48px', marginTop: '8px', background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)', color: '#000', fontWeight: '900' }}
           >
             ⚡ Broadcast Room ID to Players Now
+          </button>
+        </form>
+      )}
+
+      {/* MODE 2.5: DIRECT PRIZE DISTRIBUTION TO USER WALLET */}
+      {activeTab === 'payout' && (
+        <form onSubmit={handleDirectPrizePayout} className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', color: 'var(--success)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>💰</span> Distribute Winning Money to Player Wallet
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+              Credit winnings directly to any player's in-app wallet balance in real-time. Players can withdraw this to their UPI / Bank account anytime!
+            </p>
+          </div>
+
+          {payoutStatus && (
+            <div style={{ 
+              color: payoutStatus.includes('✅') ? 'var(--success)' : 'var(--danger)', 
+              background: payoutStatus.includes('✅') ? 'rgba(0,230,118,0.1)' : 'rgba(255,23,68,0.1)', 
+              padding: '12px 14px', 
+              borderRadius: '8px', 
+              border: `1px solid ${payoutStatus.includes('✅') ? 'var(--success)' : 'var(--danger)'}`, 
+              fontSize: '0.88rem' 
+            }}>
+              {payoutStatus}
+            </div>
+          )}
+
+          <div className="form-group">
+            <label>Player Free Fire UID, Email, or In-Game Nickname <span style={{ color: 'var(--primary)' }}>*</span></label>
+            <input 
+              type="text" 
+              value={payoutPlayerIdentifier} 
+              onChange={(e) => setPayoutPlayerIdentifier(e.target.value)} 
+              placeholder="e.g. 482910384 or player@gmail.com or ZEST_KILLER"
+              className="form-input"
+              required
+            />
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label>Prize Amount to Credit (₹) <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <input 
+                type="number" 
+                value={payoutAmount} 
+                onChange={(e) => setPayoutAmount(e.target.value)} 
+                placeholder="e.g. 500"
+                className="form-input"
+                min="1"
+                required
+              />
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                {['50', '100', '250', '500', '1000', '2000'].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setPayoutAmount(amt)}
+                    style={{
+                      background: payoutAmount === amt ? 'var(--success)' : 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: payoutAmount === amt ? '#000' : '#fff',
+                      fontWeight: '700',
+                      borderRadius: '12px',
+                      padding: '2px 8px',
+                      fontSize: '0.7rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ₹{amt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Prize Reason / Match Title</label>
+              <input 
+                type="text" 
+                value={payoutReason} 
+                onChange={(e) => setPayoutReason(e.target.value)} 
+                placeholder="e.g. 1st Place Winner - CS 2v2"
+                className="form-input"
+                required
+              />
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={payoutLoading}
+            style={{ 
+              width: '100%', 
+              height: '48px', 
+              marginTop: '4px', 
+              background: 'linear-gradient(135deg, #00e676 0%, #ffd600 100%)', 
+              color: '#000', 
+              fontWeight: '900',
+              fontSize: '0.92rem'
+            }}
+          >
+            {payoutLoading ? '⚡ Processing Cloud Payout...' : '⚡ Credit Prize Money to Player Wallet Now'}
           </button>
         </form>
       )}

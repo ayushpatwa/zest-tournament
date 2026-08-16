@@ -425,3 +425,67 @@ export const saveUserProfileRealtime = async (userData) => {
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Credits money into a user's wallet in Firestore
+ */
+export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tournament Prize Winnings') => {
+  try {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) return { success: false, error: 'Invalid amount' };
+
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    let targetDocId = null;
+    let targetUserData = null;
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (
+        data.uid === uidOrEmail || 
+        data.email?.toLowerCase() === uidOrEmail.toLowerCase() || 
+        data.nickname?.toLowerCase() === uidOrEmail.toLowerCase()
+      ) {
+        targetDocId = docSnap.id;
+        targetUserData = data;
+      }
+    });
+
+    if (targetDocId) {
+      await updateDoc(doc(db, "users", targetDocId), {
+        wallet: increment(numAmount),
+        "stats.earnings": increment(numAmount),
+        updatedAt: serverTimestamp()
+      });
+      return { success: true, user: targetUserData };
+    }
+
+    // Also update local registered users cache if found
+    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    let localFound = false;
+    const updatedUsers = existingUsers.map(u => {
+      if (u.uid === uidOrEmail || u.email?.toLowerCase() === uidOrEmail.toLowerCase() || u.nickname?.toLowerCase() === uidOrEmail.toLowerCase()) {
+        localFound = true;
+        return {
+          ...u,
+          wallet: (u.wallet || 0) + numAmount,
+          stats: {
+            ...u.stats,
+            earnings: (u.stats?.earnings || 0) + numAmount
+          }
+        };
+      }
+      return u;
+    });
+
+    if (localFound) {
+      localStorage.setItem('zest_registered_users', JSON.stringify(updatedUsers));
+      return { success: true };
+    }
+
+    return { success: false, error: 'Player UID or Email not found.' };
+  } catch (error) {
+    console.error("[Firebase] Error crediting user wallet:", error);
+    return { success: false, error: error.message };
+  }
+};
