@@ -93,6 +93,20 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
   }, []);
 
   const filteredTournaments = tournaments.filter(t => {
+    // 1. If Room ID has been dropped, remove match from public Arena
+    if (t.roomId && t.roomId.trim() !== '') {
+      return false;
+    }
+
+    // 2. If current player has joined this match, hide from Arena (shown exclusively in "My Matches")
+    const isJoined = t.joinedPlayers?.some(p => 
+      p.isUser || p.uid === userProfile?.uid || p.nickname === userProfile?.nickname
+    );
+    if (isJoined) {
+      return false;
+    }
+
+    // 3. Category & Mode filter
     const filter = selectedFilter.toLowerCase();
     let matchesFilter = false;
     
@@ -330,8 +344,24 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
           {/* Tournament Grid */}
           {filteredTournaments.length === 0 ? (
             <div className="glass-panel" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🎮</div>
-              <p>No tournament matches found matching your search.</p>
+              <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🎮</div>
+              <h3 style={{ fontSize: '1.05rem', color: '#fff', margin: '0 0 6px 0' }}>
+                {joinedCount > 0 ? 'All Joined Matches Moved to "My Matches"!' : 'No open tournament matches available right now.'}
+              </h3>
+              <p style={{ fontSize: '0.8rem', maxWidth: '360px', margin: '0 auto 16px auto', lineHeight: '1.4' }}>
+                {joinedCount > 0 
+                  ? 'Matches you have registered for and matches where Room IDs have dropped are shown under your My Matches tab.' 
+                  : 'Host new matches from the Admin panel or check back shortly for new tournaments!'}
+              </p>
+              {joinedCount > 0 && (
+                <button
+                  onClick={() => setCurrentView('my_matches')}
+                  className="btn btn-secondary"
+                  style={{ padding: '10px 20px', fontSize: '0.85rem', fontWeight: '700' }}
+                >
+                  🎯 View My Matches ({joinedCount}) ➔
+                </button>
+              )}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
