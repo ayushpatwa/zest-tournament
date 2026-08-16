@@ -5,7 +5,17 @@ function CountdownTimer({ startTime }) {
   const [timeLeft, setTimeLeft] = useState('');
 
   useEffect(() => {
+    if (!startTime) {
+      setTimeLeft('LIVE');
+      return;
+    }
+
     const target = new Date(startTime).getTime();
+    if (isNaN(target)) {
+      // Custom text slot like "3:00 PM - 4:00 PM"
+      setTimeLeft(`⏰ ${startTime}`);
+      return;
+    }
     
     const update = () => {
       const now = new Date().getTime();

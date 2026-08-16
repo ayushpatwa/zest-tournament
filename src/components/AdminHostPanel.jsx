@@ -14,7 +14,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   const [prizePool, setPrizePool] = useState('2000');
   const [entryFee, setEntryFee] = useState('20');
   const [slotsTotal, setSlotsTotal] = useState('48');
-  const [startingIn, setStartingIn] = useState('30');
+  const [matchTiming, setMatchTiming] = useState('03:00 PM - 04:00 PM');
   const [errorMsg, setErrorMsg] = useState('');
   const [deleteStatusMsg, setDeleteStatusMsg] = useState('');
   const [deletingId, setDeletingId] = useState(null);
@@ -81,11 +81,14 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
       setErrorMsg('Tournament Title is required.');
       return;
     }
+    if (!matchTiming.trim()) {
+      setErrorMsg('Match Timing / Slot is required (e.g. 03:00 PM - 04:00 PM).');
+      return;
+    }
 
     const prize = parseFloat(prizePool);
     const fee = parseFloat(entryFee);
     let slots = parseInt(slotsTotal);
-    const minutes = parseInt(startingIn);
 
     // Enforce exact rules
     const is1v1 = type.toLowerCase().includes('1v1');
@@ -97,16 +100,14 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     else if (is2v2) slots = 4;
     else if (isClashSquad4v4) slots = 8;
 
-    if (isNaN(prize) || prize < 0 || isNaN(fee) || fee < 0 || isNaN(slots) || slots < 2 || isNaN(minutes) || minutes <= 0) {
+    if (isNaN(prize) || prize < 0 || isNaN(fee) || fee < 0 || isNaN(slots) || slots < 2) {
       setErrorMsg('Please enter valid numeric parameters.');
       return;
     }
 
-    const startTime = new Date(Date.now() + minutes * 60 * 1000).toISOString();
-
     const newTournament = {
       id: `custom-${Date.now()}`,
-      title: title,
+      title: title.trim(),
       mode: is1v1 ? 'Solo' : is2v2 ? 'Duo' : isClashSquad4v4 ? 'Squad' : mode,
       type: type,
       map: mapName,
@@ -117,7 +118,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
       maxSlots: slots,
       slotsJoined: 0,
       joinedPlayers: [],
-      startTime: startTime,
+      startTime: matchTiming.trim(),
       status: 'upcoming',
       roomId: '',
       roomPassword: '',
@@ -463,16 +464,35 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             </div>
 
             <div className="form-group">
-              <label>Starting in (Minutes)</label>
+              <label>Match Timing / Slot (e.g. 3:00 PM - 4:00 PM)</label>
               <input 
-                type="number" 
-                value={startingIn} 
-                onChange={(e) => setStartingIn(e.target.value)} 
+                type="text" 
+                value={matchTiming} 
+                onChange={(e) => setMatchTiming(e.target.value)} 
+                placeholder="e.g. 03:00 PM - 04:00 PM or Tonight, 08:30 PM"
                 className="form-input"
-                min="5"
-                max="1440"
                 required
               />
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                {['03:00 PM - 04:00 PM', '06:00 PM - 07:00 PM', '08:30 PM - 09:30 PM', '10:00 PM - 11:00 PM'].map(slot => (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setMatchTiming(slot)}
+                    style={{
+                      background: matchTiming === slot ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: '#fff',
+                      borderRadius: '12px',
+                      padding: '3px 8px',
+                      fontSize: '0.68rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {slot}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
