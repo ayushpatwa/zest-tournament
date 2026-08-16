@@ -20,6 +20,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
   const getPageTitle = () => {
     switch(currentView) {
       case 'dashboard': return 'ARENA';
+      case 'my_matches': return 'MY MATCHES';
       case 'lobby': return 'MATCH LOBBY';
       case 'wallet': return 'MY WALLET';
       case 'profile': return 'PLAYER PROFILE';
@@ -324,6 +325,27 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
         >
           <span style={{ fontSize: '1.25rem' }}>🎮</span>
           <span>ARENA</span>
+        </button>
+
+        <button 
+          onClick={() => setCurrentView('my_matches')}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: currentView === 'my_matches' ? 'var(--secondary)' : 'var(--text-muted)',
+            fontFamily: 'var(--font-heading)',
+            fontSize: '0.68rem',
+            fontWeight: '700',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '3px',
+            cursor: 'pointer',
+            transition: 'color 0.2s ease'
+          }}
+        >
+          <span style={{ fontSize: '1.25rem' }}>🎯</span>
+          <span>MY MATCHES</span>
         </button>
 
         <button 

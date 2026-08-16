@@ -51,11 +51,15 @@ const HALL_OF_FAME_DATA = [
   { rank: 7, nickname: "Panda_OP", uid: "284019284", avatar: "🐼", earnings: 14500, kills: 160, wins: 14, kd: "3.0" }
 ];
 
-export default function Dashboard({ tournaments, onSelectTournament, setCurrentView }) {
+export default function Dashboard({ tournaments, onSelectTournament, setCurrentView, userProfile }) {
   const [mainView, setMainView] = useState('tournaments'); // 'tournaments' | 'hall_of_fame'
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [hofCategory, setHofCategory] = useState('earnings'); // 'earnings' | 'kills' | 'wins'
+  
+  const joinedCount = tournaments.filter(t => 
+    t.joinedPlayers?.some(p => p.isUser || p.uid === userProfile?.uid || p.nickname === userProfile?.nickname)
+  ).length;
   
   // Featured Banners list
   const featured = [
@@ -105,7 +109,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
   return (
     <div className="animate-slide-in" style={{ paddingBottom: '24px' }}>
       
-      {/* Top Main Mode Switcher (Arena vs Hall of Fame) */}
+      {/* Top Main Mode Switcher (Arena vs My Matches vs Hall of Fame) */}
       <div style={{
         display: 'flex',
         background: 'rgba(7, 9, 14, 0.7)',
@@ -120,20 +124,56 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
           onClick={() => setMainView('tournaments')}
           style={{
             flex: 1,
-            padding: '10px',
+            padding: '10px 4px',
             borderRadius: '8px',
             border: 'none',
             background: mainView === 'tournaments' ? 'var(--primary)' : 'transparent',
             color: '#fff',
             fontFamily: 'var(--font-heading)',
-            fontSize: '0.82rem',
+            fontSize: '0.78rem',
             fontWeight: '700',
             cursor: 'pointer',
             boxShadow: mainView === 'tournaments' ? 'var(--glow-primary)' : 'none',
             transition: 'all 0.2s ease'
           }}
         >
-          🎮 MATCH ARENA
+          🎮 ARENA
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentView('my_matches')}
+          style={{
+            flex: 1,
+            padding: '10px 4px',
+            borderRadius: '8px',
+            border: 'none',
+            background: 'transparent',
+            color: joinedCount > 0 ? 'var(--secondary)' : 'var(--text-muted)',
+            fontFamily: 'var(--font-heading)',
+            fontSize: '0.78rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px'
+          }}
+        >
+          <span>🎯 MY MATCHES</span>
+          {joinedCount > 0 && (
+            <span style={{
+              background: 'var(--secondary)',
+              color: '#000',
+              borderRadius: '10px',
+              padding: '1px 6px',
+              fontSize: '0.65rem',
+              fontWeight: '900'
+            }}>
+              {joinedCount}
+            </span>
+          )}
         </button>
 
         <button
@@ -141,13 +181,13 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
           onClick={() => setMainView('hall_of_fame')}
           style={{
             flex: 1,
-            padding: '10px',
+            padding: '10px 4px',
             borderRadius: '8px',
             border: 'none',
             background: mainView === 'hall_of_fame' ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' : 'transparent',
             color: mainView === 'hall_of_fame' ? '#000' : 'var(--accent)',
             fontFamily: 'var(--font-heading)',
-            fontSize: '0.82rem',
+            fontSize: '0.78rem',
             fontWeight: '900',
             cursor: 'pointer',
             boxShadow: mainView === 'hall_of_fame' ? '0 0 15px rgba(255,214,0,0.4)' : 'none',

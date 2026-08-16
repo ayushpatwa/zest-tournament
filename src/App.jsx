@@ -6,6 +6,7 @@ import WalletPage from './components/WalletPage';
 import ProfilePage from './components/ProfilePage';
 import AdminHostPanel from './components/AdminHostPanel';
 import LoginPage from './components/LoginPage';
+import MyMatchesPage from './components/MyMatchesPage';
 import { sendToMakeWebhook } from './services/webhookService';
 import { 
   subscribeToTournamentsRealtime, 
@@ -203,6 +204,19 @@ export default function App() {
         {currentView === 'dashboard' && (
           <Dashboard 
             tournaments={tournaments} 
+            userProfile={userProfile}
+            onSelectTournament={(id) => {
+              setSelectedTournamentId(id);
+              setCurrentView('lobby');
+            }} 
+            setCurrentView={setCurrentView}
+          />
+        )}
+
+        {currentView === 'my_matches' && (
+          <MyMatchesPage 
+            tournaments={tournaments} 
+            userProfile={userProfile}
             onSelectTournament={(id) => {
               setSelectedTournamentId(id);
               setCurrentView('lobby');
