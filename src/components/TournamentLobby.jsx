@@ -117,10 +117,11 @@ export default function TournamentLobby({
       </div>
 
       {/* Lobby Navigation Tabs */}
-      <div className="glass-panel" style={{ display: 'flex', padding: '4px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+      <div className="glass-panel" style={{ display: 'flex', padding: '4px', borderRadius: '12px', border: '1px solid var(--border-color)', gap: '4px' }}>
         {[
           { id: 'details', label: '📋 MATCH DETAILS & ROOM ID' },
-          { id: 'brackets', label: '🏆 PLAYERS & STANDINGS' }
+          { id: 'brackets', label: '🏆 PLAYERS & STANDINGS' },
+          { id: 'rules', label: '📜 RULES' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -375,6 +376,100 @@ export default function TournamentLobby({
               No players joined yet. Be the first to register!
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 3: MATCH RULES & FAIRPLAY GUIDELINES */}
+      {activeTab === 'rules' && (
+        <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
+            <div>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--secondary)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📜</span> Match Rules & Fairplay Guidelines
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
+                Rules specifically enforced for this {tournament.title} match ({tournament.mode} • {tournament.type}).
+              </p>
+            </div>
+            {setCurrentView && (
+              <button
+                type="button"
+                onClick={() => setCurrentView('rules')}
+                className="btn btn-outline"
+                style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+              >
+                Full Rulebook ➔
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+            
+            {/* Rule 1 */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📱</span> Device & Hardware Policy
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                Strictly <strong>MOBILE DEVICES ONLY</strong> (Android & iOS). Emulators, PC clients (BlueStacks, LDPlayer), keymappers, and iPad tablets are strictly prohibited.
+              </p>
+            </div>
+
+            {/* Rule 2 */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🛡️</span> Zero Tolerance for Cheats & Teaming
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                No Mod APKs, auto-aim scripts, or map glitch exploits. Teaming up with opponents in Solo/Duo results in immediate disqualification and permanent ban without refund.
+              </p>
+            </div>
+
+            {/* Rule 3 */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🔑</span> Room ID & Punctuality
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                Room ID & Password will be dropped here 15 minutes before the start time. You must join the custom room using your registered in-game nickname and numeric UID.
+              </p>
+            </div>
+
+            {/* Rule 4 */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>💰</span> Prize Distribution & Proofs
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                Always take a screenshot of the end scoreboard. Prize money is automatically credited to your in-app wallet within 15-30 minutes after match verification.
+              </p>
+            </div>
+
+          </div>
+
+          {/* Direct Support link */}
+          <div className="flex-between" style={{ background: 'linear-gradient(135deg, rgba(0, 136, 204, 0.15) 0%, rgba(0, 229, 255, 0.08) 100%)', padding: '12px 16px', borderRadius: '10px', border: '1px solid #0088cc', flexWrap: 'wrap', gap: '8px' }}>
+            <span style={{ fontSize: '0.78rem', color: '#fff' }}>
+              Need urgent assistance with room ID or referee help?
+            </span>
+            <a
+              href="https://t.me/zesttournament"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: '#00e5ff',
+                fontFamily: 'var(--font-heading)',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <span>💬</span> Contact Arbiter on Telegram ➔
+            </a>
+          </div>
         </div>
       )}
 
