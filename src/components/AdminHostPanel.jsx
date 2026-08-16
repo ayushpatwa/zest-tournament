@@ -319,9 +319,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
             <div className="form-group">
               <label>Match Mode</label>
               <select value={mode} onChange={(e) => setMode(e.target.value)} className="form-input">
-                <option value="Solo">Solo (1 vs 1 / 1 vs 47)</option>
-                <option value="Duo">Duo (2 vs 2)</option>
-                <option value="Squad">Squad (4 vs 4 / BR)</option>
+                <option value="Solo">Solo</option>
+                <option value="Duo">Duo</option>
+                <option value="Squad">Squad</option>
               </select>
             </div>
 
