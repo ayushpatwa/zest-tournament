@@ -409,16 +409,19 @@ export const sendLobbyMessageRealtime = async (tournamentId, msgData) => {
 };
 
 /**
- * Saves user profile to Firestore
+ * Saves user profile to Firestore in real-time
  */
 export const saveUserProfileRealtime = async (userData) => {
   try {
     if (!userData.uid && !userData.id) return;
-    const userId = String(userData.uid || userData.id);
+    const userId = String(userData.uid || userData.id).trim();
     await setDoc(doc(db, "users", userId), {
       ...userData,
+      uid: String(userData.uid || userId).trim(),
+      wallet: typeof userData.wallet === 'number' ? userData.wallet : (parseFloat(userData.wallet) || 0),
       lastActive: serverTimestamp()
     }, { merge: true });
+    console.log(`[Firebase] User profile synced for ${userId}`);
     return { success: true };
   } catch (error) {
     console.error("[Firebase] Error saving user profile:", error);
@@ -427,63 +430,126 @@ export const saveUserProfileRealtime = async (userData) => {
 };
 
 /**
- * Credits money into a user's wallet in Firestore
+ * Real-time subscription to a single user's profile and live wallet balance
+ */
+export const subscribeToUserProfileRealtime = (userIdOrUid, onUpdate) => {
+  try {
+    if (!userIdOrUid) return () => {};
+    const userId = String(userIdOrUid).trim();
+    const docRef = doc(db, "users", userId);
+    
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        console.log(`[Firebase] Live balance/profile update for ${userId}:`, data.wallet);
+        onUpdate(data);
+      }
+    }, (err) => {
+      console.warn("[Firebase] User profile subscription warning:", err);
+    });
+    return unsubscribe;
+  } catch (err) {
+    console.error("[Firebase] subscribeToUserProfileRealtime error:", err);
+    return () => {};
+  }
+};
+
+/**
+ * Real-time subscription to all registered players (for Admin Host panel)
+ */
+export const subscribeToAllUsersRealtime = (onUpdate) => {
+  try {
+    const usersCollection = collection(db, "users");
+    const unsubscribe = onSnapshot(usersCollection, (snapshot) => {
+      const usersList = [];
+      snapshot.forEach((docSnap) => {
+        usersList.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      onUpdate(usersList);
+    }, (err) => {
+      console.warn("[Firebase] All users subscription warning:", err);
+    });
+    return unsubscribe;
+  } catch (err) {
+    console.error("[Firebase] subscribeToAllUsersRealtime error:", err);
+    return () => {};
+  }
+};
+
+/**
+ * Credits money into a user's wallet in Firestore and updates cloud balance in real-time
  */
 export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tournament Prize Winnings') => {
   try {
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) return { success: false, error: 'Invalid amount' };
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return { success: false, error: 'Please enter a valid positive prize amount.' };
+    }
 
+    const queryStr = String(uidOrEmail).trim().toLowerCase();
+    const rawQuery = String(uidOrEmail).trim();
     const usersCollection = collection(db, "users");
     const snapshot = await getDocs(usersCollection);
+    
     let targetDocId = null;
     let targetUserData = null;
 
+    // 1. Search through all cloud Firestore users
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
-      if (
-        data.uid === uidOrEmail || 
-        data.email?.toLowerCase() === uidOrEmail.toLowerCase() || 
-        data.nickname?.toLowerCase() === uidOrEmail.toLowerCase()
-      ) {
+      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
+      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
+      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
+      const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
+
+      if (docIdMatch || uidMatch || emailMatch || nickMatch) {
         targetDocId = docSnap.id;
         targetUserData = data;
       }
     });
 
+    // 2. If doc exists in Firestore, atomically increment wallet & earnings
     if (targetDocId) {
-      await updateDoc(doc(db, "users", targetDocId), {
+      const targetRef = doc(db, "users", targetDocId);
+      await setDoc(targetRef, {
         wallet: increment(numAmount),
         "stats.earnings": increment(numAmount),
+        lastPrize: {
+          amount: numAmount,
+          title: title,
+          creditedAt: new Date().toISOString()
+        },
         updatedAt: serverTimestamp()
-      });
-      return { success: true, user: targetUserData };
+      }, { merge: true });
+
+      console.log(`[Firebase Realtime] Successfully credited ₹${numAmount} to user ${targetDocId}`);
+      return { success: true, user: { ...targetUserData, wallet: (targetUserData.wallet || 0) + numAmount } };
     }
 
-    // Also update local registered users cache if found
-    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
-    let localFound = false;
-    const updatedUsers = existingUsers.map(u => {
-      if (u.uid === uidOrEmail || u.email?.toLowerCase() === uidOrEmail.toLowerCase() || u.nickname?.toLowerCase() === uidOrEmail.toLowerCase()) {
-        localFound = true;
-        return {
-          ...u,
-          wallet: (u.wallet || 0) + numAmount,
-          stats: {
-            ...u.stats,
-            earnings: (u.stats?.earnings || 0) + numAmount
-          }
-        };
-      }
-      return u;
-    });
+    // 3. If doc does not exist yet by query, create new user doc directly with the identifier as UID
+    const newDocRef = doc(db, "users", rawQuery);
+    await setDoc(newDocRef, {
+      uid: rawQuery,
+      nickname: rawQuery,
+      wallet: numAmount,
+      stats: {
+        matches: 1,
+        wins: 1,
+        kills: 0,
+        earnings: numAmount
+      },
+      lastPrize: {
+        amount: numAmount,
+        title: title,
+        creditedAt: new Date().toISOString()
+      },
+      updatedAt: serverTimestamp()
+    }, { merge: true });
 
-    if (localFound) {
-      localStorage.setItem('zest_registered_users', JSON.stringify(updatedUsers));
-      return { success: true };
-    }
-
-    return { success: false, error: 'Player UID or Email not found.' };
+    return { 
+      success: true, 
+      user: { uid: rawQuery, nickname: rawQuery, wallet: numAmount } 
+    };
   } catch (error) {
     console.error("[Firebase] Error crediting user wallet:", error);
     return { success: false, error: error.message };

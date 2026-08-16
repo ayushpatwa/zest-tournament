@@ -14,6 +14,7 @@ import { updateLiveRazorpayConfig } from './services/razorpayService';
 import { 
   subscribeToTournamentsRealtime, 
   subscribeToAppSettingsRealtime,
+  subscribeToUserProfileRealtime,
   saveAppSettingsRealtime,
   saveTournamentRealtime, 
   deleteTournamentRealtime,
@@ -102,6 +103,28 @@ export default function App() {
       unsubscribeSettings();
     };
   }, []);
+
+  // 2. Real-time Live Wallet & User Profile sync with Firestore Cloud
+  useEffect(() => {
+    if (!currentUser?.uid && !currentUser?.id) return;
+    const userIdentifier = String(currentUser.uid || currentUser.id).trim();
+    console.log(`[Firebase Realtime] Listening to live wallet balance for ${userIdentifier}`);
+    
+    const unsubscribeUser = subscribeToUserProfileRealtime(userIdentifier, (liveUserData) => {
+      if (liveUserData) {
+        if (typeof liveUserData.wallet === 'number') {
+          setWalletBalance(liveUserData.wallet);
+        }
+        setUserProfile(prev => ({
+          ...prev,
+          ...liveUserData,
+          wallet: typeof liveUserData.wallet === 'number' ? liveUserData.wallet : prev.wallet
+        }));
+      }
+    });
+
+    return () => unsubscribeUser();
+  }, [currentUser?.uid, currentUser?.id]);
 
   // Sync user profile & wallet to local storage
   useEffect(() => {

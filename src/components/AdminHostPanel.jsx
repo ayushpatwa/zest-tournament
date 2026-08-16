@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 import { getRazorpayConfig, setRazorpayConfig } from '../services/razorpayService';
-import { saveAppSettingsRealtime, creditUserWalletRealtime } from '../services/firebase';
+import { saveAppSettingsRealtime, creditUserWalletRealtime, subscribeToAllUsersRealtime } from '../services/firebase';
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView }) {
   const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'manage' | 'razorpay' | 'webhook' | 'app_update'
@@ -26,6 +26,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   const [payoutReason, setPayoutReason] = useState('1st Place Tournament Winner 🏆');
   const [payoutStatus, setPayoutStatus] = useState('');
   const [payoutLoading, setPayoutLoading] = useState(false);
+  const [cloudUsers, setCloudUsers] = useState([]);
 
   // Room ID Broadcast states
   const [selectedTourneyId, setSelectedTourneyId] = useState(tournaments[0]?.id || '');
@@ -59,6 +60,13 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     const saved = JSON.parse(localStorage.getItem('zest_match_proofs') || '[]');
     setMatchProofs(saved);
   }, [activeTab]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAllUsersRealtime((usersList) => {
+      setCloudUsers(usersList);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleTypeChange = (newType) => {
     setType(newType);
@@ -789,6 +797,66 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
           >
             {payoutLoading ? '⚡ Processing Cloud Payout...' : '⚡ Credit Prize Money to Player Wallet Now'}
           </button>
+
+          {/* Live Player Directory */}
+          <div style={{ marginTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
+            <div className="flex-between" style={{ marginBottom: '10px' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--secondary)', margin: 0, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>👥</span> Registered Players Directory ({cloudUsers.length})
+              </h4>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Tap any player to auto-fill their UID
+              </span>
+            </div>
+
+            {cloudUsers.length === 0 ? (
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>
+                No player accounts found in Firebase yet. When a player registers, they will appear here!
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '260px', overflowY: 'auto' }}>
+                {cloudUsers.map(u => (
+                  <div 
+                    key={u.id || u.uid}
+                    className="flex-between"
+                    style={{
+                      background: payoutPlayerIdentifier === (u.uid || u.id) ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255,255,255,0.03)',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: payoutPlayerIdentifier === (u.uid || u.id) ? '1px solid var(--success)' : '1px solid rgba(255,255,255,0.06)',
+                      gap: '8px',
+                      flexWrap: 'wrap'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#fff' }}>
+                        {u.nickname || 'Player'} <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>({u.email || u.phone || 'No Contact'})</span>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--secondary)', fontFamily: 'monospace', marginTop: '2px' }}>
+                        UID: <strong style={{ color: '#fff' }}>{u.uid || u.id}</strong> | Live Balance: <strong style={{ color: 'var(--success)' }}>₹{u.wallet || 0}</strong>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setPayoutPlayerIdentifier(u.uid || u.id)}
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '0.72rem',
+                        background: payoutPlayerIdentifier === (u.uid || u.id) ? 'var(--success)' : 'rgba(255,255,255,0.1)',
+                        color: payoutPlayerIdentifier === (u.uid || u.id) ? '#000' : '#fff',
+                        fontWeight: '700',
+                        borderRadius: '6px'
+                      }}
+                    >
+                      {payoutPlayerIdentifier === (u.uid || u.id) ? '✓ Selected' : '👉 Select Player'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </form>
       )}
 
