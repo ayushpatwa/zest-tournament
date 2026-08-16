@@ -192,6 +192,50 @@ export const SEED_TOURNAMENTS = [
       { nickname: "Tactical_Viper", uid: "582910398" }
     ],
     leaderboard: []
+  },
+  {
+    id: "ff_cs_2v2_08",
+    title: "Clash Squad 2v2 Duo Blitz",
+    mode: "Duo",
+    map: "Bermuda (CS)",
+    type: "Clash Squad 2v2",
+    entryFee: 50,
+    prizePool: 2200,
+    perKillPrize: 25,
+    slotsTotal: 4,
+    maxSlots: 4,
+    slotsJoined: 2,
+    startTime: "Tonight, 09:45 PM",
+    serverStatus: "2 Slots Left",
+    status: "open",
+    roomId: "",
+    roomPassword: "",
+    joinedPlayers: [
+      { nickname: "Duo_Rushers", uid: "918273645" }
+    ],
+    leaderboard: []
+  },
+  {
+    id: "ff_cs_2v2_hs_09",
+    title: "Clash Squad 2v2 Headshot Duo Masters",
+    mode: "Duo",
+    map: "Bermuda (CS)",
+    type: "Clash Squad 2v2 Headshot",
+    entryFee: 60,
+    prizePool: 2600,
+    perKillPrize: 30,
+    slotsTotal: 4,
+    maxSlots: 4,
+    slotsJoined: 2,
+    startTime: "Tonight, 10:30 PM",
+    serverStatus: "Registration Open",
+    status: "open",
+    roomId: "",
+    roomPassword: "",
+    joinedPlayers: [
+      { nickname: "HeadshotDuo_OP", uid: "829102938" }
+    ],
+    leaderboard: []
   }
 ];
 

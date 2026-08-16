@@ -57,10 +57,10 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
       setSlotsTotal('2');
       setMode('Solo');
       setMapName('Iron Dome');
-    } else if (newType.includes('Lone Wolf') && (newType.includes('2v2') || newType === 'Lone Wolf 2v2')) {
+    } else if (newType.includes('2v2')) {
       setSlotsTotal('4');
       setMode('Duo');
-      setMapName('Iron Cage');
+      setMapName(newType.includes('Clash') ? 'Bermuda (CS)' : 'Iron Cage');
     } else if (newType.includes('Clash Squad')) {
       setSlotsTotal('8');
       setMode('Squad');
@@ -87,20 +87,21 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     const minutes = parseInt(startingIn);
 
     // Enforce exact rules
-    const isLoneWolf1v1 = type.toLowerCase().includes('1v1');
-    const isLoneWolf2v2 = type.toLowerCase().includes('lone wolf') && type.toLowerCase().includes('2v2');
-    const isClashSquad = type.toLowerCase().includes('clash');
+    const is1v1 = type.toLowerCase().includes('1v1');
+    const is2v2 = type.toLowerCase().includes('2v2');
+    const isClashSquad4v4 = type.toLowerCase().includes('clash') && !is2v2;
+    const isLoneWolf = type.toLowerCase().includes('lone wolf');
 
-    if (isLoneWolf1v1) slots = 2;
-    else if (isLoneWolf2v2) slots = 4;
-    else if (isClashSquad) slots = 8;
+    if (is1v1) slots = 2;
+    else if (is2v2) slots = 4;
+    else if (isClashSquad4v4) slots = 8;
 
     if (isNaN(prize) || prize < 0 || isNaN(fee) || fee < 0 || isNaN(slots) || slots < 2 || isNaN(minutes) || minutes <= 0) {
       setErrorMsg('Please enter valid numeric parameters.');
       return;
     }
 
-    const numMockJoined = isLoneWolf1v1 ? 1 : isLoneWolf2v2 ? 2 : isClashSquad ? 4 : Math.min(Math.floor(Math.random() * (slots / 2)) + 3, slots - 1);
+    const numMockJoined = is1v1 ? 1 : is2v2 ? 2 : isClashSquad4v4 ? 4 : Math.min(Math.floor(Math.random() * (slots / 2)) + 3, slots - 1);
     const joinedPlayers = [];
     
     for (let i = 0; i < numMockJoined; i++) {
@@ -117,11 +118,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     const newTournament = {
       id: `custom-${Date.now()}`,
       title: title,
-      mode: isLoneWolf1v1 ? 'Solo' : isLoneWolf2v2 ? 'Duo' : isClashSquad ? 'Squad' : mode,
+      mode: is1v1 ? 'Solo' : is2v2 ? 'Duo' : isClashSquad4v4 ? 'Squad' : mode,
       type: type,
       map: mapName,
       prizePool: prize,
-      perKillPrize: (isLoneWolf1v1 || isLoneWolf2v2) ? 0 : 25,
+      perKillPrize: isLoneWolf ? 0 : 25,
       entryFee: fee,
       slotsTotal: slots,
       maxSlots: slots,
@@ -362,6 +363,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                 <option value="Classic">Classic Battle Royale</option>
                 <option value="Clash Squad">Clash Squad 4v4</option>
                 <option value="Clash Squad Headshot">Clash Squad Headshot 4v4 🎯</option>
+                <option value="Clash Squad 2v2">Clash Squad 2v2 ⚔️ (4 Players)</option>
+                <option value="Clash Squad 2v2 Headshot">Clash Squad 2v2 Headshot 🎯 (4 Players)</option>
                 <option value="Lone Wolf Headshot 1v1">Lone Wolf Headshot 1v1 🎯 (2 Players)</option>
                 <option value="Lone Wolf Headshot 2v2">Lone Wolf Headshot 2v2 🎯 (4 Players)</option>
                 <option value="Lone Wolf 2v2">Lone Wolf 2v2 🐺 (4 Players)</option>
@@ -405,7 +408,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             }}>
               <span>⚔️</span>
               <div>
-                <strong>CLASH SQUAD RULES:</strong> Exactly <strong>8 Players Only</strong> (Two teams of 4).
+                <strong>CLASH SQUAD RULES:</strong> {type.includes('2v2') ? 'Exactly 4 Players (Two Duo Teams / 2 vs 2).' : 'Exactly 8 Players (Two 4-Player Teams / 4 vs 4).'}
               </div>
             </div>
           )}

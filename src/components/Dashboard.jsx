@@ -114,6 +114,8 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
       matchesFilter = true;
     } else if (selectedFilter === 'CS Headshot' || selectedFilter === 'CS Headshot 🎯') {
       matchesFilter = (t.type?.toLowerCase().includes('headshot') && t.type?.toLowerCase().includes('clash')) || t.title?.toLowerCase().includes('headshot');
+    } else if (selectedFilter === 'CS 2v2' || selectedFilter === 'CS 2v2 ⚔️') {
+      matchesFilter = t.type?.toLowerCase().includes('clash') && t.type?.toLowerCase().includes('2v2');
     } else if (selectedFilter === 'Lone Wolf 1v1' || selectedFilter === 'Lone Wolf 1v1 🐺') {
       matchesFilter = t.type?.toLowerCase().includes('lone wolf') && (t.type?.toLowerCase().includes('1v1') || t.mode?.toLowerCase() === 'solo');
     } else if (selectedFilter === 'Lone Wolf 2v2' || selectedFilter === 'Lone Wolf 2v2 🐺') {
@@ -307,6 +309,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
               {[
                 'All', 
                 'CS Headshot 🎯', 
+                'CS 2v2 ⚔️',
                 'Lone Wolf 1v1 🐺', 
                 'Lone Wolf 2v2 🐺', 
                 'Solo', 
@@ -408,9 +411,9 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                             🐺 {t.type}
                           </span>
                         )}
-                        {t.type === 'Clash Squad' && (
+                        {t.type?.toLowerCase().includes('clash') && (
                           <span className="badge" style={{ background: 'rgba(255, 87, 34, 0.15)', color: 'var(--primary)', border: '1px solid rgba(255, 87, 34, 0.3)', fontSize: '0.65rem', fontWeight: '700' }}>
-                            ⚔️ CS 4v4
+                            ⚔️ {t.type?.includes('2v2') ? 'CS 2v2' : 'CS 4v4'}
                           </span>
                         )}
                         {t.type === 'Classic' && (
