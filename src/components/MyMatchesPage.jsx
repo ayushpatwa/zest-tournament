@@ -208,9 +208,13 @@ export default function MyMatchesPage({
                   <h3 style={{ fontSize: '1.1rem', color: '#fff', margin: '0 0 4px 0' }}>
                     {t.title}
                   </h3>
-                  <div style={{ display: 'flex', gap: '14px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', gap: '14px', fontSize: '0.8rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
                     <span>🗺️ Map: <strong>{t.map}</strong></span>
-                    <span>💰 Bounty: <strong>₹{t.perKillPrize || 25}/Kill</strong></span>
+                    <span>{t.type?.toLowerCase().includes('lone wolf') ? '🏆 Prize: ' : '💰 Bounty: '}
+                      <strong style={{ color: t.type?.toLowerCase().includes('lone wolf') ? 'var(--accent)' : 'inherit' }}>
+                        {t.type?.toLowerCase().includes('lone wolf') ? `₹${t.prizePool} (Winner Takes All)` : `₹${t.perKillPrize || 25}/Kill`}
+                      </strong>
+                    </span>
                     {slotIndex !== -1 && <span>🎯 Slot: <strong style={{ color: 'var(--secondary)' }}>#{slotIndex + 1}</strong></span>}
                   </div>
                 </div>

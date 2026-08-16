@@ -49,6 +49,27 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
     setMatchProofs(saved);
   }, [activeTab]);
 
+  const handleTypeChange = (newType) => {
+    setType(newType);
+    if (newType.includes('1v1')) {
+      setSlotsTotal('2');
+      setMode('Solo');
+      setMapName('Iron Dome');
+    } else if (newType.includes('Lone Wolf') && (newType.includes('2v2') || newType === 'Lone Wolf 2v2')) {
+      setSlotsTotal('4');
+      setMode('Duo');
+      setMapName('Iron Cage');
+    } else if (newType.includes('Clash Squad')) {
+      setSlotsTotal('8');
+      setMode('Squad');
+      setMapName('Bermuda (CS)');
+    } else {
+      setSlotsTotal('48');
+      setMode('Solo');
+      setMapName('Bermuda');
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -60,15 +81,24 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
 
     const prize = parseFloat(prizePool);
     const fee = parseFloat(entryFee);
-    const slots = parseInt(slotsTotal);
+    let slots = parseInt(slotsTotal);
     const minutes = parseInt(startingIn);
 
-    if (isNaN(prize) || prize < 0 || isNaN(fee) || fee < 0 || isNaN(slots) || slots <= 2 || isNaN(minutes) || minutes <= 0) {
+    // Enforce exact rules
+    const isLoneWolf1v1 = type.toLowerCase().includes('1v1');
+    const isLoneWolf2v2 = type.toLowerCase().includes('lone wolf') && type.toLowerCase().includes('2v2');
+    const isClashSquad = type.toLowerCase().includes('clash');
+
+    if (isLoneWolf1v1) slots = 2;
+    else if (isLoneWolf2v2) slots = 4;
+    else if (isClashSquad) slots = 8;
+
+    if (isNaN(prize) || prize < 0 || isNaN(fee) || fee < 0 || isNaN(slots) || slots < 2 || isNaN(minutes) || minutes <= 0) {
       setErrorMsg('Please enter valid numeric parameters.');
       return;
     }
 
-    const numMockJoined = Math.floor(Math.random() * (slots / 2)) + 5;
+    const numMockJoined = isLoneWolf1v1 ? 1 : isLoneWolf2v2 ? 2 : isClashSquad ? 4 : Math.min(Math.floor(Math.random() * (slots / 2)) + 3, slots - 1);
     const joinedPlayers = [];
     
     for (let i = 0; i < numMockJoined; i++) {
@@ -80,34 +110,19 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
     }
 
     const leaderboard = [];
-    if (type === 'Classic') {
-      for (let i = 0; i < numMockJoined; i++) {
-        const kills = Math.floor(Math.random() * 8);
-        const placementPoints = Math.max(12 - i, 0);
-        const killPoints = kills * 2;
-        leaderboard.push({
-          nickname: joinedPlayers[i].nickname,
-          uid: joinedPlayers[i].uid,
-          kills: kills,
-          placementPoints: placementPoints,
-          totalPoints: placementPoints + killPoints,
-          isUser: false
-        });
-      }
-      leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
-    }
-
     const startTime = new Date(Date.now() + minutes * 60 * 1000).toISOString();
 
     const newTournament = {
       id: `custom-${Date.now()}`,
       title: title,
-      mode: mode,
+      mode: isLoneWolf1v1 ? 'Solo' : isLoneWolf2v2 ? 'Duo' : isClashSquad ? 'Squad' : mode,
       type: type,
       map: mapName,
       prizePool: prize,
+      perKillPrize: (isLoneWolf1v1 || isLoneWolf2v2) ? 0 : 25,
       entryFee: fee,
       slotsTotal: slots,
+      maxSlots: slots,
       slotsJoined: numMockJoined,
       joinedPlayers: joinedPlayers,
       startTime: startTime,
@@ -328,17 +343,57 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
 
             <div className="form-group">
               <label>Game Type</label>
-              <select value={type} onChange={(e) => setType(e.target.value)} className="form-input">
+              <select value={type} onChange={(e) => handleTypeChange(e.target.value)} className="form-input">
                 <option value="Classic">Classic Battle Royale</option>
                 <option value="Clash Squad">Clash Squad 4v4</option>
                 <option value="Clash Squad Headshot">Clash Squad Headshot 4v4 🎯</option>
-                <option value="Lone Wolf Headshot 1v1">Lone Wolf Headshot 1v1 🎯</option>
-                <option value="Lone Wolf Headshot 2v2">Lone Wolf Headshot 2v2 🎯</option>
-                <option value="Lone Wolf 2v2">Lone Wolf 2v2 🐺</option>
-                <option value="Lone Wolf 1v1">Lone Wolf 1v1 🐺</option>
+                <option value="Lone Wolf Headshot 1v1">Lone Wolf Headshot 1v1 🎯 (2 Players)</option>
+                <option value="Lone Wolf Headshot 2v2">Lone Wolf Headshot 2v2 🎯 (4 Players)</option>
+                <option value="Lone Wolf 2v2">Lone Wolf 2v2 🐺 (4 Players)</option>
+                <option value="Lone Wolf 1v1">Lone Wolf 1v1 🐺 (2 Players)</option>
               </select>
             </div>
           </div>
+
+          {/* Mode Rules Dynamic Helper Badge */}
+          {type.toLowerCase().includes('lone wolf') && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, rgba(255, 214, 0, 0.1) 100%)',
+              border: '1px solid var(--secondary)',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              fontSize: '0.78rem',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>🐺</span>
+              <div>
+                <strong>LONE WOLF RULES:</strong> {type.includes('1v1') ? 'Max 2 Players (1 vs 1).' : 'Max 4 Players (2 vs 2).'} 
+                <span style={{ color: 'var(--accent)' }}> Winning Prize Only (No Per-Kill Bounty).</span>
+              </div>
+            </div>
+          )}
+
+          {type.toLowerCase().includes('clash') && (
+            <div style={{
+              background: 'rgba(255, 87, 34, 0.1)',
+              border: '1px solid var(--primary)',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              fontSize: '0.78rem',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>⚔️</span>
+              <div>
+                <strong>CLASH SQUAD RULES:</strong> Exactly <strong>8 Players Only</strong> (Two teams of 4).
+              </div>
+            </div>
+          )}
 
           <div className="grid-2">
             <div className="form-group">
@@ -372,7 +427,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
 
           <div className="grid-2">
             <div className="form-group">
-              <label>Prize Pool (₹)</label>
+              <label>Winning Prize Pool (₹)</label>
               <input 
                 type="number" 
                 value={prizePool} 
@@ -397,7 +452,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onBr
           </div>
 
           <div className="form-group">
-            <label>Total Slots (Players/Teams)</label>
+            <label>Total Slots ({type.includes('1v1') ? '2 for 1v1' : (type.includes('Lone Wolf') || type.includes('2v2')) ? '4 for 2v2' : type.includes('Clash') ? '8 for CS' : 'Slots'})</label>
             <input 
               type="number" 
               value={slotsTotal} 

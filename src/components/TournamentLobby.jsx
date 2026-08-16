@@ -252,8 +252,12 @@ export default function TournamentLobby({
               <p style={{ fontWeight: '700', color: 'var(--accent)', margin: '2px 0 0 0' }}>₹{tournament.entryFee}</p>
             </div>
             <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Per Kill Bounty:</span>
-              <p style={{ fontWeight: '700', color: 'var(--secondary)', margin: '2px 0 0 0' }}>₹{tournament.perKillPrize || 25}</p>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {tournament.type?.toLowerCase().includes('lone wolf') ? 'Prize Structure:' : 'Per Kill Bounty:'}
+              </span>
+              <p style={{ fontWeight: '700', color: tournament.type?.toLowerCase().includes('lone wolf') ? 'var(--accent)' : 'var(--secondary)', margin: '2px 0 0 0' }}>
+                {tournament.type?.toLowerCase().includes('lone wolf') ? '🏆 Winner Takes All' : `₹${tournament.perKillPrize || 25}`}
+              </p>
             </div>
           </div>
 

@@ -402,7 +402,11 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                       </h3>
                       <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                         <span>🗺️ Map: <strong>{t.map}</strong></span>
-                        <span>💰 Bounty: <strong>₹{t.perKillPrize || 25}/Kill</strong></span>
+                        <span>{t.type?.toLowerCase().includes('lone wolf') ? '🏆 Prize Type: ' : '💰 Bounty: '}
+                          <strong style={{ color: t.type?.toLowerCase().includes('lone wolf') ? 'var(--accent)' : 'inherit' }}>
+                            {t.type?.toLowerCase().includes('lone wolf') ? 'Winner Takes All' : `₹${t.perKillPrize || 25}/Kill`}
+                          </strong>
+                        </span>
                       </div>
                     </div>
 
@@ -419,7 +423,9 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                       }}
                     >
                       <div>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Prize Pool</div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          {t.type?.toLowerCase().includes('lone wolf') ? 'Winning Prize' : 'Prize Pool'}
+                        </div>
                         <div style={{ fontSize: '0.95rem', color: 'var(--accent)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
                           ₹{t.prizePool}
                         </div>
@@ -431,7 +437,9 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                         </div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Slots</div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          {t.type?.includes('1v1') ? '1v1 Slots' : (t.type?.includes('2v2') || t.type?.includes('Lone Wolf')) ? '2v2 Slots' : t.type?.includes('Clash') ? '4v4 Slots' : 'Slots'}
+                        </div>
                         <div style={{ fontSize: '0.95rem', color: 'var(--secondary)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
                           {joinedSlots}/{totalSlots}
                         </div>
