@@ -7,7 +7,8 @@ export default function TournamentLobby({
   walletBalance, 
   setWalletBalance, 
   onBack, 
-  onRegisterUser 
+  onRegisterUser,
+  setCurrentView
 }) {
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'brackets'
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -156,7 +157,13 @@ export default function TournamentLobby({
             </div>
             <div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Start Time:</span>
-              <p style={{ fontWeight: '700', margin: '2px 0 0 0' }}>{tournament.startTime ? new Date(tournament.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Today'}</p>
+              <p style={{ fontWeight: '700', margin: '2px 0 0 0', color: 'var(--secondary)' }}>
+                {tournament.startTime 
+                  ? (!isNaN(new Date(tournament.startTime).getTime()) 
+                      ? new Date(tournament.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) 
+                      : tournament.startTime) 
+                  : 'Today, Live'}
+              </p>
             </div>
             <div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Entry Fee:</span>
@@ -275,7 +282,27 @@ export default function TournamentLobby({
 
           {/* Rules & Gameplay Guidelines */}
           <div className="glass-panel" style={{ padding: '16px' }}>
-            <h3 style={{ fontSize: '0.95rem', marginBottom: '8px', color: 'var(--secondary)' }}>📜 Tournament Match Rules</h3>
+            <div className="flex-between" style={{ marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '0.95rem', margin: 0, color: 'var(--secondary)' }}>📜 Tournament Match Rules</h3>
+              {setCurrentView && (
+                <button
+                  type="button"
+                  onClick={() => setCurrentView('rules')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--primary)',
+                    fontSize: '0.75rem',
+                    fontFamily: 'var(--font-heading)',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Full Rules ➔
+                </button>
+              )}
+            </div>
             <ul style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingLeft: '18px', margin: 0, lineHeight: '1.6' }}>
               <li>Players must join the custom room using their registered Free Fire UID and Nickname.</li>
               <li>Emulators / PC players are strictly prohibited unless stated otherwise.</li>

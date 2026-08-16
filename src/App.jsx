@@ -7,6 +7,7 @@ import ProfilePage from './components/ProfilePage';
 import AdminHostPanel from './components/AdminHostPanel';
 import LoginPage from './components/LoginPage';
 import MyMatchesPage from './components/MyMatchesPage';
+import RulesPage from './components/RulesPage';
 import AppUpdateModal from './components/AppUpdateModal';
 import { isNewVersionAvailable, CURRENT_APP_VERSION } from './services/appUpdateService';
 import { sendToMakeWebhook, updateLiveWebhookUrl } from './services/webhookService';
@@ -301,6 +302,7 @@ export default function App() {
             setWalletBalance={setWalletBalance}
             onBack={() => setCurrentView('dashboard')}
             onRegisterUser={handleRegisterUser}
+            setCurrentView={setCurrentView}
           />
         )}
 
@@ -321,6 +323,10 @@ export default function App() {
             onLogout={handleLogout}
             currentUser={currentUser}
           />
+        )}
+
+        {currentView === 'rules' && (
+          <RulesPage setCurrentView={setCurrentView} />
         )}
 
         {currentView === 'admin' && currentUser?.role === 'admin' && (
