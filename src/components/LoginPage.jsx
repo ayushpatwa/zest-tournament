@@ -4,7 +4,8 @@ import {
   resetUserPasswordRealtime, 
   saveUserProfileRealtime, 
   authenticateUserRealtime, 
-  checkUserExistsRealtime 
+  checkUserExistsRealtime,
+  findUserForPasswordReset
 } from '../services/firebase';
 import { dispatchRealOtp } from '../services/otpService';
 
