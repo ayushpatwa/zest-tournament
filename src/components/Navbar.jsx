@@ -1,26 +1,54 @@
 import React, { useState } from 'react';
 
-export default function Navbar({ currentView, setCurrentView, walletBalance, currentUser, cloudNotifications = [] }) {
+export default function Navbar({ currentView, setCurrentView, walletBalance, currentUser, cloudNotifications = [], tournaments = [] }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [readNotifIds, setReadNotifIds] = useState(() => {
     const saved = localStorage.getItem('zest_read_notif_ids');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Calculate unread items
-  const unreadCount = cloudNotifications.filter(n => !readNotifIds.includes(n.id)).length;
+  const isAdmin = currentUser?.role === 'admin';
+  const isHost = currentUser?.role === 'host' || currentUser?.isHost || isAdmin;
+
+  // Filter notifications strictly:
+  // - Global announcements: shown to everyone
+  // - Room ID & Pass drops (targetTournamentId): strictly shown ONLY to registered players of that match + Admin/Host
+  const userVisibleNotifications = cloudNotifications.filter(n => {
+    if (n.targetTournamentId) {
+      if (isAdmin || isHost) return true;
+
+      const targetTourney = tournaments.find(t => t.id === n.targetTournamentId);
+      if (targetTourney && targetTourney.joinedPlayers) {
+        const cleanUid = String(currentUser?.uid || '').trim().toLowerCase();
+        const cleanEmail = String(currentUser?.email || '').trim().toLowerCase();
+        const cleanId = String(currentUser?.id || '').trim().toLowerCase();
+
+        return targetTourney.joinedPlayers.some(p => {
+          const pUid = String(p.uid || '').trim().toLowerCase();
+          const pEmail = String(p.email || '').trim().toLowerCase();
+          const pId = String(p.id || '').trim().toLowerCase();
+
+          return (cleanUid && pUid === cleanUid) ||
+                 (cleanEmail && pEmail === cleanEmail) ||
+                 (cleanId && pId === cleanId);
+        });
+      }
+      return false;
+    }
+    return true;
+  });
+
+  // Calculate unread items from visible notifications
+  const unreadCount = userVisibleNotifications.filter(n => !readNotifIds.includes(n.id)).length;
 
   const toggleNotifications = () => {
     setNotificationsOpen(!notificationsOpen);
-    if (!notificationsOpen && cloudNotifications.length > 0) {
-      const allIds = cloudNotifications.map(n => n.id);
+    if (!notificationsOpen && userVisibleNotifications.length > 0) {
+      const allIds = userVisibleNotifications.map(n => n.id);
       setReadNotifIds(allIds);
       localStorage.setItem('zest_read_notif_ids', JSON.stringify(allIds));
     }
   };
-
-  const isAdmin = currentUser?.role === 'admin';
-  const isHost = currentUser?.role === 'host' || currentUser?.isHost || isAdmin;
 
   const getPageTitle = () => {
     switch(currentView) {
@@ -283,11 +311,11 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                 >
                   <div className="flex-between" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>
                     <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.75rem', fontWeight: '700', color: 'var(--secondary)' }}>
-                      📢 NOTIFICATIONS ({cloudNotifications.length})
+                      📢 NOTIFICATIONS ({userVisibleNotifications.length})
                     </span>
                     <span 
                       onClick={() => {
-                        const allIds = cloudNotifications.map(n => n.id);
+                        const allIds = userVisibleNotifications.map(n => n.id);
                         setReadNotifIds(allIds);
                         localStorage.setItem('zest_read_notif_ids', JSON.stringify(allIds));
                       }} 
@@ -297,12 +325,12 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                     </span>
                   </div>
 
-                  {cloudNotifications.length === 0 ? (
+                  {userVisibleNotifications.length === 0 ? (
                     <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', fontSize: '0.75rem' }}>
-                      🔔 No announcements yet. When the admin posts tournament notices, they will appear here!
+                      🔔 No announcements yet. When match room IDs are dropped for your tournaments or notices posted, they will appear here!
                     </div>
                   ) : (
-                    cloudNotifications.map(n => {
+                    userVisibleNotifications.map(n => {
                       const isUnread = !readNotifIds.includes(n.id);
                       return (
                         <div key={n.id} style={{
@@ -311,7 +339,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                           padding: '8px 10px',
                           borderRadius: '8px',
                           background: isUnread ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-                          borderLeft: `3px solid ${n.type === 'alert' ? 'var(--danger)' : n.type === 'prize' ? 'var(--success)' : 'var(--primary)'}`,
+                          borderLeft: `3px solid ${n.type === 'alert' ? 'var(--danger)' : n.type === 'prize' ? 'var(--success)' : n.type === 'match' ? '#ffd600' : 'var(--primary)'}`,
                           border: isUnread ? '1px solid rgba(0, 229, 255, 0.25)' : '1px solid rgba(255, 255, 255, 0.05)',
                           color: 'var(--text-primary)',
                           display: 'flex',
@@ -319,7 +347,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                           gap: '3px'
                         }}>
                           <div className="flex-between" style={{ gap: '6px' }}>
-                            <strong style={{ color: '#fff', fontSize: '0.78rem' }}>
+                            <strong style={{ color: n.type === 'match' ? '#ffd600' : '#fff', fontSize: '0.78rem' }}>
                               {n.title || 'Match Notice'}
                             </strong>
                             <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>

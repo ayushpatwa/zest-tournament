@@ -218,9 +218,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
       return;
     }
 
+    const targetTourney = tournaments.find(t => t.id === selectedTourneyId);
+    const tourneyTitle = targetTourney?.title || 'Tournament Match';
+
     if (onBroadcastRoomCredentials) {
       await onBroadcastRoomCredentials(selectedTourneyId, inputRoomId.trim(), inputRoomPass.trim());
-      setRoomBroadcastStatus('✅ Broadcasted Room ID & Password to all player devices in real-time!');
+      
+      // Dispatch targeted notification to registered players only
+      await sendNotificationRealtime({
+        title: `🔑 Custom Room ID Dropped: ${tourneyTitle}`,
+        message: `Room ID: ${inputRoomId.trim()} | Password: ${inputRoomPass.trim() || 'No Password'}. Open match lobby and join custom room now!`,
+        type: 'match',
+        targetTournamentId: selectedTourneyId,
+        tournamentTitle: tourneyTitle
+      });
+
+      setRoomBroadcastStatus(`✅ Room ID & Password broadcasted strictly to registered players of "${tourneyTitle}" in real-time!`);
       setTimeout(() => setRoomBroadcastStatus(''), 4000);
     }
   };

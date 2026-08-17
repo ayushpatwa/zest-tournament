@@ -274,6 +274,7 @@ export default function App() {
         walletBalance={walletBalance} 
         currentUser={currentUser}
         cloudNotifications={cloudNotifications}
+        tournaments={tournaments}
       />
 
       {/* Main viewport */}
