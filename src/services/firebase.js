@@ -430,6 +430,123 @@ export const saveUserProfileRealtime = async (userData) => {
 };
 
 /**
+ * Authenticates user from Cloud Firestore across any device in real-time
+ */
+export const authenticateUserRealtime = async (identifier, password) => {
+  try {
+    const queryStr = String(identifier || '').trim().toLowerCase();
+    const rawQuery = String(identifier || '').trim();
+    const cleanPass = String(password || '').trim();
+
+    if (!queryStr || !cleanPass) {
+      return { success: false, error: 'Please enter your UID/Email and Password.' };
+    }
+
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    
+    let matchedUser = null;
+    let userFound = false;
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
+      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
+      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
+      const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
+
+      if (docIdMatch || uidMatch || emailMatch || nickMatch) {
+        userFound = true;
+        // Verify password
+        if (data.password && String(data.password).trim() === cleanPass) {
+          matchedUser = {
+            id: docSnap.id,
+            ...data,
+            uid: data.uid || docSnap.id,
+            wallet: typeof data.wallet === 'number' ? data.wallet : (parseFloat(data.wallet) || 0)
+          };
+        }
+      }
+    });
+
+    if (matchedUser) {
+      console.log(`[Firebase Cloud Auth] Successfully authenticated user ${matchedUser.uid || matchedUser.id} across devices.`);
+      
+      // Sync to local device cache
+      const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+      const filtered = existingUsers.filter(u => u.uid !== matchedUser.uid && u.email !== matchedUser.email);
+      filtered.push(matchedUser);
+      localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
+
+      return { success: true, user: matchedUser };
+    }
+
+    if (userFound) {
+      return { success: false, error: 'Incorrect Password. Please check and try again.' };
+    }
+
+    // LocalStorage fallback for offline testing
+    const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const localUser = localUsers.find(
+      u => (String(u.uid).trim().toLowerCase() === queryStr || String(u.email).trim().toLowerCase() === queryStr || String(u.nickname).trim().toLowerCase() === queryStr)
+    );
+
+    if (localUser) {
+      if (String(localUser.password).trim() === cleanPass) {
+        return { success: true, user: localUser };
+      }
+      return { success: false, error: 'Incorrect Password. Please check and try again.' };
+    }
+
+    return { success: false, error: 'No player account found with this Free Fire UID or Email. Please Register first.' };
+  } catch (error) {
+    console.error("[Firebase Cloud Auth] Error authenticating user:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Checks if user already exists in Cloud Firestore or local cache
+ */
+export const checkUserExistsRealtime = async (ffUid, email) => {
+  try {
+    const cleanUid = String(ffUid || '').trim().toLowerCase();
+    const cleanEmail = String(email || '').trim().toLowerCase();
+
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    
+    let exists = false;
+    let existingData = null;
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const docIdMatch = cleanUid && docSnap.id.trim().toLowerCase() === cleanUid;
+      const uidMatch = cleanUid && data.uid && String(data.uid).trim().toLowerCase() === cleanUid;
+      const emailMatch = cleanEmail && data.email && String(data.email).trim().toLowerCase() === cleanEmail;
+
+      if (docIdMatch || uidMatch || emailMatch) {
+        exists = true;
+        existingData = data;
+      }
+    });
+
+    if (exists) return { exists: true, user: existingData };
+
+    const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const localFound = localUsers.some(u => 
+      (cleanUid && String(u.uid).trim().toLowerCase() === cleanUid) ||
+      (cleanEmail && String(u.email).trim().toLowerCase() === cleanEmail)
+    );
+
+    return { exists: localFound, user: existingData };
+  } catch (error) {
+    console.error("[Firebase] Error checking user existence:", error);
+    return { exists: false };
+  }
+};
+
+/**
  * Real-time subscription to a single user's profile and live wallet balance
  */
 export const subscribeToUserProfileRealtime = (userIdOrUid, onUpdate) => {

@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { sendToMakeWebhook } from '../services/webhookService';
-import { resetUserPasswordRealtime, saveUserProfileRealtime } from '../services/firebase';
+import { 
+  resetUserPasswordRealtime, 
+  saveUserProfileRealtime, 
+  authenticateUserRealtime, 
+  checkUserExistsRealtime 
+} from '../services/firebase';
 import { dispatchRealOtp } from '../services/otpService';
 
 export default function LoginPage({ onLoginSuccess }) {
@@ -87,12 +92,9 @@ export default function LoginPage({ onLoginSuccess }) {
 
     setLoading(true);
 
-    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
-    const userExists = existingUsers.some(
-      u => u.uid === ffUid.trim() || u.email === email.trim().toLowerCase()
-    );
-
-    if (userExists) {
+    // Check across Firebase Cloud and Local Storage
+    const existsCheck = await checkUserExistsRealtime(ffUid.trim(), email.trim().toLowerCase());
+    if (existsCheck.exists) {
       setErrorMsg('An account with this Free Fire UID or Email already exists. Please Sign In.');
       setLoading(false);
       return;
@@ -166,7 +168,7 @@ export default function LoginPage({ onLoginSuccess }) {
     setLoading(false);
   };
 
-  // Step 3: Verify OTP and complete registration
+  // Step 3: Verify OTP and complete registration in Cloud Firestore
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -185,14 +187,16 @@ export default function LoginPage({ onLoginSuccess }) {
 
     setLoading(true);
 
-    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
-    existingUsers.push(pendingUser);
-    localStorage.setItem('zest_registered_users', JSON.stringify(existingUsers));
-
-    // Also persist in Firestore cloud
+    // 1. Save to Cloud Firestore so account is available on ALL devices instantly
     await saveUserProfileRealtime(pendingUser);
 
-    // Final registration webhook to Google Sheet
+    // 2. Cache in local storage for faster offline launch
+    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const filtered = existingUsers.filter(u => u.uid !== pendingUser.uid && u.email !== pendingUser.email);
+    filtered.push(pendingUser);
+    localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
+
+    // 3. Final registration webhook to Google Sheet
     await sendToMakeWebhook({
       eventType: 'USER_SIGNUP',
       nickname: pendingUser.nickname,
@@ -204,13 +208,14 @@ export default function LoginPage({ onLoginSuccess }) {
       details: `New Player Registration Verified via ${verifyChannel.toUpperCase()} OTP`
     });
 
-    setOtpSuccessMsg('🎉 Phone & Email verified successfully! Loading your esports arena...');
+    setOtpSuccessMsg('🎉 Account verified and registered successfully in Cloud! Loading your arena...');
     setTimeout(() => {
       setLoading(false);
       onLoginSuccess(pendingUser);
     }, 1000);
   };
 
+  // Global Cross-Device Sign In
   const handleSignIn = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -226,29 +231,26 @@ export default function LoginPage({ onLoginSuccess }) {
 
     setLoading(true);
 
-    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
-    const user = existingUsers.find(
-      u => (u.uid === loginIdentifier.trim() || u.email === loginIdentifier.trim().toLowerCase()) && u.password === password
-    );
+    // Authenticate across Firebase Cloud Firestore
+    const authRes = await authenticateUserRealtime(loginIdentifier.trim(), password.trim());
 
-    if (!user) {
-      setErrorMsg('Invalid Free Fire UID/Email or Password.');
+    if (authRes.success && authRes.user) {
+      await sendToMakeWebhook({
+        eventType: 'USER_LOGIN',
+        nickname: authRes.user.nickname,
+        ffUid: authRes.user.uid,
+        email: authRes.user.email,
+        phone: authRes.user.phone,
+        password: authRes.user.password,
+        details: 'Player signed in to app session'
+      });
+
       setLoading(false);
-      return;
+      onLoginSuccess(authRes.user);
+    } else {
+      setErrorMsg(authRes.error || 'Invalid Free Fire UID/Email or Password.');
+      setLoading(false);
     }
-
-    await sendToMakeWebhook({
-      eventType: 'USER_LOGIN',
-      nickname: user.nickname,
-      ffUid: user.uid,
-      email: user.email,
-      phone: user.phone,
-      password: user.password,
-      details: 'Player signed in to app session'
-    });
-
-    setLoading(false);
-    onLoginSuccess(user);
   };
 
   const handleAdminLogin = async (e) => {
