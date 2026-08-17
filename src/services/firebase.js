@@ -768,21 +768,35 @@ export const findUserForPasswordReset = async (identifier) => {
     const queryStr = String(identifier || '').trim().toLowerCase();
     if (!queryStr) return { success: false, error: 'Please enter your Free Fire UID or Email.' };
 
-    const usersCollection = collection(db, "users");
-    const snapshot = await getDocs(usersCollection);
-    
     let matchedUser = null;
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
-      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
-      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
-      const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
+
+    // Check Firebase Firestore with 3s timeout
+    try {
+      const usersCollection = collection(db, "users");
+      const snapshotPromise = getDocs(usersCollection);
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
       
-      if (docIdMatch || uidMatch || emailMatch || nickMatch) {
-        matchedUser = { id: docSnap.id, ...data, uid: data.uid || docSnap.id };
-      }
-    });
+      const snapshot = await Promise.race([snapshotPromise, timeoutPromise]);
+      
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
+        const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
+        const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
+        const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
+        
+        if (docIdMatch || uidMatch || emailMatch || nickMatch) {
+          matchedUser = { 
+            id: docSnap.id, 
+            ...data, 
+            uid: data.uid || docSnap.id,
+            email: data.email || (queryStr.includes('@') ? queryStr : '')
+          };
+        }
+      });
+    } catch (fbErr) {
+      console.warn("[Firebase] Firestore findUser lookup timeout or warning:", fbErr);
+    }
 
     if (matchedUser) {
       return { success: true, user: matchedUser };
@@ -791,17 +805,35 @@ export const findUserForPasswordReset = async (identifier) => {
     // Local storage fallback
     const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
     const foundLocal = localUsers.find(u => 
-      String(u.uid).trim().toLowerCase() === queryStr || 
-      String(u.email).trim().toLowerCase() === queryStr
+      String(u.uid || '').trim().toLowerCase() === queryStr || 
+      String(u.email || '').trim().toLowerCase() === queryStr ||
+      String(u.nickname || '').trim().toLowerCase() === queryStr
     );
+
     if (foundLocal) {
-      return { success: true, user: foundLocal };
+      return { 
+        success: true, 
+        user: { ...foundLocal, email: foundLocal.email || (queryStr.includes('@') ? queryStr : '') } 
+      };
     }
 
-    return { success: false, error: 'No player account found with this Free Fire UID or Email.' };
+    // If identifier is an email, allow password reset for that email
+    if (queryStr.includes('@') && queryStr.includes('.')) {
+      return {
+        success: true,
+        user: {
+          uid: queryStr.split('@')[0],
+          nickname: queryStr.split('@')[0],
+          email: queryStr,
+          phone: ''
+        }
+      };
+    }
+
+    return { success: false, error: `No registered player account found with "${queryStr}". Please Register first.` };
   } catch (err) {
     console.error("[Firebase] findUserForPasswordReset error:", err);
-    return { success: false, error: err.message };
+    return { success: false, error: err.message || 'Failed to search account.' };
   }
 };
 

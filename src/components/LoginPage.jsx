@@ -305,48 +305,58 @@ export default function LoginPage({ onLoginSuccess }) {
     setErrorMsg('');
     setResetSuccessMsg('');
 
-    if (!recoverIdentifier.trim()) {
+    const cleanInput = recoverIdentifier.trim();
+    if (!cleanInput) {
       setErrorMsg('Please enter your Free Fire UID or registered Email.');
       return;
     }
 
     setLoading(true);
-    const lookup = await findUserForPasswordReset(recoverIdentifier.trim());
 
-    if (!lookup.success || !lookup.user) {
-      setErrorMsg(lookup.error || 'No account found with this Free Fire UID or Email.');
+    try {
+      const lookup = await findUserForPasswordReset(cleanInput);
+
+      if (!lookup.success || !lookup.user) {
+        setErrorMsg(lookup.error || `No registered player account found with "${cleanInput}". Please Register first.`);
+        setLoading(false);
+        return;
+      }
+
+      const foundUser = lookup.user;
+      const targetEmail = foundUser.email || (cleanInput.includes('@') ? cleanInput : '');
+
+      if (!targetEmail) {
+        setErrorMsg('This account does not have a registered email address for OTP recovery.');
+        setLoading(false);
+        return;
+      }
+
+      // Generate secure 6-digit OTP code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setRecoverOtp(code);
+      setEnteredRecoverOtp('');
+      setRecoverUser({ ...foundUser, email: targetEmail });
+      setNewResetPassword('');
+      setConfirmResetPassword('');
+
+      // Dispatch OTP to user's real registered email via Make.com in background
+      dispatchRealOtp({
+        email: targetEmail,
+        phone: foundUser.phone || '',
+        nickname: foundUser.nickname || 'Player',
+        ffUid: foundUser.uid || cleanInput,
+        otpCode: code,
+        channel: 'email'
+      }).catch(err => console.warn('[OTP] Background dispatch warning:', err));
+
+      setResendTimer(30);
+      setAuthMode('forgot_otp_verify');
+    } catch (err) {
+      console.error('[OTP Recovery Error]:', err);
+      setErrorMsg(err.message || 'Failed to initiate password recovery. Please try again.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const foundUser = lookup.user;
-    if (!foundUser.email) {
-      setErrorMsg('This account does not have a registered email address for OTP recovery.');
-      setLoading(false);
-      return;
-    }
-
-    // Generate secure 6-digit OTP code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setRecoverOtp(code);
-    setEnteredRecoverOtp('');
-    setRecoverUser(foundUser);
-    setNewResetPassword('');
-    setConfirmResetPassword('');
-
-    // Dispatch OTP to user's real registered email via Make.com
-    await dispatchRealOtp({
-      email: foundUser.email,
-      phone: foundUser.phone || '',
-      nickname: foundUser.nickname || 'Player',
-      ffUid: foundUser.uid || recoverIdentifier,
-      otpCode: code,
-      channel: 'email'
-    });
-
-    setResendTimer(30);
-    setAuthMode('forgot_otp_verify');
-    setLoading(false);
   };
 
   // Resend OTP for password reset
@@ -356,22 +366,27 @@ export default function LoginPage({ onLoginSuccess }) {
     setResetSuccessMsg('');
     setLoading(true);
 
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setRecoverOtp(newCode);
-    setEnteredRecoverOtp('');
+    try {
+      const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+      setRecoverOtp(newCode);
+      setEnteredRecoverOtp('');
 
-    await dispatchRealOtp({
-      email: recoverUser.email,
-      phone: recoverUser.phone || '',
-      nickname: recoverUser.nickname || 'Player',
-      ffUid: recoverUser.uid || recoverIdentifier,
-      otpCode: newCode,
-      channel: 'email'
-    });
+      dispatchRealOtp({
+        email: recoverUser.email,
+        phone: recoverUser.phone || '',
+        nickname: recoverUser.nickname || 'Player',
+        ffUid: recoverUser.uid || recoverIdentifier,
+        otpCode: newCode,
+        channel: 'email'
+      }).catch(err => console.warn('[OTP Resend] Background dispatch warning:', err));
 
-    setResendTimer(30);
-    setResetSuccessMsg(`✅ New 6-digit OTP code sent to ${recoverUser.email}!`);
-    setLoading(false);
+      setResendTimer(30);
+      setResetSuccessMsg(`✅ New 6-digit OTP code sent to ${recoverUser.email}!`);
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to resend OTP.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Step 2 of Password Reset: Verify OTP and save new password
@@ -402,26 +417,33 @@ export default function LoginPage({ onLoginSuccess }) {
     }
 
     setLoading(true);
-    const res = await resetUserPasswordRealtime(recoverUser.uid || recoverIdentifier, '', newResetPassword.trim());
+    try {
+      const targetUid = recoverUser?.uid || recoverIdentifier;
+      const res = await resetUserPasswordRealtime(targetUid, '', newResetPassword.trim());
 
-    if (res.success) {
-      setResetSuccessMsg('✅ Password updated successfully! Logging into your esports arena...');
-      await sendToMakeWebhook({
-        eventType: 'PASSWORD_RESET',
-        nickname: recoverUser.nickname || 'Player',
-        ffUid: recoverUser.uid || recoverIdentifier,
-        email: recoverUser.email,
-        phone: recoverUser.phone || 'N/A',
-        password: newResetPassword.trim(),
-        details: 'Player verified Email OTP and reset password successfully'
-      });
+      if (res.success) {
+        setResetSuccessMsg('✅ Password updated successfully! Logging into your esports arena...');
+        
+        sendToMakeWebhook({
+          eventType: 'PASSWORD_RESET',
+          nickname: recoverUser?.nickname || 'Player',
+          ffUid: recoverUser?.uid || recoverIdentifier,
+          email: recoverUser?.email || 'N/A',
+          phone: recoverUser?.phone || 'N/A',
+          password: newResetPassword.trim(),
+          details: 'Player verified Email OTP and reset password successfully'
+        }).catch(err => console.warn('[Webhook] Password reset webhook warning:', err));
 
-      setTimeout(() => {
+        setTimeout(() => {
+          setLoading(false);
+          onLoginSuccess(res.user || { ...recoverUser, password: newResetPassword.trim() });
+        }, 1200);
+      } else {
+        setErrorMsg(res.error || 'Failed to update password.');
         setLoading(false);
-        onLoginSuccess(res.user || { ...recoverUser, password: newResetPassword.trim() });
-      }, 1200);
-    } else {
-      setErrorMsg(res.error || 'Failed to update password.');
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Error updating password.');
       setLoading(false);
     }
   };
