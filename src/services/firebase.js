@@ -761,6 +761,51 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
 };
 
 /**
+ * Looks up user by UID or Email to initiate OTP password reset
+ */
+export const findUserForPasswordReset = async (identifier) => {
+  try {
+    const queryStr = String(identifier || '').trim().toLowerCase();
+    if (!queryStr) return { success: false, error: 'Please enter your Free Fire UID or Email.' };
+
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    
+    let matchedUser = null;
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
+      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
+      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
+      const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
+      
+      if (docIdMatch || uidMatch || emailMatch || nickMatch) {
+        matchedUser = { id: docSnap.id, ...data, uid: data.uid || docSnap.id };
+      }
+    });
+
+    if (matchedUser) {
+      return { success: true, user: matchedUser };
+    }
+
+    // Local storage fallback
+    const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const foundLocal = localUsers.find(u => 
+      String(u.uid).trim().toLowerCase() === queryStr || 
+      String(u.email).trim().toLowerCase() === queryStr
+    );
+    if (foundLocal) {
+      return { success: true, user: foundLocal };
+    }
+
+    return { success: false, error: 'No player account found with this Free Fire UID or Email.' };
+  } catch (err) {
+    console.error("[Firebase] findUserForPasswordReset error:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
  * Resets a user's password in Firestore after verifying their UID/Email and Phone
  */
 export const resetUserPasswordRealtime = async (identifier, verificationPhone, newPassword) => {

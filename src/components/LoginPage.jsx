@@ -31,8 +31,11 @@ export default function LoginPage({ onLoginSuccess }) {
   
   // Account Recovery state
   const [recoverIdentifier, setRecoverIdentifier] = useState('');
-  const [recoverPhone, setRecoverPhone] = useState('');
+  const [recoverUser, setRecoverUser] = useState(null);
+  const [recoverOtp, setRecoverOtp] = useState('');
+  const [enteredRecoverOtp, setEnteredRecoverOtp] = useState('');
   const [newResetPassword, setNewResetPassword] = useState('');
+  const [confirmResetPassword, setConfirmResetPassword] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
   
   // Admin Login state
@@ -296,41 +299,131 @@ export default function LoginPage({ onLoginSuccess }) {
     setErrorMsg('Invalid Admin username or password. (Default: admin / admin123)');
   };
 
-  const handleRecoverPassword = async (e) => {
+  // Step 1 of Password Reset: Look up user and dispatch Email OTP
+  const handleInitiatePasswordRecovery = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     setResetSuccessMsg('');
 
     if (!recoverIdentifier.trim()) {
-      setErrorMsg('Please enter your Free Fire UID or Email.');
-      return;
-    }
-    if (!newResetPassword.trim() || newResetPassword.length < 4) {
-      setErrorMsg('New password must be at least 4 characters long.');
+      setErrorMsg('Please enter your Free Fire UID or registered Email.');
       return;
     }
 
     setLoading(true);
-    const res = await resetUserPasswordRealtime(recoverIdentifier.trim(), recoverPhone.trim(), newResetPassword.trim());
-    
+    const lookup = await findUserForPasswordReset(recoverIdentifier.trim());
+
+    if (!lookup.success || !lookup.user) {
+      setErrorMsg(lookup.error || 'No account found with this Free Fire UID or Email.');
+      setLoading(false);
+      return;
+    }
+
+    const foundUser = lookup.user;
+    if (!foundUser.email) {
+      setErrorMsg('This account does not have a registered email address for OTP recovery.');
+      setLoading(false);
+      return;
+    }
+
+    // Generate secure 6-digit OTP code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setRecoverOtp(code);
+    setEnteredRecoverOtp('');
+    setRecoverUser(foundUser);
+    setNewResetPassword('');
+    setConfirmResetPassword('');
+
+    // Dispatch OTP to user's real registered email via Make.com
+    await dispatchRealOtp({
+      email: foundUser.email,
+      phone: foundUser.phone || '',
+      nickname: foundUser.nickname || 'Player',
+      ffUid: foundUser.uid || recoverIdentifier,
+      otpCode: code,
+      channel: 'email'
+    });
+
+    setResendTimer(30);
+    setAuthMode('forgot_otp_verify');
+    setLoading(false);
+  };
+
+  // Resend OTP for password reset
+  const handleResendRecoverOtp = async () => {
+    if (resendTimer > 0 || !recoverUser?.email) return;
+    setErrorMsg('');
+    setResetSuccessMsg('');
+    setLoading(true);
+
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setRecoverOtp(newCode);
+    setEnteredRecoverOtp('');
+
+    await dispatchRealOtp({
+      email: recoverUser.email,
+      phone: recoverUser.phone || '',
+      nickname: recoverUser.nickname || 'Player',
+      ffUid: recoverUser.uid || recoverIdentifier,
+      otpCode: newCode,
+      channel: 'email'
+    });
+
+    setResendTimer(30);
+    setResetSuccessMsg(`✅ New 6-digit OTP code sent to ${recoverUser.email}!`);
+    setLoading(false);
+  };
+
+  // Step 2 of Password Reset: Verify OTP and save new password
+  const handleVerifyAndResetPassword = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setResetSuccessMsg('');
+
+    const cleanInput = enteredRecoverOtp.trim();
+    if (!cleanInput || cleanInput.length < 6) {
+      setErrorMsg('Please enter the complete 6-digit OTP code.');
+      return;
+    }
+
+    if (cleanInput !== recoverOtp.trim()) {
+      setErrorMsg('❌ Invalid OTP code. Please enter the correct code received on your Email.');
+      return;
+    }
+
+    if (!newResetPassword.trim() || newResetPassword.trim().length < 4) {
+      setErrorMsg('New password must be at least 4 characters long.');
+      return;
+    }
+
+    if (newResetPassword.trim() !== confirmResetPassword.trim()) {
+      setErrorMsg('Passwords do not match. Please retype correctly.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await resetUserPasswordRealtime(recoverUser.uid || recoverIdentifier, '', newResetPassword.trim());
+
     if (res.success) {
-      setResetSuccessMsg('✅ Password reset successfully! Logging into your account...');
+      setResetSuccessMsg('✅ Password updated successfully! Logging into your esports arena...');
       await sendToMakeWebhook({
         eventType: 'PASSWORD_RESET',
-        nickname: res.user?.nickname || 'Player',
-        ffUid: res.user?.uid || recoverIdentifier,
-        email: res.user?.email || 'N/A',
-        phone: res.user?.phone || recoverPhone,
+        nickname: recoverUser.nickname || 'Player',
+        ffUid: recoverUser.uid || recoverIdentifier,
+        email: recoverUser.email,
+        phone: recoverUser.phone || 'N/A',
         password: newResetPassword.trim(),
-        details: 'Player self-service password reset'
+        details: 'Player verified Email OTP and reset password successfully'
       });
+
       setTimeout(() => {
-        onLoginSuccess(res.user);
-      }, 1500);
+        setLoading(false);
+        onLoginSuccess(res.user || { ...recoverUser, password: newResetPassword.trim() });
+      }, 1200);
     } else {
-      setErrorMsg(res.error || 'Failed to verify account.');
+      setErrorMsg(res.error || 'Failed to update password.');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -550,19 +643,95 @@ export default function LoginPage({ onLoginSuccess }) {
           </form>
         )}
 
-        {/* MODE 4: FORGOT PASSWORD / ACCOUNT RECOVERY */}
+        {/* MODE 4: FORGOT PASSWORD (STEP 1: ENTER UID / EMAIL) */}
         {authMode === 'forgot' && (
-          <form onSubmit={handleRecoverPassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <form onSubmit={handleInitiatePasswordRecovery} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{
               background: 'rgba(0, 229, 255, 0.08)',
               border: '1px solid rgba(0, 229, 255, 0.25)',
-              padding: '10px',
-              borderRadius: '8px',
-              fontSize: '0.75rem',
-              color: 'var(--secondary)',
+              padding: '12px',
+              borderRadius: '10px',
+              fontSize: '0.78rem',
+              color: 'var(--text-primary)',
               lineHeight: '1.4'
             }}>
-              🔑 <strong>Recover Account:</strong> Enter your Free Fire UID or Email and registered phone number to reset your password.
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '1rem' }}>🔑</span>
+                <strong style={{ color: 'var(--secondary)', fontFamily: 'var(--font-heading)', fontSize: '0.82rem' }}>
+                  RECOVER ACCOUNT PASSWORD
+                </strong>
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.74rem' }}>
+                Enter your Free Fire UID or registered Email. We will send a 6-digit security OTP to verify your identity.
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Free Fire UID or Registered Email <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <input
+                type="text"
+                value={recoverIdentifier}
+                onChange={(e) => setRecoverIdentifier(e.target.value)}
+                placeholder="e.g. 482910384 or player@gmail.com"
+                className="form-input"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+              style={{
+                width: '100%',
+                height: '46px',
+                marginTop: '4px',
+                fontSize: '0.9rem',
+                fontWeight: '900',
+                background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)'
+              }}
+            >
+              {loading ? 'Sending Recovery OTP...' : '⚡ Send Password Reset OTP →'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setAuthMode('signin'); setErrorMsg(''); setResetSuccessMsg(''); }}
+              className="btn btn-outline"
+              style={{ width: '100%', height: '40px', fontSize: '0.8rem', marginTop: '2px' }}
+            >
+              ← Back to Sign In
+            </button>
+          </form>
+        )}
+
+        {/* MODE 4.5: FORGOT PASSWORD (STEP 2: VERIFY EMAIL OTP & SET NEW PASSWORD) */}
+        {authMode === 'forgot_otp_verify' && (
+          <form onSubmit={handleVerifyAndResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{
+              background: 'rgba(0, 229, 255, 0.08)',
+              border: '1px solid rgba(0, 229, 255, 0.25)',
+              padding: '14px',
+              borderRadius: '12px',
+              fontSize: '0.8rem',
+              color: 'var(--text-primary)',
+              lineHeight: '1.45'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '1.2rem' }}>📩</span>
+                <strong style={{ color: 'var(--secondary)', fontFamily: 'var(--font-heading)', fontSize: '0.85rem' }}>
+                  PASSWORD RESET OTP SENT
+                </strong>
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
+                We sent a 6-digit verification code to:
+                <div style={{ color: '#fff', fontWeight: '700', fontSize: '0.86rem', marginTop: '3px', wordBreak: 'break-all' }}>
+                  {recoverUser?.email}
+                </div>
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                💡 Please check your Email Inbox (or Spam folder) and enter the 6-digit code below.
+              </div>
             </div>
 
             {resetSuccessMsg && (
@@ -579,25 +748,27 @@ export default function LoginPage({ onLoginSuccess }) {
               </div>
             )}
 
+            {/* 6-Digit OTP Code Input */}
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Free Fire UID or Email <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <label>Enter 6-Digit Email OTP Code <span style={{ color: 'var(--primary)' }}>*</span></label>
               <input
                 type="text"
-                value={recoverIdentifier}
-                onChange={(e) => setRecoverIdentifier(e.target.value)}
-                placeholder="Enter UID or Email"
-                className="form-input"
-                required
-              />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Registered Phone Number <span style={{ color: 'var(--primary)' }}>*</span></label>
-              <input
-                type="tel"
-                value={recoverPhone}
-                onChange={(e) => setRecoverPhone(e.target.value)}
-                placeholder="e.g. 9876543210"
+                value={enteredRecoverOtp}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setEnteredRecoverOtp(val);
+                }}
+                placeholder="• • • • • •"
+                maxLength={6}
+                autoFocus
+                style={{
+                  textAlign: 'center',
+                  fontFamily: 'monospace',
+                  fontSize: '1.5rem',
+                  fontWeight: '900',
+                  letterSpacing: '8px',
+                  color: '#00e5ff'
+                }}
                 className="form-input"
                 required
               />
@@ -615,31 +786,67 @@ export default function LoginPage({ onLoginSuccess }) {
               />
             </div>
 
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Confirm New Password <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <input
+                type="password"
+                value={confirmResetPassword}
+                onChange={(e) => setConfirmResetPassword(e.target.value)}
+                placeholder="Re-enter new password"
+                className="form-input"
+                required
+              />
+            </div>
+
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={loading}
+              disabled={loading || enteredRecoverOtp.length < 6}
               style={{
                 width: '100%',
                 height: '46px',
                 marginTop: '4px',
                 fontSize: '0.9rem',
-                background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)',
-                color: '#000',
-                fontWeight: '900'
+                fontWeight: '900',
+                background: enteredRecoverOtp.length === 6 
+                  ? 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)' 
+                  : 'rgba(255,255,255,0.1)',
+                color: enteredRecoverOtp.length === 6 ? '#000' : 'var(--text-muted)'
               }}
             >
-              {loading ? 'Verifying & Resetting...' : '⚡ Reset Password & Log In'}
+              {loading ? 'Verifying & Updating...' : '✅ Verify OTP & Update Password'}
             </button>
 
-            <button
-              type="button"
-              onClick={() => { setAuthMode('signin'); setErrorMsg(''); setResetSuccessMsg(''); }}
-              className="btn btn-outline"
-              style={{ width: '100%', height: '40px', fontSize: '0.8rem', marginTop: '2px' }}
-            >
-              ← Back to Sign In
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleResendRecoverOtp}
+                disabled={resendTimer > 0 || loading}
+                className="btn btn-outline"
+                style={{
+                  flex: 1,
+                  height: '38px',
+                  fontSize: '0.74rem',
+                  color: resendTimer > 0 ? 'var(--text-muted)' : 'var(--secondary)',
+                  borderColor: resendTimer > 0 ? 'rgba(255,255,255,0.1)' : 'var(--secondary)'
+                }}
+              >
+                {resendTimer > 0 ? `⏳ Resend OTP (${resendTimer}s)` : '🔄 Resend Email OTP'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setAuthMode('forgot'); setErrorMsg(''); setResetSuccessMsg(''); }}
+                className="btn btn-outline"
+                style={{
+                  flex: 1,
+                  height: '38px',
+                  fontSize: '0.74rem'
+                }}
+              >
+                ← Back
+              </button>
+            </div>
           </form>
         )}
 
