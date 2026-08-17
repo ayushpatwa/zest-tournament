@@ -1026,48 +1026,63 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
               : (walletAction === 'credit' ? `⚡ Credit ₹${payoutAmount || 0} Coins to Player Wallet` : `🔻 Deduct ₹${payoutAmount || 0} Coins from Player Wallet`)}
           </button>
 
-          {/* Live Player Directory */}
-          <div style={{ marginTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
-            <div className="flex-between" style={{ marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
-              <h4 style={{ fontSize: '0.85rem', color: 'var(--secondary)', margin: 0, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>👥</span> Registered Players Directory ({cloudUsers.length})
-              </h4>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Tap "Select" to credit/deduct coins or delete account
-              </span>
-            </div>
+            {/* Live Player Directory */}
+            {(() => {
+              const nonAdminPlayers = cloudUsers.filter(u => {
+                const isAdmin = 
+                  u.role === 'admin' ||
+                  String(u.uid).trim() === '4209471305' ||
+                  String(u.id).trim() === '4209471305' ||
+                  String(u.id).trim() === 'admin_master_1' ||
+                  String(u.uid).trim().toUpperCase() === 'ADMIN_001' ||
+                  String(u.email || '').trim().toLowerCase() === 'admin@zest.gg';
+                return !isAdmin;
+              });
 
-            {/* Quick Player Search Filter */}
-            <div style={{ marginBottom: '10px' }}>
-              <input
-                type="text"
-                value={playerSearchQuery}
-                onChange={(e) => setPlayerSearchQuery(e.target.value)}
-                placeholder="🔍 Search players by Nickname, UID, Email or Phone..."
-                className="form-input"
-                style={{ padding: '8px 12px', fontSize: '0.8rem', height: '36px' }}
-              />
-            </div>
+              const filteredDisplayUsers = nonAdminPlayers.filter(u => {
+                if (!playerSearchQuery.trim()) return true;
+                const q = playerSearchQuery.trim().toLowerCase();
+                return (
+                  (u.nickname && u.nickname.toLowerCase().includes(q)) ||
+                  (u.uid && String(u.uid).toLowerCase().includes(q)) ||
+                  (u.email && u.email.toLowerCase().includes(q)) ||
+                  (u.phone && String(u.phone).toLowerCase().includes(q)) ||
+                  (u.id && String(u.id).toLowerCase().includes(q))
+                );
+              });
 
-            {cloudUsers.length === 0 ? (
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>
-                No player accounts found in Firebase yet. When a player registers, they will appear here!
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
-                {cloudUsers
-                  .filter(u => {
-                    if (!playerSearchQuery.trim()) return true;
-                    const q = playerSearchQuery.trim().toLowerCase();
-                    return (
-                      (u.nickname && u.nickname.toLowerCase().includes(q)) ||
-                      (u.uid && String(u.uid).toLowerCase().includes(q)) ||
-                      (u.email && u.email.toLowerCase().includes(q)) ||
-                      (u.phone && String(u.phone).toLowerCase().includes(q)) ||
-                      (u.id && String(u.id).toLowerCase().includes(q))
-                    );
-                  })
-                  .map(u => (
+              return (
+                <div style={{ marginTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
+                  <div className="flex-between" style={{ marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
+                    <h4 style={{ fontSize: '0.85rem', color: 'var(--secondary)', margin: 0, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>👥</span> Registered Players Directory ({nonAdminPlayers.length})
+                    </h4>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Tap "Select" to credit/deduct coins or appoint host
+                    </span>
+                  </div>
+
+                  {/* Quick Player Search Filter */}
+                  <div style={{ marginBottom: '10px' }}>
+                    <input
+                      type="text"
+                      value={playerSearchQuery}
+                      onChange={(e) => setPlayerSearchQuery(e.target.value)}
+                      placeholder="🔍 Search players by Nickname, UID, Email or Phone..."
+                      className="form-input"
+                      style={{ padding: '8px 12px', fontSize: '0.8rem', height: '36px' }}
+                    />
+                  </div>
+
+                  {filteredDisplayUsers.length === 0 ? (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>
+                      {nonAdminPlayers.length === 0 
+                        ? 'No registered player accounts found in Firebase yet.' 
+                        : 'No players match your search filter.'}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                      {filteredDisplayUsers.map(u => (
                   <div 
                     key={u.id || u.uid}
                     className="flex-between"
@@ -1230,7 +1245,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
               </div>
             )}
           </div>
-        </form>
+        );
+      })()}
+    </form>
       )}
 
       {/* MODE 2.7: BROADCAST NOTIFICATIONS TO BELL 🔔 */}
