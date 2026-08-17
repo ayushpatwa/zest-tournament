@@ -297,6 +297,7 @@ export default function App() {
         setCurrentView={setCurrentView} 
         walletBalance={walletBalance} 
         currentUser={currentUser}
+        userProfile={userProfile}
         cloudNotifications={cloudNotifications}
         tournaments={tournaments}
       />

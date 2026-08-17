@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function Navbar({ currentView, setCurrentView, walletBalance, currentUser, cloudNotifications = [], tournaments = [] }) {
+export default function Navbar({ currentView, setCurrentView, walletBalance, currentUser, userProfile, cloudNotifications = [], tournaments = [] }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [readNotifIds, setReadNotifIds] = useState(() => {
     const saved = localStorage.getItem('zest_read_notif_ids');
@@ -10,31 +10,52 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
   const isAdmin = currentUser?.role === 'admin';
   const isHost = currentUser?.role === 'host' || currentUser?.isHost || isAdmin;
 
+  // Active player identifiers
+  const cleanUid = String(userProfile?.uid || currentUser?.uid || '').trim().toLowerCase();
+  const cleanEmail = String(userProfile?.email || currentUser?.email || '').trim().toLowerCase();
+  const cleanId = String(userProfile?.id || currentUser?.id || '').trim().toLowerCase();
+
   // Filter notifications strictly:
   // - Global announcements: shown to everyone
-  // - Room ID & Pass drops (targetTournamentId): strictly shown ONLY to registered players of that match + Admin/Host
+  // - Room ID & Pass drops (targetTournamentId / type === 'match' / targetUids): strictly shown ONLY to registered players of that match + Super Admin
   const userVisibleNotifications = cloudNotifications.filter(n => {
-    if (n.targetTournamentId) {
-      if (isAdmin || isHost) return true;
+    const isRoomDropNotif = n.targetTournamentId || n.type === 'match' || (Array.isArray(n.targetUids) && n.targetUids.length > 0);
 
-      const targetTourney = tournaments.find(t => t.id === n.targetTournamentId);
-      if (targetTourney && targetTourney.joinedPlayers) {
-        const cleanUid = String(currentUser?.uid || '').trim().toLowerCase();
-        const cleanEmail = String(currentUser?.email || '').trim().toLowerCase();
-        const cleanId = String(currentUser?.id || '').trim().toLowerCase();
+    if (isRoomDropNotif) {
+      // 1. Super Admin can view all alerts for monitoring
+      if (isAdmin) return true;
 
-        return targetTourney.joinedPlayers.some(p => {
-          const pUid = String(p.uid || '').trim().toLowerCase();
-          const pEmail = String(p.email || '').trim().toLowerCase();
-          const pId = String(p.id || '').trim().toLowerCase();
-
-          return (cleanUid && pUid === cleanUid) ||
-                 (cleanEmail && pEmail === cleanEmail) ||
-                 (cleanId && pId === cleanId);
+      // 2. Check if player UID is in targetUids array
+      if (Array.isArray(n.targetUids) && n.targetUids.length > 0) {
+        const inTargetUids = n.targetUids.some(u => {
+          const cleanTarget = String(u).trim().toLowerCase();
+          return cleanTarget && (cleanTarget === cleanUid || cleanTarget === cleanId || cleanTarget === cleanEmail);
         });
+        if (inTargetUids) return true;
       }
+
+      // 3. Check if player is registered in the tournament object
+      if (n.targetTournamentId) {
+        const targetTourney = tournaments.find(t => t.id === n.targetTournamentId);
+        if (targetTourney && Array.isArray(targetTourney.joinedPlayers)) {
+          const isPlayerRegistered = targetTourney.joinedPlayers.some(p => {
+            const pUid = String(p.uid || '').trim().toLowerCase();
+            const pEmail = String(p.email || '').trim().toLowerCase();
+            const pId = String(p.id || '').trim().toLowerCase();
+
+            return (cleanUid && pUid === cleanUid) ||
+                   (cleanEmail && pEmail === cleanEmail) ||
+                   (cleanId && pId === cleanId);
+          });
+          if (isPlayerRegistered) return true;
+        }
+      }
+
+      // Player is NOT registered in this match -> HIDE COMPLETELY!
       return false;
     }
+
+    // General announcement -> visible to everyone
     return true;
   });
 

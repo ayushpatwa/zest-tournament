@@ -946,6 +946,9 @@ export const sendNotificationRealtime = async (notificationData) => {
       title: notificationData.title || 'Announcement',
       message: notificationData.message || '',
       type: notificationData.type || 'info', // 'alert' | 'match' | 'prize' | 'info'
+      targetTournamentId: notificationData.targetTournamentId || null,
+      targetUids: Array.isArray(notificationData.targetUids) ? notificationData.targetUids : [],
+      tournamentTitle: notificationData.tournamentTitle || '',
       createdAt: serverTimestamp(),
       createdTimeStr: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + ', ' + new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
     });

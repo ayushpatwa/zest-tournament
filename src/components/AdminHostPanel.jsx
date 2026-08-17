@@ -220,16 +220,20 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
 
     const targetTourney = tournaments.find(t => t.id === selectedTourneyId);
     const tourneyTitle = targetTourney?.title || 'Tournament Match';
+    const joinedUids = (targetTourney?.joinedPlayers || [])
+      .map(p => String(p.uid || '').trim().toLowerCase())
+      .filter(Boolean);
 
     if (onBroadcastRoomCredentials) {
       await onBroadcastRoomCredentials(selectedTourneyId, inputRoomId.trim(), inputRoomPass.trim());
       
-      // Dispatch targeted notification to registered players only
+      // Dispatch targeted notification strictly for registered players
       await sendNotificationRealtime({
         title: `🔑 Custom Room ID Dropped: ${tourneyTitle}`,
         message: `Room ID: ${inputRoomId.trim()} | Password: ${inputRoomPass.trim() || 'No Password'}. Open match lobby and join custom room now!`,
         type: 'match',
         targetTournamentId: selectedTourneyId,
+        targetUids: joinedUids,
         tournamentTitle: tourneyTitle
       });
 
