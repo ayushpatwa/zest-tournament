@@ -38,78 +38,124 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
       <div 
         className="glass-panel" 
         style={{
-          background: 'linear-gradient(135deg, rgba(255, 87, 34, 0.08) 0%, rgba(0, 229, 255, 0.08) 100%)',
-          padding: '20px',
+          background: 'linear-gradient(135deg, rgba(255, 87, 34, 0.1) 0%, rgba(0, 229, 255, 0.08) 100%)',
+          padding: '16px',
           borderRadius: '16px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          position: 'relative',
           display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          border: '1px solid rgba(255, 255, 255, 0.05)'
+          flexDirection: 'column',
+          gap: '12px'
         }}
       >
-        {/* Avatar */}
         <div style={{
-          width: '64px',
-          height: '64px',
-          borderRadius: '12px',
-          background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '2rem',
-          boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+          alignItems: 'flex-start',
+          gap: '12px'
         }}>
-          🦊
-        </div>
+          {/* Avatar */}
+          <div style={{
+            width: '54px',
+            height: '54px',
+            borderRadius: '12px',
+            background: userProfile.role === 'admin'
+              ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)'
+              : 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.75rem',
+            boxShadow: userProfile.role === 'admin' ? '0 0 15px rgba(255, 214, 0, 0.4)' : '0 4px 15px rgba(0,0,0,0.3)',
+            flexShrink: 0
+          }}>
+            {userProfile.role === 'admin' ? '👑' : '🦊'}
+          </div>
 
-        {/* User game name */}
-        <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: '1.2rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>{userProfile.nickname || "Gamer_Newbie"}</span>
-            {userProfile.role === 'admin' ? (
-              <span style={{ 
-                fontSize: '0.65rem', 
-                background: 'rgba(255,214,0,0.2)', 
-                color: 'var(--accent)', 
-                padding: '2px 6px', 
-                borderRadius: '4px',
-                border: '1px solid rgba(255,214,0,0.4)',
-                fontWeight: '900'
+          {/* User Details */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <h2 style={{ 
+                fontSize: '1.05rem', 
+                margin: 0, 
+                fontFamily: 'var(--font-heading)',
+                fontWeight: '900',
+                color: '#fff',
+                lineHeight: '1.2',
+                wordBreak: 'break-word'
               }}>
-                👑 ADMIN
-              </span>
-            ) : (
-              <span style={{ 
-                fontSize: '0.65rem', 
-                background: 'rgba(255,214,0,0.15)', 
-                color: 'var(--accent)', 
-                padding: '2px 6px', 
-                borderRadius: '4px',
-                border: '1px solid rgba(255,214,0,0.3)'
-              }}>
-                LVL 56
-              </span>
-            )}
-          </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--secondary)', marginTop: '4px', fontFamily: 'monospace' }}>
-            UID: {userProfile.uid || "Not Linked"} {userProfile.role === 'admin' && '• [Host Access Active]'}
-          </p>
-        </div>
+                {userProfile.nickname || "Gamer_Newbie"}
+              </h2>
 
-        <button 
-          onClick={() => setIsEditing(!isEditing)}
-          style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            color: '#fff',
-            padding: '8px 12px',
-            fontSize: '0.75rem',
-            cursor: 'pointer'
-          }}
-        >
-          ✏️ Edit
-        </button>
+              {userProfile.role === 'admin' ? (
+                <span className="badge" style={{ 
+                  fontSize: '0.6rem', 
+                  background: 'rgba(255,214,0,0.2)', 
+                  color: 'var(--accent)', 
+                  padding: '2px 6px', 
+                  borderRadius: '4px',
+                  border: '1px solid rgba(255,214,0,0.4)',
+                  fontWeight: '900',
+                  whiteSpace: 'nowrap'
+                }}>
+                  👑 ADMIN
+                </span>
+              ) : (
+                <span className="badge" style={{ 
+                  fontSize: '0.6rem', 
+                  background: 'rgba(0, 229, 255, 0.15)', 
+                  color: 'var(--secondary)', 
+                  padding: '2px 6px', 
+                  borderRadius: '4px',
+                  border: '1px solid rgba(0, 229, 255, 0.3)',
+                  fontWeight: '700',
+                  whiteSpace: 'nowrap'
+                }}>
+                  PRO PLAYER
+                </span>
+              )}
+            </div>
+
+            <p style={{ 
+              fontSize: '0.75rem', 
+              color: 'var(--secondary)', 
+              marginTop: '4px', 
+              fontFamily: 'monospace',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              flexWrap: 'wrap'
+            }}>
+              <span>UID: {userProfile.uid || "Not Linked"}</span>
+              {userProfile.role === 'admin' && (
+                <span style={{ color: 'var(--accent)', fontWeight: '700' }}>• [Host Active]</span>
+              )}
+            </p>
+          </div>
+
+          {/* Edit Profile Button (Neatly Aligned at Top Right) */}
+          <button 
+            onClick={() => setIsEditing(!isEditing)}
+            style={{
+              background: isEditing ? 'var(--secondary)' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${isEditing ? 'var(--secondary)' : 'rgba(255,255,255,0.15)'}`,
+              borderRadius: '8px',
+              color: isEditing ? '#000' : '#fff',
+              padding: '6px 10px',
+              fontSize: '0.72rem',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span>{isEditing ? '✕' : '✏️'}</span>
+            <span>{isEditing ? 'Close' : 'Edit'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Account Info details */}
