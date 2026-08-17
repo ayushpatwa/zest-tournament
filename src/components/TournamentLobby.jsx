@@ -20,7 +20,17 @@ export default function TournamentLobby({
   const [copiedId, setCopiedId] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const isUserJoined = tournament.joinedPlayers?.some(p => p.isUser || p.uid === userProfile.uid);
+  const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
+  const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
+
+  const isUserJoined = Boolean(
+    (cleanUserUid || cleanUserEmail) && 
+    tournament.joinedPlayers?.some(p => {
+      const pUid = String(p.uid || '').trim().toLowerCase();
+      const pEmail = String(p.email || '').trim().toLowerCase();
+      return (cleanUserUid && pUid === cleanUserUid) || (cleanUserEmail && pEmail === cleanUserEmail);
+    })
+  );
   const isSquadMode = tournament.mode === 'Duo' || tournament.mode === 'Squad';
   const isLoneWolf = tournament.type?.toLowerCase().includes('lone wolf');
 

@@ -60,8 +60,16 @@ export default function MyMatchesPage({
   const [copiedId, setCopiedId] = useState(null);
 
   // Filter tournaments where current user has joined
+  const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
+  const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
+
   const joinedTournaments = tournaments.filter(t => {
-    return t.joinedPlayers?.some(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
+    if ((!cleanUserUid && !cleanUserEmail) || !t.joinedPlayers) return false;
+    return t.joinedPlayers.some(p => {
+      const pUid = String(p.uid || '').trim().toLowerCase();
+      const pEmail = String(p.email || '').trim().toLowerCase();
+      return (cleanUserUid && pUid === cleanUserUid) || (cleanUserEmail && pEmail === cleanUserEmail);
+    });
   });
 
   const filteredMatches = joinedTournaments.filter(t => {

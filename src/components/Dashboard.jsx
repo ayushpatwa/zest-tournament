@@ -67,9 +67,19 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
   const [searchQuery, setSearchQuery] = useState('');
   const [hofCategory, setHofCategory] = useState('earnings'); // 'earnings' | 'kills' | 'wins'
   
-  const joinedCount = tournaments.filter(t => 
-    t.joinedPlayers?.some(p => p.isUser || p.uid === userProfile?.uid || p.nickname === userProfile?.nickname)
-  ).length;
+  const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
+  const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
+
+  const isPlayerInMatch = (t) => {
+    if ((!cleanUserUid && !cleanUserEmail) || !t.joinedPlayers) return false;
+    return t.joinedPlayers.some(p => {
+      const pUid = String(p.uid || '').trim().toLowerCase();
+      const pEmail = String(p.email || '').trim().toLowerCase();
+      return (cleanUserUid && pUid === cleanUserUid) || (cleanUserEmail && pEmail === cleanUserEmail);
+    });
+  };
+
+  const joinedCount = tournaments.filter(t => isPlayerInMatch(t)).length;
   
   // Featured Banners list
   const featured = [
@@ -109,10 +119,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
     }
 
     // 2. If current player has joined this match, hide from Arena (shown exclusively in "My Matches")
-    const isJoined = t.joinedPlayers?.some(p => 
-      p.isUser || p.uid === userProfile?.uid || p.nickname === userProfile?.nickname
-    );
-    if (isJoined) {
+    if (isPlayerInMatch(t)) {
       return false;
     }
 

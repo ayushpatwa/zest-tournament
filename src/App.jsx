@@ -23,7 +23,7 @@ import {
   joinTournamentRealtime, 
   updateRoomCredentialsRealtime,
   saveUserProfileRealtime,
-  SEED_TOURNAMENTS 
+  deductUserWalletRealtime
 } from './services/firebase';
 import './App.css';
 
@@ -194,15 +194,21 @@ export default function App() {
 
   // Handle tournament join registration (Firebase Realtime + Webhook)
   const handleRegisterUser = async (tournamentId, uid, nickname, fee) => {
-    // 1. Deduct Entry Fee
-    setWalletBalance(prev => prev - fee);
+    const numFee = parseFloat(fee) || 0;
+
+    // 1. Deduct Entry Fee locally and in Firestore Cloud
+    setWalletBalance(prev => Math.max(0, prev - numFee));
+    const targetUserId = userProfile.uid || userProfile.id || uid;
+    if (targetUserId && numFee > 0) {
+      await deductUserWalletRealtime(targetUserId, numFee, `Entry Fee: Match ${tournamentId}`);
+    }
     
     // 2. Add to transaction log
     const txId = Date.now();
     const newTx = {
       id: txId,
       type: 'registration',
-      amount: fee,
+      amount: numFee,
       title: `Registration - Entry Fee`,
       date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       status: 'Success'
@@ -212,20 +218,20 @@ export default function App() {
     // 3. Update User Profile
     setUserProfile(prev => ({
       ...prev,
-      uid: uid,
-      nickname: nickname,
+      uid: String(uid).trim(),
+      nickname: String(nickname).trim(),
       stats: {
         ...prev.stats,
         matches: (prev.stats?.matches || 0) + 1
       }
     }));
 
+    // Specific participant record strictly tied to this player's UID
     const userParticipant = { 
-      nickname: nickname, 
-      uid: uid, 
+      nickname: String(nickname).trim(), 
+      uid: String(uid).trim(), 
       email: userProfile.email || 'N/A',
       phone: userProfile.phone || 'N/A',
-      isUser: true,
       joinedAt: new Date().toISOString()
     };
 
@@ -240,7 +246,7 @@ export default function App() {
       ffUid: uid,
       email: userProfile.email || 'N/A',
       phone: userProfile.phone || 'N/A',
-      details: `${tourney?.title || 'Tournament'} (Map: ${tourney?.map || 'Bermuda'}, Fee: ₹${fee})`
+      details: `${tourney?.title || 'Tournament'} (Map: ${tourney?.map || 'Bermuda'}, Fee: ₹${numFee})`
     });
   };
 
