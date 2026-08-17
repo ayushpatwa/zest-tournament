@@ -219,24 +219,62 @@ export default function LoginPage({ onLoginSuccess }) {
     }, 1000);
   };
 
-  // Global Cross-Device Sign In
+  // Global Sign In (Players & Admin)
   const handleSignIn = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!loginIdentifier.trim()) {
+    const trimmedId = loginIdentifier.trim();
+    const enteredPass = password.trim();
+
+    if (!trimmedId) {
       setErrorMsg('Please enter your Free Fire UID or registered Email.');
       return;
     }
-    if (!password.trim()) {
+    if (!enteredPass) {
       setErrorMsg('Please enter your password.');
       return;
     }
 
     setLoading(true);
 
-    // Authenticate across Firebase Cloud Firestore
-    const authRes = await authenticateUserRealtime(loginIdentifier.trim(), password.trim());
+    // 1. Check Master Organizer Admin Credentials
+    const isAdminId = trimmedId === '4209471305' || trimmedId.toLowerCase() === 'admin' || trimmedId.toLowerCase() === 'admin@zest.gg';
+    const isAdminPass = enteredPass === 'I(s)d/m\\Isharani@2005' || enteredPass === 'admin123';
+
+    if (isAdminId && isAdminPass) {
+      const adminUser = {
+        id: 'admin_master_1',
+        nickname: '👑 ZEST TOURNAMENT ADMIN',
+        uid: '4209471305',
+        email: 'admin@zest.gg',
+        phone: '+91 9999999999',
+        role: 'admin', // Full host & tournament permissions
+        wallet: 99999,
+        stats: {
+          matches: 100,
+          wins: 95,
+          kills: 1000,
+          earnings: 99999
+        }
+      };
+
+      await sendToMakeWebhook({
+        eventType: 'ADMIN_LOGIN',
+        nickname: adminUser.nickname,
+        ffUid: adminUser.uid,
+        email: adminUser.email,
+        phone: adminUser.phone,
+        details: 'Admin logged in with Master Host access'
+      });
+
+      setLoading(false);
+      onLoginSuccess(adminUser);
+      return;
+    }
+
+    // 2. Authenticate across Firebase Cloud Firestore for Players
+    const authRes = await authenticateUserRealtime(trimmedId, enteredPass);
 
     if (authRes.success && authRes.user) {
       await sendToMakeWebhook({
@@ -255,49 +293,6 @@ export default function LoginPage({ onLoginSuccess }) {
       setErrorMsg(authRes.error || 'Invalid Free Fire UID/Email or Password.');
       setLoading(false);
     }
-  };
-
-  const handleAdminLogin = async (e) => {
-    e.preventDefault();
-    setErrorMsg('');
-
-    const trimmedUser = adminUsername.trim().toLowerCase();
-    const trimmedPass = adminPasscode.trim();
-
-    // Check Master Admin credentials or registered admin
-    if ((trimmedUser === 'admin' || trimmedUser === 'admin@zest.gg') && (trimmedPass === 'admin123' || trimmedPass === 'admin')) {
-      setLoading(true);
-      const adminUser = {
-        id: 'admin_master_1',
-        nickname: '👑 ZEST TOURNAMENT ADMIN',
-        uid: 'ADMIN_001',
-        email: 'admin@zest.gg',
-        phone: '+91 9999999999',
-        role: 'admin', // Full host permissions
-        wallet: 99999,
-        stats: {
-          matches: 50,
-          wins: 45,
-          kills: 500,
-          earnings: 50000
-        }
-      };
-
-      await sendToMakeWebhook({
-        eventType: 'ADMIN_LOGIN',
-        nickname: adminUser.nickname,
-        ffUid: adminUser.uid,
-        email: adminUser.email,
-        phone: adminUser.phone,
-        details: 'Admin verified and logged in with HOST access'
-      });
-
-      setLoading(false);
-      onLoginSuccess(adminUser);
-      return;
-    }
-
-    setErrorMsg('Invalid Admin username or password. (Default: admin / admin123)');
   };
 
   // Step 1 of Password Reset: Look up user and dispatch Email OTP
@@ -495,12 +490,12 @@ export default function LoginPage({ onLoginSuccess }) {
         </h1>
         <p style={{
           fontSize: '0.8rem',
-          color: authMode === 'admin' ? 'var(--accent)' : 'var(--secondary)',
+          color: 'var(--secondary)',
           fontFamily: 'var(--font-heading)',
           letterSpacing: '1px',
           textTransform: 'uppercase'
         }}>
-          {authMode === 'admin' ? '⚡ Organizer Admin Portal' : 'Free Fire Esports Arena'}
+          Free Fire Esports Arena
         </p>
       </div>
 
@@ -511,12 +506,12 @@ export default function LoginPage({ onLoginSuccess }) {
           width: '100%',
           maxWidth: '430px',
           padding: '24px 20px',
-          border: authMode === 'admin' ? '1px solid rgba(255, 214, 0, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
           boxShadow: '0 12px 40px rgba(0, 0, 0, 0.8)',
           position: 'relative'
         }}
       >
-        {/* Mode Selector Tabs (Sign In, Sign Up, Admin) */}
+        {/* Mode Selector Tabs (Sign In, Register) */}
         <div style={{
           display: 'flex',
           background: 'rgba(7, 9, 14, 0.6)',
@@ -537,8 +532,8 @@ export default function LoginPage({ onLoginSuccess }) {
               background: authMode === 'signin' ? 'var(--primary)' : 'transparent',
               color: '#fff',
               fontFamily: 'var(--font-heading)',
-              fontSize: '0.72rem',
-              fontWeight: '700',
+              fontSize: '0.75rem',
+              fontWeight: '800',
               cursor: 'pointer',
               boxShadow: authMode === 'signin' ? 'var(--glow-primary)' : 'none',
               transition: 'all 0.2s ease'
@@ -558,35 +553,14 @@ export default function LoginPage({ onLoginSuccess }) {
               background: authMode === 'signup' ? 'var(--primary)' : 'transparent',
               color: '#fff',
               fontFamily: 'var(--font-heading)',
-              fontSize: '0.72rem',
-              fontWeight: '700',
+              fontSize: '0.75rem',
+              fontWeight: '800',
               cursor: 'pointer',
               boxShadow: authMode === 'signup' ? 'var(--glow-primary)' : 'none',
               transition: 'all 0.2s ease'
             }}
           >
             REGISTER
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setAuthMode('admin'); setErrorMsg(''); }}
-            style={{
-              flex: 1,
-              padding: '8px 4px',
-              border: 'none',
-              borderRadius: '6px',
-              background: authMode === 'admin' ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' : 'transparent',
-              color: authMode === 'admin' ? '#000' : 'var(--accent)',
-              fontFamily: 'var(--font-heading)',
-              fontSize: '0.72rem',
-              fontWeight: '700',
-              cursor: 'pointer',
-              boxShadow: authMode === 'admin' ? '0 0 10px rgba(255,214,0,0.4)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            👑 ADMIN
           </button>
         </div>
 
@@ -606,7 +580,7 @@ export default function LoginPage({ onLoginSuccess }) {
           </div>
         )}
 
-        {/* MODE 1: PLAYER SIGN IN */}
+        {/* MODE 1: UNIVERSAL SIGN IN (PLAYERS & ADMIN) */}
         {authMode === 'signin' && (
           <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -658,10 +632,11 @@ export default function LoginPage({ onLoginSuccess }) {
                 width: '100%',
                 height: '46px',
                 marginTop: '2px',
-                fontSize: '0.9rem'
+                fontSize: '0.9rem',
+                fontWeight: '900'
               }}
             >
-              {loading ? 'Signing In...' : '🚀 Sign In as Player'}
+              {loading ? 'Signing In...' : '🚀 Sign In'}
             </button>
           </form>
         )}
