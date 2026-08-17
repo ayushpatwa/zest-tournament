@@ -794,60 +794,29 @@ export default function LoginPage({ onLoginSuccess }) {
             <div style={{
               background: 'rgba(0, 229, 255, 0.08)',
               border: '1px solid rgba(0, 229, 255, 0.25)',
-              padding: '12px',
-              borderRadius: '10px',
-              fontSize: '0.78rem',
+              padding: '14px',
+              borderRadius: '12px',
+              fontSize: '0.8rem',
               color: 'var(--text-primary)',
-              lineHeight: '1.4'
+              lineHeight: '1.45'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '1rem' }}>{verifyChannel === 'email' ? '📩' : '📱'}</span>
-                <strong style={{ color: 'var(--secondary)', fontFamily: 'var(--font-heading)', fontSize: '0.82rem' }}>
-                  OTP SENT FOR VERIFICATION
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '1.2rem' }}>{verifyChannel === 'email' ? '📩' : '📱'}</span>
+                <strong style={{ color: 'var(--secondary)', fontFamily: 'var(--font-heading)', fontSize: '0.85rem' }}>
+                  {verifyChannel === 'email' ? 'CHECK YOUR EMAIL INBOX' : 'CHECK YOUR SMS MESSAGES'}
                 </strong>
               </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.74rem' }}>
-                We sent a 6-digit security code to: <strong style={{ color: '#fff' }}>{verifyChannel === 'email' ? pendingUser?.email : pendingUser?.phone}</strong>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
+                We have sent a 6-digit verification OTP to:
+                <div style={{ color: '#fff', fontWeight: '700', fontSize: '0.86rem', marginTop: '3px', wordBreak: 'break-all' }}>
+                  {verifyChannel === 'email' ? pendingUser?.email : pendingUser?.phone}
+                </div>
               </div>
-            </div>
-
-            {/* Simulated Live Delivery Alert Banner with 1-Click Auto Fill */}
-            <div style={{
-              background: 'rgba(255, 214, 0, 0.08)',
-              border: '1px solid rgba(255, 214, 0, 0.3)',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '8px'
-            }}>
-              <div>
-                <span style={{ fontSize: '0.68rem', color: 'var(--accent)', fontWeight: '700', display: 'block' }}>
-                  🔐 Live Security OTP
-                </span>
-                <span style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: '900', color: '#fff', letterSpacing: '2px' }}>
-                  {generatedOtp}
-                </span>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                {verifyChannel === 'email' 
+                  ? '💡 Tip: If you don\'t see the email within 1 minute, please check your Spam / Promotions folder.' 
+                  : '💡 Tip: Please ensure your phone is reachable to receive incoming SMS messages.'}
               </div>
-
-              <button
-                type="button"
-                onClick={() => setEnteredOtp(generatedOtp)}
-                style={{
-                  background: 'rgba(255, 214, 0, 0.2)',
-                  border: '1px solid var(--accent)',
-                  color: 'var(--accent)',
-                  borderRadius: '6px',
-                  padding: '6px 10px',
-                  fontSize: '0.72rem',
-                  fontWeight: '800',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                ⚡ Auto-Fill OTP
-              </button>
             </div>
 
             {otpSuccessMsg && (
