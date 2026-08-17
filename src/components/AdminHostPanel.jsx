@@ -395,6 +395,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
         </div>
 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {/* Universal Host Tabs (Available to both Appointed Hosts & Super Admin) */}
           <button
             onClick={() => setActiveTab('host')}
             className="btn"
@@ -427,19 +428,19 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
           </button>
 
           <button
-            onClick={() => setActiveTab('broadcast')}
+            onClick={() => setActiveTab('manage')}
             className="btn"
             style={{
               padding: '6px 12px',
               fontSize: '0.75rem',
               borderRadius: '8px',
-              background: activeTab === 'broadcast' ? 'linear-gradient(135deg, #ff007f 0%, #ff5722 100%)' : 'rgba(255,255,255,0.05)',
+              background: activeTab === 'manage' ? 'var(--danger)' : 'rgba(255,255,255,0.05)',
               color: '#fff',
               border: '1px solid var(--border-color)',
-              fontWeight: '900'
+              fontWeight: '700'
             }}
           >
-            🔔 Announcements & Delete Msgs ({broadcastList.length})
+            🗑️ Delete Match ({tournaments.length})
           </button>
 
           {/* Super Admin Exclusive Tabs */}
@@ -462,19 +463,19 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
               </button>
 
               <button
-                onClick={() => setActiveTab('manage')}
+                onClick={() => setActiveTab('broadcast')}
                 className="btn"
                 style={{
                   padding: '6px 12px',
                   fontSize: '0.75rem',
                   borderRadius: '8px',
-                  background: activeTab === 'manage' ? 'var(--danger)' : 'rgba(255,255,255,0.05)',
+                  background: activeTab === 'broadcast' ? 'linear-gradient(135deg, #ff007f 0%, #ff5722 100%)' : 'rgba(255,255,255,0.05)',
                   color: '#fff',
                   border: '1px solid var(--border-color)',
-                  fontWeight: '700'
+                  fontWeight: '900'
                 }}
               >
-                🗑️ Delete Matches ({tournaments.length})
+                🔔 Announcements ({broadcastList.length})
               </button>
 
               <button
@@ -1115,7 +1116,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                           const confirmToggle = window.confirm(
                             isCurrentlyHost
                               ? `Revoke Host permissions from player "${u.nickname || u.uid}"? They will return to a standard player.`
-                              : `Grant Match Host permissions to player "${u.nickname || u.uid}"?\n\nThey will be able to Host Matches, Drop Room IDs, and Delete Broadcasts.`
+                              : `Grant Match Host permissions to player "${u.nickname || u.uid}"?\n\nThey will be able to:\n• Host Matches\n• Drop Custom Room IDs\n• Delete Matches`
                           );
                           if (confirmToggle) {
                             const res = await toggleUserHostRoleRealtime(u.uid || u.id, !isCurrentlyHost);
