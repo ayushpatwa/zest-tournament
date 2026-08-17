@@ -704,67 +704,19 @@ export default function LoginPage({ onLoginSuccess }) {
               />
             </div>
 
-            {/* OTP Verification Method Selector */}
-            <div style={{ marginTop: '2px' }}>
-              <label style={{ 
-                display: 'block', 
-                fontSize: '0.72rem', 
-                fontFamily: 'var(--font-heading)', 
-                color: 'var(--text-muted)', 
-                marginBottom: '6px',
-                textTransform: 'uppercase'
-              }}>
-                Verify Account Via <span style={{ color: 'var(--secondary)' }}>*</span>
-              </label>
-              <div style={{
-                display: 'flex',
-                background: 'rgba(7, 9, 14, 0.7)',
-                borderRadius: '8px',
-                padding: '3px',
-                border: '1px solid var(--border-color)',
-                gap: '4px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setVerifyChannel('email')}
-                  style={{
-                    flex: 1,
-                    padding: '8px 4px',
-                    border: 'none',
-                    borderRadius: '6px',
-                    background: verifyChannel === 'email' ? 'rgba(0, 229, 255, 0.2)' : 'transparent',
-                    border: verifyChannel === 'email' ? '1px solid var(--secondary)' : '1px solid transparent',
-                    color: verifyChannel === 'email' ? '#00e5ff' : 'var(--text-muted)',
-                    fontFamily: 'var(--font-heading)',
-                    fontSize: '0.72rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  📧 Email OTP
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVerifyChannel('phone')}
-                  style={{
-                    flex: 1,
-                    padding: '8px 4px',
-                    border: 'none',
-                    borderRadius: '6px',
-                    background: verifyChannel === 'phone' ? 'rgba(0, 230, 118, 0.25)' : 'transparent',
-                    border: verifyChannel === 'phone' ? '1px solid var(--success)' : '1px solid transparent',
-                    color: verifyChannel === 'phone' ? 'var(--success)' : 'var(--text-muted)',
-                    fontFamily: 'var(--font-heading)',
-                    fontSize: '0.72rem',
-                    fontWeight: '800',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  💬 WhatsApp OTP
-                </button>
-              </div>
+            <div style={{
+              background: 'rgba(0, 229, 255, 0.06)',
+              border: '1px solid rgba(0, 229, 255, 0.2)',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.74rem',
+              color: 'var(--secondary)'
+            }}>
+              <span>📩</span>
+              <span>A 6-digit verification OTP will be sent directly to your registered email address.</span>
             </div>
 
             <button
@@ -774,18 +726,18 @@ export default function LoginPage({ onLoginSuccess }) {
               style={{
                 width: '100%',
                 height: '46px',
-                marginTop: '6px',
+                marginTop: '4px',
                 fontSize: '0.9rem',
                 fontWeight: '900',
                 background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)'
               }}
             >
-              {loading ? 'Generating Security OTP...' : `⚡ Send OTP to ${verifyChannel === 'email' ? 'Email' : 'WhatsApp'} →`}
+              {loading ? 'Sending Verification OTP...' : '⚡ Send Verification OTP to Email →'}
             </button>
           </form>
         )}
 
-        {/* MODE 2.5: OTP VERIFICATION SCREEN (STEP 2) */}
+        {/* MODE 2.5: EMAIL OTP VERIFICATION SCREEN (STEP 2) */}
         {authMode === 'otp_verify' && (
           <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{
@@ -798,21 +750,19 @@ export default function LoginPage({ onLoginSuccess }) {
               lineHeight: '1.45'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <span style={{ fontSize: '1.2rem' }}>{verifyChannel === 'email' ? '📩' : '💬'}</span>
+                <span style={{ fontSize: '1.2rem' }}>📩</span>
                 <strong style={{ color: 'var(--secondary)', fontFamily: 'var(--font-heading)', fontSize: '0.85rem' }}>
-                  {verifyChannel === 'email' ? 'CHECK YOUR EMAIL INBOX' : 'CHECK YOUR WHATSAPP MESSAGES'}
+                  CHECK YOUR EMAIL INBOX
                 </strong>
               </div>
               <div style={{ color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
                 We have sent a 6-digit verification OTP to:
                 <div style={{ color: '#fff', fontWeight: '700', fontSize: '0.86rem', marginTop: '3px', wordBreak: 'break-all' }}>
-                  {verifyChannel === 'email' ? pendingUser?.email : pendingUser?.phone}
+                  {pendingUser?.email || email}
                 </div>
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-                {verifyChannel === 'email' 
-                  ? '💡 Tip: If you don\'t see the email within 1 minute, please check your Spam / Promotions folder.' 
-                  : '💡 Tip: Please check your WhatsApp incoming chats for the Zest Tournament verification message.'}
+                💡 Tip: If you don't see the email within 1 minute, please check your <strong>Spam / Promotions</strong> folder.
               </div>
             </div>
 
@@ -832,7 +782,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
             {/* 6-Digit OTP Code Input */}
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Enter 6-Digit OTP Code <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <label>Enter 6-Digit Email OTP Code <span style={{ color: 'var(--primary)' }}>*</span></label>
               <input
                 type="text"
                 value={enteredOtp}
@@ -871,7 +821,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 color: enteredOtp.length === 6 ? '#000' : 'var(--text-muted)'
               }}
             >
-              {loading ? 'Verifying...' : '✅ Verify OTP & Complete Registration'}
+              {loading ? 'Verifying...' : '✅ Verify Email OTP & Complete Registration'}
             </button>
 
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -888,7 +838,7 @@ export default function LoginPage({ onLoginSuccess }) {
                   borderColor: resendTimer > 0 ? 'rgba(255,255,255,0.1)' : 'var(--secondary)'
                 }}
               >
-                {resendTimer > 0 ? `⏳ Resend OTP (${resendTimer}s)` : '🔄 Resend OTP Code'}
+                {resendTimer > 0 ? `⏳ Resend OTP (${resendTimer}s)` : '🔄 Resend Email OTP'}
               </button>
 
               <button
@@ -901,7 +851,7 @@ export default function LoginPage({ onLoginSuccess }) {
                   fontSize: '0.74rem'
                 }}
               >
-                ← Change Phone/Email
+                ← Change Email
               </button>
             </div>
           </form>
