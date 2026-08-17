@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { sendToMakeWebhook } from '../services/webhookService';
 import { resetUserPasswordRealtime, saveUserProfileRealtime } from '../services/firebase';
+import { dispatchRealOtp } from '../services/otpService';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'admin' | 'forgot'
@@ -57,7 +58,7 @@ export default function LoginPage({ onLoginSuccess }) {
     return /^[0-9+-\s]{8,15}$/.test(val);
   };
 
-  // Step 1: Initiate Sign Up and Dispatch OTP
+  // Step 1: Initiate Sign Up and Dispatch OTP to Email/SMS
   const handleInitiateSignUp = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -125,16 +126,14 @@ export default function LoginPage({ onLoginSuccess }) {
 
     setPendingUser(targetUser);
 
-    // Dispatch OTP webhook for Email/SMS notification logging
-    await sendToMakeWebhook({
-      eventType: 'OTP_VERIFICATION',
-      nickname: targetUser.nickname,
-      ffUid: targetUser.uid,
+    // Automated Real Dispatch: Webhook + Direct Email/SMS Gateway
+    await dispatchRealOtp({
       email: targetUser.email,
       phone: targetUser.phone,
+      nickname: targetUser.nickname,
+      ffUid: targetUser.uid,
       otpCode: code,
-      channel: verifyChannel,
-      details: `Verification OTP ${code} dispatched to ${verifyChannel === 'email' ? targetUser.email : targetUser.phone}`
+      channel: verifyChannel
     });
 
     setResendTimer(30);
@@ -153,15 +152,13 @@ export default function LoginPage({ onLoginSuccess }) {
     setGeneratedOtp(newCode);
     setEnteredOtp('');
 
-    await sendToMakeWebhook({
-      eventType: 'OTP_VERIFICATION_RESEND',
-      nickname: pendingUser?.nickname || nickname,
-      ffUid: pendingUser?.uid || ffUid,
+    await dispatchRealOtp({
       email: pendingUser?.email || email,
       phone: pendingUser?.phone || phone,
+      nickname: pendingUser?.nickname || nickname,
+      ffUid: pendingUser?.uid || ffUid,
       otpCode: newCode,
-      channel: verifyChannel,
-      details: `New OTP ${newCode} resent to ${verifyChannel === 'email' ? email : phone}`
+      channel: verifyChannel
     });
 
     setResendTimer(30);
