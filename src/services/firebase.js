@@ -1067,15 +1067,43 @@ export const toggleUserHostRoleRealtime = async (userIdOrUid, enableHost = true)
       console.log(`[Firebase] Updated role to ${newRole} for user ${targetDocId}`);
     }
 
+    if (targetUserData?.uid && targetUserData.uid !== targetDocId) {
+      try {
+        await setDoc(doc(db, "users", String(targetUserData.uid).trim()), {
+          role: newRole,
+          isHost: newIsHost,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (_) {}
+    }
+
     // Update local storage
     const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
     const updated = existingUsers.map(u => {
-      if (String(u.uid).trim().toLowerCase() === queryStr || String(u.email).trim().toLowerCase() === queryStr) {
+      if (
+        (u.uid && String(u.uid).trim().toLowerCase() === queryStr) || 
+        (u.email && String(u.email).trim().toLowerCase() === queryStr) ||
+        (u.id && String(u.id).trim().toLowerCase() === queryStr)
+      ) {
         return { ...u, role: newRole, isHost: newIsHost };
       }
       return u;
     });
     localStorage.setItem('zest_registered_users', JSON.stringify(updated));
+
+    // Also update active session if current player is on same device
+    const currentSession = JSON.parse(localStorage.getItem('zest_current_user') || 'null');
+    if (currentSession && (
+      (currentSession.uid && String(currentSession.uid).trim().toLowerCase() === queryStr) ||
+      (currentSession.email && String(currentSession.email).trim().toLowerCase() === queryStr) ||
+      (currentSession.id && String(currentSession.id).trim().toLowerCase() === queryStr)
+    )) {
+      localStorage.setItem('zest_current_user', JSON.stringify({
+        ...currentSession,
+        role: newRole,
+        isHost: newIsHost
+      }));
+    }
 
     return { 
       success: true, 

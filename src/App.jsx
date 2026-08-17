@@ -140,6 +140,26 @@ export default function App() {
           ...liveUserData,
           wallet: typeof liveUserData.wallet === 'number' ? liveUserData.wallet : prev.wallet
         }));
+
+        // Real-time instant role synchronization across all tabs & connected devices
+        setCurrentUser(prev => {
+          if (!prev) return prev;
+          const updatedRole = liveUserData.role !== undefined ? liveUserData.role : prev.role;
+          const updatedIsHost = liveUserData.isHost !== undefined ? liveUserData.isHost : prev.isHost;
+          
+          // If host permissions were revoked and player is currently on host panel, exit immediately
+          if (prev.role !== 'admin' && updatedRole !== 'host' && !updatedIsHost) {
+            setCurrentView(v => v === 'admin' ? 'dashboard' : v);
+          }
+
+          return {
+            ...prev,
+            ...liveUserData,
+            role: updatedRole,
+            isHost: updatedIsHost,
+            wallet: typeof liveUserData.wallet === 'number' ? liveUserData.wallet : prev.wallet
+          };
+        });
       }
     });
 

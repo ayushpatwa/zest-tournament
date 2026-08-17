@@ -1132,6 +1132,20 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                               : `Grant Match Host permissions to player "${u.nickname || u.uid}"?\n\nThey will be able to:\n• Host Matches\n• Drop Custom Room IDs\n• Delete Matches`
                           );
                           if (confirmToggle) {
+                            // Instant local UI state update
+                            const nextRole = !isCurrentlyHost ? 'host' : 'player';
+                            const nextIsHost = !isCurrentlyHost;
+                            setCloudUsers(prev => prev.map(usr => {
+                              if (
+                                (usr.uid && usr.uid === u.uid) || 
+                                (usr.id && usr.id === u.id) || 
+                                (usr.email && usr.email === u.email)
+                              ) {
+                                return { ...usr, role: nextRole, isHost: nextIsHost };
+                              }
+                              return usr;
+                            }));
+
                             const res = await toggleUserHostRoleRealtime(u.uid || u.id, !isCurrentlyHost);
                             if (res.success) {
                               alert(isCurrentlyHost 
