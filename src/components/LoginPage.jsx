@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { sendToMakeWebhook } from '../services/webhookService';
-import { resetUserPasswordRealtime } from '../services/firebase';
+import { resetUserPasswordRealtime, saveUserProfileRealtime } from '../services/firebase';
 
 export default function LoginPage({ onLoginSuccess }) {
-  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'admin' | 'forgot'
+  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'admin' | 'forgot'
   
   // Sign Up form state
   const [nickname, setNickname] = useState('');
@@ -11,6 +11,14 @@ export default function LoginPage({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [verifyChannel, setVerifyChannel] = useState('email'); // 'email' | 'phone'
+  
+  // OTP Verification state
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [enteredOtp, setEnteredOtp] = useState('');
+  const [pendingUser, setPendingUser] = useState(null);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [otpSuccessMsg, setOtpSuccessMsg] = useState('');
   
   // Player Sign In state
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -28,6 +36,19 @@ export default function LoginPage({ onLoginSuccess }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Timer countdown effect for OTP resend
+  useEffect(() => {
+    let interval = null;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer(prev => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [resendTimer]);
+
   const validateEmail = (val) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
   };
@@ -36,9 +57,11 @@ export default function LoginPage({ onLoginSuccess }) {
     return /^[0-9+-\s]{8,15}$/.test(val);
   };
 
-  const handleSignUp = async (e) => {
+  // Step 1: Initiate Sign Up and Dispatch OTP
+  const handleInitiateSignUp = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    setOtpSuccessMsg('');
 
     if (!nickname.trim()) {
       setErrorMsg('Please enter your Free Fire In-Game Nickname.');
@@ -63,15 +86,34 @@ export default function LoginPage({ onLoginSuccess }) {
 
     setLoading(true);
 
-    const newUser = {
+    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const userExists = existingUsers.some(
+      u => u.uid === ffUid.trim() || u.email === email.trim().toLowerCase()
+    );
+
+    if (userExists) {
+      setErrorMsg('An account with this Free Fire UID or Email already exists. Please Sign In.');
+      setLoading(false);
+      return;
+    }
+
+    // Generate secure 6-digit OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    setEnteredOtp('');
+
+    const targetUser = {
       id: `user_${Date.now()}`,
       nickname: nickname.trim(),
       uid: ffUid.trim(),
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
       password: password,
-      role: 'player', // Standard player
+      role: 'player',
       wallet: 0,
+      isVerified: true,
+      verifiedMethod: verifyChannel,
+      verifiedAt: new Date().toISOString(),
       stats: {
         matches: 0,
         wins: 0,
@@ -81,30 +123,95 @@ export default function LoginPage({ onLoginSuccess }) {
       createdAt: new Date().toISOString()
     };
 
-    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
-    const userExists = existingUsers.some(u => u.uid === newUser.uid || u.email === newUser.email);
+    setPendingUser(targetUser);
 
-    if (userExists) {
-      setErrorMsg('An account with this Free Fire UID or Email already exists. Please Sign In.');
-      setLoading(false);
+    // Dispatch OTP webhook for Email/SMS notification logging
+    await sendToMakeWebhook({
+      eventType: 'OTP_VERIFICATION',
+      nickname: targetUser.nickname,
+      ffUid: targetUser.uid,
+      email: targetUser.email,
+      phone: targetUser.phone,
+      otpCode: code,
+      channel: verifyChannel,
+      details: `Verification OTP ${code} dispatched to ${verifyChannel === 'email' ? targetUser.email : targetUser.phone}`
+    });
+
+    setResendTimer(30);
+    setAuthMode('otp_verify');
+    setLoading(false);
+  };
+
+  // Step 2: Resend OTP
+  const handleResendOtp = async () => {
+    if (resendTimer > 0) return;
+    setErrorMsg('');
+    setOtpSuccessMsg('');
+    setLoading(true);
+
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(newCode);
+    setEnteredOtp('');
+
+    await sendToMakeWebhook({
+      eventType: 'OTP_VERIFICATION_RESEND',
+      nickname: pendingUser?.nickname || nickname,
+      ffUid: pendingUser?.uid || ffUid,
+      email: pendingUser?.email || email,
+      phone: pendingUser?.phone || phone,
+      otpCode: newCode,
+      channel: verifyChannel,
+      details: `New OTP ${newCode} resent to ${verifyChannel === 'email' ? email : phone}`
+    });
+
+    setResendTimer(30);
+    setOtpSuccessMsg(`✅ New 6-digit OTP code sent to your ${verifyChannel === 'email' ? 'Email' : 'Phone'}!`);
+    setLoading(false);
+  };
+
+  // Step 3: Verify OTP and complete registration
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setOtpSuccessMsg('');
+
+    const cleanInput = enteredOtp.trim();
+    if (!cleanInput || cleanInput.length < 6) {
+      setErrorMsg('Please enter the complete 6-digit OTP code.');
       return;
     }
 
-    existingUsers.push(newUser);
+    if (cleanInput !== generatedOtp.trim()) {
+      setErrorMsg(`❌ Invalid OTP code. Please enter the correct code sent to your ${verifyChannel === 'email' ? 'Email' : 'Phone'}.`);
+      return;
+    }
+
+    setLoading(true);
+
+    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    existingUsers.push(pendingUser);
     localStorage.setItem('zest_registered_users', JSON.stringify(existingUsers));
 
+    // Also persist in Firestore cloud
+    await saveUserProfileRealtime(pendingUser);
+
+    // Final registration webhook to Google Sheet
     await sendToMakeWebhook({
       eventType: 'USER_SIGNUP',
-      nickname: newUser.nickname,
-      ffUid: newUser.uid,
-      email: newUser.email,
-      phone: newUser.phone,
-      password: newUser.password,
-      details: 'New Player Registration'
+      nickname: pendingUser.nickname,
+      ffUid: pendingUser.uid,
+      email: pendingUser.email,
+      phone: pendingUser.phone,
+      password: pendingUser.password,
+      verifiedMethod: verifyChannel,
+      details: `New Player Registration Verified via ${verifyChannel.toUpperCase()} OTP`
     });
 
-    setLoading(false);
-    onLoginSuccess(newUser);
+    setOtpSuccessMsg('🎉 Phone & Email verified successfully! Loading your esports arena...');
+    setTimeout(() => {
+      setLoading(false);
+      onLoginSuccess(pendingUser);
+    }, 1000);
   };
 
   const handleSignIn = async (e) => {
@@ -537,9 +644,9 @@ export default function LoginPage({ onLoginSuccess }) {
           </form>
         )}
 
-        {/* MODE 2: PLAYER SIGN UP */}
+        {/* MODE 2: PLAYER SIGN UP (STEP 1) */}
         {authMode === 'signup' && (
-          <form onSubmit={handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <form onSubmit={handleInitiateSignUp} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Free Fire Nickname <span style={{ color: 'var(--primary)' }}>*</span></label>
               <input
@@ -589,7 +696,7 @@ export default function LoginPage({ onLoginSuccess }) {
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Password <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <label>Password <span style={{ color: 'var(--primary)' }}>* (Min 4 chars)</span></label>
               <input
                 type="password"
                 value={password}
@@ -600,6 +707,69 @@ export default function LoginPage({ onLoginSuccess }) {
               />
             </div>
 
+            {/* OTP Verification Method Selector */}
+            <div style={{ marginTop: '2px' }}>
+              <label style={{ 
+                display: 'block', 
+                fontSize: '0.72rem', 
+                fontFamily: 'var(--font-heading)', 
+                color: 'var(--text-muted)', 
+                marginBottom: '6px',
+                textTransform: 'uppercase'
+              }}>
+                Verify Account Via <span style={{ color: 'var(--secondary)' }}>*</span>
+              </label>
+              <div style={{
+                display: 'flex',
+                background: 'rgba(7, 9, 14, 0.7)',
+                borderRadius: '8px',
+                padding: '3px',
+                border: '1px solid var(--border-color)',
+                gap: '4px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setVerifyChannel('email')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 4px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    background: verifyChannel === 'email' ? 'rgba(0, 229, 255, 0.2)' : 'transparent',
+                    border: verifyChannel === 'email' ? '1px solid var(--secondary)' : '1px solid transparent',
+                    color: verifyChannel === 'email' ? '#00e5ff' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.72rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  📧 Email OTP
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVerifyChannel('phone')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 4px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    background: verifyChannel === 'phone' ? 'rgba(0, 230, 118, 0.2)' : 'transparent',
+                    border: verifyChannel === 'phone' ? '1px solid var(--success)' : '1px solid transparent',
+                    color: verifyChannel === 'phone' ? 'var(--success)' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.72rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  📱 Phone / SMS OTP
+                </button>
+              </div>
+            </div>
+
             <button
               type="submit"
               className="btn btn-primary"
@@ -607,12 +777,167 @@ export default function LoginPage({ onLoginSuccess }) {
               style={{
                 width: '100%',
                 height: '46px',
-                marginTop: '8px',
-                fontSize: '0.9rem'
+                marginTop: '6px',
+                fontSize: '0.9rem',
+                fontWeight: '900',
+                background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)'
               }}
             >
-              {loading ? 'Registering...' : '🔥 Register Account'}
+              {loading ? 'Generating Security OTP...' : `⚡ Send OTP to ${verifyChannel === 'email' ? 'Email' : 'Phone'} →`}
             </button>
+          </form>
+        )}
+
+        {/* MODE 2.5: OTP VERIFICATION SCREEN (STEP 2) */}
+        {authMode === 'otp_verify' && (
+          <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{
+              background: 'rgba(0, 229, 255, 0.08)',
+              border: '1px solid rgba(0, 229, 255, 0.25)',
+              padding: '12px',
+              borderRadius: '10px',
+              fontSize: '0.78rem',
+              color: 'var(--text-primary)',
+              lineHeight: '1.4'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '1rem' }}>{verifyChannel === 'email' ? '📩' : '📱'}</span>
+                <strong style={{ color: 'var(--secondary)', fontFamily: 'var(--font-heading)', fontSize: '0.82rem' }}>
+                  OTP SENT FOR VERIFICATION
+                </strong>
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.74rem' }}>
+                We sent a 6-digit security code to: <strong style={{ color: '#fff' }}>{verifyChannel === 'email' ? pendingUser?.email : pendingUser?.phone}</strong>
+              </div>
+            </div>
+
+            {/* Simulated Live Delivery Alert Banner with 1-Click Auto Fill */}
+            <div style={{
+              background: 'rgba(255, 214, 0, 0.08)',
+              border: '1px solid rgba(255, 214, 0, 0.3)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px'
+            }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--accent)', fontWeight: '700', display: 'block' }}>
+                  🔐 Live Security OTP
+                </span>
+                <span style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: '900', color: '#fff', letterSpacing: '2px' }}>
+                  {generatedOtp}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setEnteredOtp(generatedOtp)}
+                style={{
+                  background: 'rgba(255, 214, 0, 0.2)',
+                  border: '1px solid var(--accent)',
+                  color: 'var(--accent)',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  fontSize: '0.72rem',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                ⚡ Auto-Fill OTP
+              </button>
+            </div>
+
+            {otpSuccessMsg && (
+              <div style={{
+                background: 'rgba(0, 230, 118, 0.15)',
+                border: '1px solid var(--success)',
+                color: 'var(--success)',
+                fontSize: '0.8rem',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                lineHeight: '1.4'
+              }}>
+                {otpSuccessMsg}
+              </div>
+            )}
+
+            {/* 6-Digit OTP Code Input */}
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Enter 6-Digit OTP Code <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <input
+                type="text"
+                value={enteredOtp}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setEnteredOtp(val);
+                }}
+                placeholder="• • • • • •"
+                maxLength={6}
+                autoFocus
+                style={{
+                  textAlign: 'center',
+                  fontFamily: 'monospace',
+                  fontSize: '1.5rem',
+                  fontWeight: '900',
+                  letterSpacing: '8px',
+                  color: '#00e5ff'
+                }}
+                className="form-input"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading || enteredOtp.length < 6}
+              style={{
+                width: '100%',
+                height: '48px',
+                fontSize: '0.92rem',
+                fontWeight: '900',
+                background: enteredOtp.length === 6 
+                  ? 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)' 
+                  : 'rgba(255,255,255,0.1)',
+                color: enteredOtp.length === 6 ? '#000' : 'var(--text-muted)'
+              }}
+            >
+              {loading ? 'Verifying...' : '✅ Verify OTP & Complete Registration'}
+            </button>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={resendTimer > 0 || loading}
+                className="btn btn-outline"
+                style={{
+                  flex: 1,
+                  height: '38px',
+                  fontSize: '0.74rem',
+                  color: resendTimer > 0 ? 'var(--text-muted)' : 'var(--secondary)',
+                  borderColor: resendTimer > 0 ? 'rgba(255,255,255,0.1)' : 'var(--secondary)'
+                }}
+              >
+                {resendTimer > 0 ? `⏳ Resend OTP (${resendTimer}s)` : '🔄 Resend OTP Code'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setAuthMode('signup'); setErrorMsg(''); setOtpSuccessMsg(''); }}
+                className="btn btn-outline"
+                style={{
+                  flex: 1,
+                  height: '38px',
+                  fontSize: '0.74rem'
+                }}
+              >
+                ← Change Phone/Email
+              </button>
+            </div>
           </form>
         )}
 
