@@ -786,3 +786,53 @@ export const deleteNotificationRealtime = async (notificationId) => {
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Permanently deletes a registered player account from Firestore and local cache
+ */
+export const deleteUserRealtime = async (userIdOrUid) => {
+  try {
+    const queryStr = String(userIdOrUid).trim().toLowerCase();
+    const rawQuery = String(userIdOrUid).trim();
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    
+    let targetDocId = null;
+    let targetNickname = '';
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
+      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
+      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
+      
+      if (docIdMatch || uidMatch || emailMatch) {
+        targetDocId = docSnap.id;
+        targetNickname = data.nickname || data.uid || docSnap.id;
+      }
+    });
+
+    if (targetDocId) {
+      await deleteDoc(doc(db, "users", targetDocId));
+      console.log(`[Firebase] Successfully deleted user ${targetDocId}`);
+    } else {
+      try {
+        await deleteDoc(doc(db, "users", rawQuery));
+      } catch (_) {}
+    }
+
+    // Clean up from local storage
+    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const filtered = existingUsers.filter(u => 
+      u.uid?.trim().toLowerCase() !== queryStr && 
+      u.id?.trim().toLowerCase() !== queryStr &&
+      u.email?.trim().toLowerCase() !== queryStr
+    );
+    localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
+
+    return { success: true, nickname: targetNickname || rawQuery };
+  } catch (error) {
+    console.error("[Firebase] Error deleting user:", error);
+    return { success: false, error: error.message };
+  }
+};

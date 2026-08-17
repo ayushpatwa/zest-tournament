@@ -7,6 +7,7 @@ import {
   deductUserWalletRealtime, 
   subscribeToAllUsersRealtime,
   resetUserPasswordRealtime,
+  deleteUserRealtime,
   sendNotificationRealtime,
   deleteNotificationRealtime,
   subscribeToNotificationsRealtime
@@ -45,6 +46,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   const [payoutStatus, setPayoutStatus] = useState('');
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [cloudUsers, setCloudUsers] = useState([]);
+  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
 
   // Room ID Broadcast states
   const [selectedTourneyId, setSelectedTourneyId] = useState(tournaments[0]?.id || '');
@@ -1002,13 +1004,25 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
 
           {/* Live Player Directory */}
           <div style={{ marginTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
-            <div className="flex-between" style={{ marginBottom: '10px' }}>
+            <div className="flex-between" style={{ marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
               <h4 style={{ fontSize: '0.85rem', color: 'var(--secondary)', margin: 0, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>👥</span> Registered Players Directory ({cloudUsers.length})
               </h4>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Tap any player to auto-fill their UID
+                Tap "Select" to credit/deduct coins or delete account
               </span>
+            </div>
+
+            {/* Quick Player Search Filter */}
+            <div style={{ marginBottom: '10px' }}>
+              <input
+                type="text"
+                value={playerSearchQuery}
+                onChange={(e) => setPlayerSearchQuery(e.target.value)}
+                placeholder="🔍 Search players by Nickname, UID, Email or Phone..."
+                className="form-input"
+                style={{ padding: '8px 12px', fontSize: '0.8rem', height: '36px' }}
+              />
             </div>
 
             {cloudUsers.length === 0 ? (
@@ -1016,8 +1030,20 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                 No player accounts found in Firebase yet. When a player registers, they will appear here!
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '260px', overflowY: 'auto' }}>
-                {cloudUsers.map(u => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                {cloudUsers
+                  .filter(u => {
+                    if (!playerSearchQuery.trim()) return true;
+                    const q = playerSearchQuery.trim().toLowerCase();
+                    return (
+                      (u.nickname && u.nickname.toLowerCase().includes(q)) ||
+                      (u.uid && String(u.uid).toLowerCase().includes(q)) ||
+                      (u.email && u.email.toLowerCase().includes(q)) ||
+                      (u.phone && String(u.phone).toLowerCase().includes(q)) ||
+                      (u.id && String(u.id).toLowerCase().includes(q))
+                    );
+                  })
+                  .map(u => (
                   <div 
                     key={u.id || u.uid}
                     className="flex-between"
@@ -1039,7 +1065,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                       <button
                         type="button"
                         className="btn"
@@ -1081,6 +1107,34 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                         }}
                       >
                         🔑 Reset Pass
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={async () => {
+                          const confirmDelete = window.confirm(`⚠️ Are you sure you want to permanently delete player "${u.nickname || u.uid}" (UID: ${u.uid || u.id})?\n\nThis will remove their account, wallet balance, and stats from Firebase.`);
+                          if (confirmDelete) {
+                            const res = await deleteUserRealtime(u.uid || u.id);
+                            if (res.success) {
+                              alert(`✅ Player account "${u.nickname || u.uid}" was deleted successfully!`);
+                            } else {
+                              alert(`⚠️ Failed to delete player: ${res.error}`);
+                            }
+                          }
+                        }}
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.72rem',
+                          background: 'rgba(255, 23, 68, 0.15)',
+                          color: '#ff80ab',
+                          border: '1px solid rgba(255, 23, 68, 0.4)',
+                          fontWeight: '700',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🗑️ Delete
                       </button>
                     </div>
                   </div>
