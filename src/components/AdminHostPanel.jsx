@@ -8,12 +8,15 @@ import {
   subscribeToAllUsersRealtime,
   resetUserPasswordRealtime,
   deleteUserRealtime,
+  toggleUserHostRoleRealtime,
   sendNotificationRealtime,
   deleteNotificationRealtime,
   subscribeToNotificationsRealtime
 } from '../services/firebase';
 
-export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView }) {
+export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView, currentUser }) {
+  const isSuperAdmin = currentUser?.role === 'admin';
+  const isHost = currentUser?.role === 'host' || currentUser?.isHost || isSuperAdmin;
   const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'broadcast' | 'manage' | 'razorpay' | 'webhook' | 'app_update'
   
   // Host Form states
@@ -382,10 +385,12 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
       <div className="flex-between" style={{ marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
         <div>
           <h2 style={{ fontSize: '1.2rem', margin: 0, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>⚙️</span> ADMIN & HOST PANEL
+            <span>{isSuperAdmin ? '👑' : '🎮'}</span> {isSuperAdmin ? 'ADMIN MASTER PANEL' : 'HOST ARENA PANEL'}
           </h2>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-            Manage tournaments, Razorpay gateway, verify match proofs, and sync Google Sheets.
+            {isSuperAdmin 
+              ? 'Manage tournaments, player payouts & host roles, Razorpay gateway, and app updates.' 
+              : 'Create matches, drop Custom Room IDs, and broadcast announcements.'}
           </p>
         </div>
 
@@ -422,22 +427,6 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
           </button>
 
           <button
-            onClick={() => setActiveTab('payout')}
-            className="btn"
-            style={{
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              borderRadius: '8px',
-              background: activeTab === 'payout' ? 'linear-gradient(135deg, #00e676 0%, #ffd600 100%)' : 'rgba(255,255,255,0.05)',
-              color: activeTab === 'payout' ? '#000' : 'var(--success)',
-              border: '1px solid var(--border-color)',
-              fontWeight: '900'
-            }}
-          >
-            💰 Give Prize Money
-          </button>
-
-          <button
             onClick={() => setActiveTab('broadcast')}
             className="btn"
             style={{
@@ -450,71 +439,92 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
               fontWeight: '900'
             }}
           >
-            🔔 Send Notification ({broadcastList.length})
+            🔔 Announcements & Delete Msgs ({broadcastList.length})
           </button>
 
-          <button
-            onClick={() => setActiveTab('manage')}
-            className="btn"
-            style={{
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              borderRadius: '8px',
-              background: activeTab === 'manage' ? 'var(--danger)' : 'rgba(255,255,255,0.05)',
-              color: '#fff',
-              border: '1px solid var(--border-color)',
-              fontWeight: '700'
-            }}
-          >
-            🗑️ Delete Matches ({tournaments.length})
-          </button>
+          {/* Super Admin Exclusive Tabs */}
+          {isSuperAdmin && (
+            <>
+              <button
+                onClick={() => setActiveTab('payout')}
+                className="btn"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  borderRadius: '8px',
+                  background: activeTab === 'payout' ? 'linear-gradient(135deg, #00e676 0%, #ffd600 100%)' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'payout' ? '#000' : 'var(--success)',
+                  border: '1px solid var(--border-color)',
+                  fontWeight: '900'
+                }}
+              >
+                💰 Give Prize Money
+              </button>
 
-          <button
-            onClick={() => setActiveTab('razorpay')}
-            className="btn"
-            style={{
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              borderRadius: '8px',
-              background: activeTab === 'razorpay' ? 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)' : 'rgba(255,255,255,0.05)',
-              color: activeTab === 'razorpay' ? '#000' : '#fff',
-              border: '1px solid var(--border-color)',
-              fontWeight: '900'
-            }}
-          >
-            💳 Gateway (Razorpay)
-          </button>
+              <button
+                onClick={() => setActiveTab('manage')}
+                className="btn"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  borderRadius: '8px',
+                  background: activeTab === 'manage' ? 'var(--danger)' : 'rgba(255,255,255,0.05)',
+                  color: '#fff',
+                  border: '1px solid var(--border-color)',
+                  fontWeight: '700'
+                }}
+              >
+                🗑️ Delete Matches ({tournaments.length})
+              </button>
 
-          <button
-            onClick={() => setActiveTab('webhook')}
-            className="btn"
-            style={{
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              borderRadius: '8px',
-              background: activeTab === 'webhook' ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
-              color: activeTab === 'webhook' ? '#000' : '#fff',
-              border: '1px solid var(--border-color)'
-            }}
-          >
-            📊 Google Sheet
-          </button>
+              <button
+                onClick={() => setActiveTab('razorpay')}
+                className="btn"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  borderRadius: '8px',
+                  background: activeTab === 'razorpay' ? 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'razorpay' ? '#000' : '#fff',
+                  border: '1px solid var(--border-color)',
+                  fontWeight: '900'
+                }}
+              >
+                💳 Gateway (Razorpay)
+              </button>
 
-          <button
-            onClick={() => setActiveTab('app_update')}
-            className="btn"
-            style={{
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              borderRadius: '8px',
-              background: activeTab === 'app_update' ? 'linear-gradient(135deg, #00e5ff 0%, #7c4dff 100%)' : 'rgba(255,255,255,0.05)',
-              color: '#fff',
-              border: '1px solid var(--border-color)',
-              fontWeight: '900'
-            }}
-          >
-            🚀 App Update (APK)
-          </button>
+              <button
+                onClick={() => setActiveTab('webhook')}
+                className="btn"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  borderRadius: '8px',
+                  background: activeTab === 'webhook' ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'webhook' ? '#000' : '#fff',
+                  border: '1px solid var(--border-color)'
+                }}
+              >
+                📊 Google Sheet
+              </button>
+
+              <button
+                onClick={() => setActiveTab('app_update')}
+                className="btn"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  borderRadius: '8px',
+                  background: activeTab === 'app_update' ? 'linear-gradient(135deg, #00e5ff 0%, #7c4dff 100%)' : 'rgba(255,255,255,0.05)',
+                  color: '#fff',
+                  border: '1px solid var(--border-color)',
+                  fontWeight: '900'
+                }}
+              >
+                🚀 App Update (APK)
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1057,8 +1067,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#fff' }}>
-                        {u.nickname || 'Player'} <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>({u.email || u.phone || 'No Contact'})</span>
+                      <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{u.nickname || 'Player'}</span>
+                        {(u.role === 'host' || u.isHost) && (
+                          <span className="badge" style={{
+                            background: 'rgba(0, 229, 255, 0.2)',
+                            color: 'var(--secondary)',
+                            border: '1px solid var(--secondary)',
+                            fontSize: '0.6rem',
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            fontWeight: '800'
+                          }}>
+                            🎮 HOST
+                          </span>
+                        )}
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>({u.email || u.phone || 'No Contact'})</span>
                       </div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--secondary)', fontFamily: 'monospace', marginTop: '2px' }}>
                         UID: <strong style={{ color: '#fff' }}>{u.uid || u.id}</strong> | Live Balance: <strong style={{ color: 'var(--success)' }}>₹{u.wallet || 0}</strong>
@@ -1080,6 +1104,42 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                         }}
                       >
                         {payoutPlayerIdentifier === (u.uid || u.id) ? '✓ Selected' : '👉 Select'}
+                      </button>
+
+                      {/* Grant / Revoke Host Permissions */}
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={async () => {
+                          const isCurrentlyHost = u.role === 'host' || u.isHost;
+                          const confirmToggle = window.confirm(
+                            isCurrentlyHost
+                              ? `Revoke Host permissions from player "${u.nickname || u.uid}"? They will return to a standard player.`
+                              : `Grant Match Host permissions to player "${u.nickname || u.uid}"?\n\nThey will be able to Host Matches, Drop Room IDs, and Delete Broadcasts.`
+                          );
+                          if (confirmToggle) {
+                            const res = await toggleUserHostRoleRealtime(u.uid || u.id, !isCurrentlyHost);
+                            if (res.success) {
+                              alert(isCurrentlyHost 
+                                ? `✓ Host permissions revoked from ${u.nickname || u.uid}.` 
+                                : `🎉 ${u.nickname || u.uid} is now granted Match Host permissions!`);
+                            } else {
+                              alert(`⚠️ Failed to update role: ${res.error}`);
+                            }
+                          }
+                        }}
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.72rem',
+                          background: (u.role === 'host' || u.isHost) ? 'rgba(0, 229, 255, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                          color: (u.role === 'host' || u.isHost) ? 'var(--secondary)' : '#fff',
+                          border: (u.role === 'host' || u.isHost) ? '1px solid var(--secondary)' : '1px solid rgba(255, 255, 255, 0.2)',
+                          fontWeight: '800',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {(u.role === 'host' || u.isHost) ? '🎮 Host (Active)' : '🎖️ Make Host'}
                       </button>
 
                       <button

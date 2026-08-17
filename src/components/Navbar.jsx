@@ -20,6 +20,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
   };
 
   const isAdmin = currentUser?.role === 'admin';
+  const isHost = currentUser?.role === 'host' || currentUser?.isHost || isAdmin;
 
   const getPageTitle = () => {
     switch(currentView) {
@@ -29,7 +30,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
       case 'wallet': return 'MY WALLET';
       case 'rules': return 'RULES & FAIRPLAY';
       case 'profile': return 'PLAYER PROFILE';
-      case 'admin': return 'HOST MATCH';
+      case 'admin': return isAdmin ? 'ORGANIZER ADMIN' : 'HOST ARENA';
       default: return 'ZEST';
     }
   };
@@ -76,6 +77,8 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
             <div style={{
               background: isAdmin 
                 ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' 
+                : isHost 
+                ? 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)'
                 : 'linear-gradient(135deg, var(--primary) 0%, #ff1744 100%)',
               width: '28px',
               height: '28px',
@@ -87,10 +90,10 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
               fontWeight: '900',
               fontSize: '1rem',
               color: '#fff',
-              boxShadow: isAdmin ? '0 0 10px rgba(255, 214, 0, 0.4)' : 'var(--glow-primary)',
+              boxShadow: isAdmin ? '0 0 10px rgba(255, 214, 0, 0.4)' : isHost ? '0 0 10px rgba(0, 229, 255, 0.4)' : 'var(--glow-primary)',
               flexShrink: 0
             }}>
-              {isAdmin ? '👑' : '🔥'}
+              {isAdmin ? '👑' : isHost ? '🎮' : '🔥'}
             </div>
 
             <div style={{ minWidth: 0 }}>
@@ -121,6 +124,20 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
                     whiteSpace: 'nowrap'
                   }}>
                     ADMIN
+                  </span>
+                ) : isHost ? (
+                  <span className="badge" style={{ 
+                    background: 'rgba(0, 229, 255, 0.2)', 
+                    color: 'var(--secondary)', 
+                    border: '1px solid var(--secondary)',
+                    fontSize: '0.5rem',
+                    padding: '1px 3px',
+                    borderRadius: '4px',
+                    fontWeight: '900',
+                    lineHeight: '1',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    HOST
                   </span>
                 ) : (
                   <span className="badge" style={{ 
@@ -459,17 +476,17 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
           <span>PROFILE</span>
         </button>
 
-        {/* HOST OPTION - EXCLUSIVELY FOR ADMIN LOGIN ONLY */}
-        {isAdmin && (
+        {/* HOST OPTION - FOR ADMIN AND APPOINTED HOSTS */}
+        {isHost && (
           <button 
             onClick={() => setCurrentView('admin')}
             style={{
               background: 'none',
               border: 'none',
-              color: currentView === 'admin' ? 'var(--accent)' : 'var(--text-muted)',
+              color: currentView === 'admin' ? (isAdmin ? 'var(--accent)' : 'var(--secondary)') : 'var(--text-muted)',
               fontFamily: 'var(--font-heading)',
               fontSize: '0.68rem',
-              fontWeight: '700',
+              fontWeight: '800',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -478,8 +495,8 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
               transition: 'color 0.2s ease'
             }}
           >
-            <span style={{ fontSize: '1.25rem' }}>⚙️</span>
-            <span>HOST (ADMIN)</span>
+            <span style={{ fontSize: '1.25rem' }}>{isAdmin ? '⚙️' : '🎮'}</span>
+            <span>{isAdmin ? 'HOST (ADMIN)' : 'HOST ARENA'}</span>
           </button>
         )}
       </nav>

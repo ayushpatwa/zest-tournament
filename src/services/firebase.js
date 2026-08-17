@@ -1030,3 +1030,61 @@ export const deleteUserRealtime = async (userIdOrUid) => {
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Grants or revokes Host / Moderator permissions for a player in Firestore & cache
+ */
+export const toggleUserHostRoleRealtime = async (userIdOrUid, enableHost = true) => {
+  try {
+    const queryStr = String(userIdOrUid).trim().toLowerCase();
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    
+    let targetDocId = null;
+    let targetUserData = null;
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
+      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
+      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
+      
+      if (docIdMatch || uidMatch || emailMatch) {
+        targetDocId = docSnap.id;
+        targetUserData = data;
+      }
+    });
+
+    const newRole = enableHost ? 'host' : 'player';
+    const newIsHost = enableHost;
+
+    if (targetDocId) {
+      await setDoc(doc(db, "users", targetDocId), {
+        role: newRole,
+        isHost: newIsHost,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      console.log(`[Firebase] Updated role to ${newRole} for user ${targetDocId}`);
+    }
+
+    // Update local storage
+    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const updated = existingUsers.map(u => {
+      if (String(u.uid).trim().toLowerCase() === queryStr || String(u.email).trim().toLowerCase() === queryStr) {
+        return { ...u, role: newRole, isHost: newIsHost };
+      }
+      return u;
+    });
+    localStorage.setItem('zest_registered_users', JSON.stringify(updated));
+
+    return { 
+      success: true, 
+      role: newRole, 
+      isHost: newIsHost, 
+      nickname: targetUserData?.nickname || userIdOrUid 
+    };
+  } catch (error) {
+    console.error("[Firebase] Error toggling host role:", error);
+    return { success: false, error: error.message };
+  }
+};

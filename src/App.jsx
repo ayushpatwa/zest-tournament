@@ -338,13 +338,14 @@ export default function App() {
           <RulesPage setCurrentView={setCurrentView} />
         )}
 
-        {currentView === 'admin' && currentUser?.role === 'admin' && (
+        {currentView === 'admin' && (currentUser?.role === 'admin' || currentUser?.role === 'host' || currentUser?.isHost) && (
           <AdminHostPanel 
             tournaments={tournaments}
             onAddTournament={handleAddTournament}
             onDeleteTournament={handleDeleteTournament}
             onBroadcastRoomCredentials={handleBroadcastRoomCredentials}
             setCurrentView={setCurrentView}
+            currentUser={currentUser}
           />
         )}
       </main>
