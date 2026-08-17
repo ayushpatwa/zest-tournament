@@ -224,24 +224,15 @@ export const subscribeToTournamentsRealtime = (onUpdate, onError) => {
   try {
     const tourneysCollection = collection(db, "tournaments");
     
-    const unsubscribe = onSnapshot(tourneysCollection, async (snapshot) => {
-      if (snapshot.empty) {
-        console.log("[Firebase] Database empty. Seeding initial tournament catalog...");
-        // Seed initial data
-        for (const t of SEED_TOURNAMENTS) {
-          await setDoc(doc(db, "tournaments", t.id), t);
-        }
-        onUpdate(SEED_TOURNAMENTS);
-      } else {
-        const list = [];
-        snapshot.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        console.log(`[Firebase Realtime] Received ${list.length} tournaments live.`);
-        onUpdate(list);
-      }
+    const unsubscribe = onSnapshot(tourneysCollection, (snapshot) => {
+      const list = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      console.log(`[Firebase Realtime] Received ${list.length} tournaments live.`);
+      onUpdate(list);
     }, (error) => {
-      console.warn("[Firebase] Realtime listener error, falling back to local memory:", error);
+      console.warn("[Firebase] Realtime listener error:", error);
       if (onError) onError(error);
     });
 

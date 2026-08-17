@@ -44,7 +44,7 @@ export default function App() {
   const [transactions, setTransactions] = useState([]);
 
   // Real-time Firestore Tournaments State
-  const [tournaments, setTournaments] = useState(SEED_TOURNAMENTS);
+  const [tournaments, setTournaments] = useState([]);
 
   // Real-time Broadcast Notifications State (Bell 🔔)
   const [cloudNotifications, setCloudNotifications] = useState([]);
@@ -78,9 +78,7 @@ export default function App() {
     
     // Subscribe to tournaments
     const unsubscribeTourneys = subscribeToTournamentsRealtime((liveTournaments) => {
-      if (liveTournaments && liveTournaments.length > 0) {
-        setTournaments(liveTournaments);
-      }
+      setTournaments(liveTournaments || []);
     });
 
     // Subscribe to broadcast notifications (Bell 🔔)
