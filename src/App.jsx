@@ -279,6 +279,13 @@ export default function App() {
 
   // Broadcast Room ID in real-time
   const handleBroadcastRoomCredentials = async (tournamentId, roomId, roomPass) => {
+    // 0ms instant local optimistic update
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        return { ...t, roomId, roomPassword: roomPass, status: 'live' };
+      }
+      return t;
+    }));
     await updateRoomCredentialsRealtime(tournamentId, roomId, roomPass);
   };
 
