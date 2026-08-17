@@ -1,33 +1,60 @@
 import React, { useState } from 'react';
+import { saveUserProfileRealtime } from '../services/firebase';
 
 export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
   const [isEditing, setIsEditing] = useState(false);
   const [nick, setNick] = useState(userProfile.nickname || '');
   const [uid, setUid] = useState(userProfile.uid || '');
-  const [email, setEmail] = useState(userProfile.email || '');
   const [phone, setPhone] = useState(userProfile.phone || '');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleUpdateProfile = (e) => {
+  const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!nick.trim() || !uid.trim() || !email.trim() || !phone.trim()) {
-      setErrorMsg('All fields including Email and Phone are mandatory.');
+    if (!nick.trim()) {
+      setErrorMsg('In-Game Nickname cannot be empty.');
+      return;
+    }
+    if (!uid.trim() || isNaN(uid.trim()) || uid.trim().length < 6) {
+      setErrorMsg('Please enter a valid numeric Free Fire UID (min 6 digits).');
+      return;
+    }
+    if (!phone.trim()) {
+      setErrorMsg('Phone Number is required.');
       return;
     }
 
-    setUserProfile(prev => ({
-      ...prev,
+    setSaving(true);
+    const updated = {
+      ...userProfile,
       nickname: nick.trim(),
       uid: uid.trim(),
-      email: email.trim(),
+      email: userProfile.email || '', // Email remains permanent and locked
       phone: phone.trim()
-    }));
+    };
+
+    // Save to Firestore Cloud in real-time
+    await saveUserProfileRealtime(updated);
+
+    // Save to LocalStorage cache
+    localStorage.setItem('zest_user_profile', JSON.stringify(updated));
+    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const mapped = existingUsers.map(u => {
+      if (u.email === updated.email || u.uid === userProfile.uid) {
+        return { ...u, nickname: updated.nickname, uid: updated.uid, phone: updated.phone };
+      }
+      return u;
+    });
+    localStorage.setItem('zest_registered_users', JSON.stringify(mapped));
+
+    setUserProfile(updated);
+    setSaving(false);
     setIsEditing(false);
-    setSuccessMsg('Account details updated successfully!');
+    setSuccessMsg('Player profile updated successfully in Cloud!');
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
@@ -180,7 +207,7 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
           <h3 style={{ fontSize: '0.9rem', marginBottom: '12px', color: 'var(--secondary)' }}>EDIT PLAYER DETAILS</h3>
           <form onSubmit={handleUpdateProfile}>
             <div className="form-group">
-              <label>In-Game Nickname</label>
+              <label>In-Game Nickname <span style={{ color: 'var(--primary)' }}>*</span></label>
               <input 
                 type="text" 
                 value={nick} 
@@ -190,8 +217,9 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
                 required
               />
             </div>
+
             <div className="form-group">
-              <label>UID (Free Fire User ID)</label>
+              <label>Free Fire UID <span style={{ color: 'var(--primary)' }}>*</span></label>
               <input 
                 type="number" 
                 value={uid} 
@@ -201,19 +229,9 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
                 required
               />
             </div>
+
             <div className="form-group">
-              <label>Email Address</label>
-              <input 
-                type="email" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                className="form-input"
-                placeholder="gamer@gmail.com"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Phone Number</label>
+              <label>Phone Number <span style={{ color: 'var(--primary)' }}>*</span></label>
               <input 
                 type="tel" 
                 value={phone} 
@@ -223,17 +241,41 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
                 required
               />
             </div>
+
+            {/* Email Address (Permanently Locked) */}
+            <div className="form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ margin: 0 }}>Registered Email Address</label>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>🔒 LOCKED (Cannot change)</span>
+              </div>
+              <input 
+                type="email" 
+                value={userProfile.email || "No Email Registered"} 
+                disabled
+                readOnly
+                className="form-input"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  color: 'var(--text-muted)',
+                  cursor: 'not-allowed',
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                }}
+              />
+            </div>
+
             {errorMsg && (
               <div style={{ color: 'var(--danger)', fontSize: '0.8rem', marginBottom: '8px' }}>
                 ⚠️ {errorMsg}
               </div>
             )}
+
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
               <button 
                 type="button" 
                 className="btn btn-outline" 
                 style={{ flex: 1, padding: '8px' }}
                 onClick={() => setIsEditing(false)}
+                disabled={saving}
               >
                 Cancel
               </button>
@@ -241,8 +283,9 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
                 type="submit" 
                 className="btn btn-secondary" 
                 style={{ flex: 1, padding: '8px' }}
+                disabled={saving}
               >
-                Save
+                {saving ? 'Saving...' : '💾 Save Profile'}
               </button>
             </div>
           </form>
