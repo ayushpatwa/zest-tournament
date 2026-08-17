@@ -752,17 +752,17 @@ export default function LoginPage({ onLoginSuccess }) {
                     padding: '8px 4px',
                     border: 'none',
                     borderRadius: '6px',
-                    background: verifyChannel === 'phone' ? 'rgba(0, 230, 118, 0.2)' : 'transparent',
+                    background: verifyChannel === 'phone' ? 'rgba(0, 230, 118, 0.25)' : 'transparent',
                     border: verifyChannel === 'phone' ? '1px solid var(--success)' : '1px solid transparent',
                     color: verifyChannel === 'phone' ? 'var(--success)' : 'var(--text-muted)',
                     fontFamily: 'var(--font-heading)',
                     fontSize: '0.72rem',
-                    fontWeight: '700',
+                    fontWeight: '800',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease'
                   }}
                 >
-                  📱 Phone / SMS OTP
+                  💬 WhatsApp OTP
                 </button>
               </div>
             </div>
@@ -780,7 +780,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)'
               }}
             >
-              {loading ? 'Generating Security OTP...' : `⚡ Send OTP to ${verifyChannel === 'email' ? 'Email' : 'Phone'} →`}
+              {loading ? 'Generating Security OTP...' : `⚡ Send OTP to ${verifyChannel === 'email' ? 'Email' : 'WhatsApp'} →`}
             </button>
           </form>
         )}
@@ -798,9 +798,9 @@ export default function LoginPage({ onLoginSuccess }) {
               lineHeight: '1.45'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <span style={{ fontSize: '1.2rem' }}>{verifyChannel === 'email' ? '📩' : '📱'}</span>
+                <span style={{ fontSize: '1.2rem' }}>{verifyChannel === 'email' ? '📩' : '💬'}</span>
                 <strong style={{ color: 'var(--secondary)', fontFamily: 'var(--font-heading)', fontSize: '0.85rem' }}>
-                  {verifyChannel === 'email' ? 'CHECK YOUR EMAIL INBOX' : 'CHECK YOUR SMS MESSAGES'}
+                  {verifyChannel === 'email' ? 'CHECK YOUR EMAIL INBOX' : 'CHECK YOUR WHATSAPP MESSAGES'}
                 </strong>
               </div>
               <div style={{ color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
@@ -812,7 +812,7 @@ export default function LoginPage({ onLoginSuccess }) {
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}>
                 {verifyChannel === 'email' 
                   ? '💡 Tip: If you don\'t see the email within 1 minute, please check your Spam / Promotions folder.' 
-                  : '💡 Tip: Please ensure your phone is reachable to receive incoming SMS messages.'}
+                  : '💡 Tip: Please check your WhatsApp incoming chats for the Zest Tournament verification message.'}
               </div>
             </div>
 
