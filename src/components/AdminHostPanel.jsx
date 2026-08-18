@@ -1037,8 +1037,6 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                   u.role === 'admin' ||
                   String(u.uid).trim() === '9084311275' ||
                   String(u.id).trim() === '9084311275' ||
-                  String(u.uid).trim() === '4209471305' ||
-                  String(u.id).trim() === '4209471305' ||
                   String(u.id).trim() === 'admin_master_1' ||
                   String(u.uid).trim().toUpperCase() === 'ADMIN_001' ||
                   String(u.email || '').trim().toLowerCase() === 'admin@zest.gg';

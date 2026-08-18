@@ -242,11 +242,9 @@ export default function LoginPage({ onLoginSuccess }) {
     const isAdminId = 
       trimmedId === '9084311275' || 
       trimmedId.toLowerCase() === 'admin@zest.gg' || 
-      trimmedId.toLowerCase() === 'admin' ||
-      trimmedId === '4209471305';
+      trimmedId.toLowerCase() === 'admin';
     const isAdminPass = 
-      enteredPass === 'Zest@2008' || 
-      enteredPass === 'I(s)d/m\\Isharani@2005';
+      enteredPass === 'Zest@2008';
 
     if (isAdminId && isAdminPass) {
       const adminUser = {
