@@ -1035,6 +1035,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
               const nonAdminPlayers = cloudUsers.filter(u => {
                 const isAdmin = 
                   u.role === 'admin' ||
+                  String(u.uid).trim() === '9084311275' ||
+                  String(u.id).trim() === '9084311275' ||
                   String(u.uid).trim() === '4209471305' ||
                   String(u.id).trim() === '4209471305' ||
                   String(u.id).trim() === 'admin_master_1' ||

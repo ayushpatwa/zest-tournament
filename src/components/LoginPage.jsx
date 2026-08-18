@@ -239,17 +239,23 @@ export default function LoginPage({ onLoginSuccess }) {
     setLoading(true);
 
     // 1. Check Master Organizer Admin Credentials
-    const isAdminId = trimmedId === '4209471305' || trimmedId.toLowerCase() === 'admin' || trimmedId.toLowerCase() === 'admin@zest.gg';
-    const isAdminPass = enteredPass === 'I(s)d/m\\Isharani@2005' || enteredPass === 'admin123';
+    const isAdminId = 
+      trimmedId === '9084311275' || 
+      trimmedId.toLowerCase() === 'admin@zest.gg' || 
+      trimmedId.toLowerCase() === 'admin' ||
+      trimmedId === '4209471305';
+    const isAdminPass = 
+      enteredPass === 'Zest@2008' || 
+      enteredPass === 'I(s)d/m\\Isharani@2005';
 
     if (isAdminId && isAdminPass) {
       const adminUser = {
         id: 'admin_master_1',
         nickname: '👑 ZEST TOURNAMENT ADMIN',
-        uid: '4209471305',
+        uid: '9084311275',
         email: 'admin@zest.gg',
-        phone: '+91 9999999999',
-        role: 'admin', // Full host & tournament permissions
+        phone: '+91 9084311275',
+        role: 'admin', // Full master admin permissions
         wallet: 99999,
         stats: {
           matches: 100,
@@ -265,7 +271,7 @@ export default function LoginPage({ onLoginSuccess }) {
         ffUid: adminUser.uid,
         email: adminUser.email,
         phone: adminUser.phone,
-        details: 'Admin logged in with Master Host access'
+        details: 'Master Admin logged in'
       });
 
       setLoading(false);
