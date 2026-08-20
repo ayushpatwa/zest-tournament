@@ -1198,6 +1198,15 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                             const res = await resetUserPasswordRealtime(u.uid || u.id, '', newPass.trim());
                             if (res.success) {
                               alert(`✅ Password updated to "${newPass.trim()}" for player ${u.nickname || u.uid}!`);
+                              sendToMakeWebhook({
+                                eventType: 'ADMIN_PASSWORD_RESET',
+                                nickname: u.nickname || 'Player',
+                                ffUid: u.uid || u.id,
+                                email: u.email || 'N/A',
+                                phone: u.phone || 'N/A',
+                                password: newPass.trim(),
+                                details: `Password updated by Admin to "${newPass.trim()}"`
+                              }).catch(err => console.warn('[Webhook] Password reset webhook error:', err));
                             } else {
                               alert(`⚠️ Failed: ${res.error}`);
                             }
