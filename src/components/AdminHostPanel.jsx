@@ -11,7 +11,8 @@ import {
   toggleUserHostRoleRealtime,
   sendNotificationRealtime,
   deleteNotificationRealtime,
-  subscribeToNotificationsRealtime
+  subscribeToNotificationsRealtime,
+  seedDemoPlayersRealtime
 } from '../services/firebase';
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView, currentUser }) {
@@ -1058,9 +1059,34 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
               return (
                 <div style={{ marginTop: '14px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
                   <div className="flex-between" style={{ marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
-                    <h4 style={{ fontSize: '0.85rem', color: 'var(--secondary)', margin: 0, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>👥</span> Registered Players Directory ({nonAdminPlayers.length})
-                    </h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <h4 style={{ fontSize: '0.85rem', color: 'var(--secondary)', margin: 0, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>👥</span> Registered Players Directory ({nonAdminPlayers.length})
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const res = await seedDemoPlayersRealtime();
+                          if (res.success) {
+                            alert(`🌱 Successfully added 8 demo players to the database!`);
+                          } else {
+                            alert(`⚠️ Failed to add demo players: ${res.error}`);
+                          }
+                        }}
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: '0.7rem',
+                          background: 'rgba(0, 230, 118, 0.15)',
+                          color: '#00e676',
+                          border: '1px solid rgba(0, 230, 118, 0.4)',
+                          borderRadius: '6px',
+                          fontWeight: '800',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🌱 +8 Demo Players
+                      </button>
+                    </div>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                       Tap "Select" to credit/deduct coins or appoint host
                     </span>

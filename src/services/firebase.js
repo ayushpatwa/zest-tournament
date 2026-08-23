@@ -929,3 +929,142 @@ export const toggleUserHostRoleRealtime = async (userIdOrUid, enableHost = true)
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Pre-defined esports demo players for testing & arena activity
+ */
+export const DEMO_PLAYERS = [
+  {
+    id: "user_demo_1",
+    uid: "582910394",
+    nickname: "SOUL_Viper",
+    email: "viper.soul@gmail.com",
+    phone: "9876543210",
+    password: "password123",
+    role: "player",
+    wallet: 1250,
+    stats: { matches: 46, wins: 22, kills: 382, earnings: 48500 },
+    isVerified: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "user_demo_2",
+    uid: "192837465",
+    nickname: "Garena_Sniper",
+    email: "garena.sniper@gmail.com",
+    phone: "9811223344",
+    password: "password123",
+    role: "player",
+    wallet: 840,
+    stats: { matches: 33, wins: 14, kills: 310, earnings: 34200 },
+    isVerified: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "user_demo_3",
+    uid: "910293847",
+    nickname: "TotalGaming_Fan",
+    email: "totalgaming.fan@gmail.com",
+    phone: "9822334455",
+    password: "password123",
+    role: "player",
+    wallet: 450,
+    stats: { matches: 28, wins: 11, kills: 275, earnings: 27800 },
+    isVerified: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "user_demo_4",
+    uid: "482910283",
+    nickname: "ShadowHunter_OP",
+    email: "shadowhunter.op@gmail.com",
+    phone: "9833445566",
+    password: "password123",
+    role: "player",
+    wallet: 620,
+    stats: { matches: 22, wins: 8, kills: 230, earnings: 21500 },
+    isVerified: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "user_demo_5",
+    uid: "849201938",
+    nickname: "Thunder_God_FF",
+    email: "thunder.god@gmail.com",
+    phone: "9844556677",
+    password: "password123",
+    role: "player",
+    wallet: 310,
+    stats: { matches: 19, wins: 7, kills: 198, earnings: 18900 },
+    isVerified: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "user_demo_6",
+    uid: "772910481",
+    nickname: "Raptor_Esports",
+    email: "raptor.esports@gmail.com",
+    phone: "9855667788",
+    password: "password123",
+    role: "player",
+    wallet: 500,
+    stats: { matches: 16, wins: 6, kills: 174, earnings: 16200 },
+    isVerified: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "user_demo_7",
+    uid: "284019284",
+    nickname: "Panda_Headshot",
+    email: "panda.hs@gmail.com",
+    phone: "9866778899",
+    password: "password123",
+    role: "player",
+    wallet: 750,
+    stats: { matches: 14, wins: 5, kills: 160, earnings: 14500 },
+    isVerified: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "user_demo_8",
+    uid: "639201847",
+    nickname: "Frost_Byte_99",
+    email: "frostbyte99@gmail.com",
+    phone: "9877889900",
+    password: "password123",
+    role: "player",
+    wallet: 200,
+    stats: { matches: 10, wins: 3, kills: 95, earnings: 8200 },
+    isVerified: true,
+    createdAt: new Date().toISOString()
+  }
+];
+
+/**
+ * Seeds demo players directly to Cloud Firestore & local cache
+ */
+export const seedDemoPlayersRealtime = async () => {
+  try {
+    for (const player of DEMO_PLAYERS) {
+      await setDoc(doc(db, "users", player.id), {
+        ...player,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    }
+    const existing = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const existingUids = new Set(existing.map(u => String(u.uid)));
+    const merged = [...existing];
+    for (const dp of DEMO_PLAYERS) {
+      if (!existingUids.has(String(dp.uid))) {
+        merged.push(dp);
+      }
+    }
+    localStorage.setItem('zest_registered_users', JSON.stringify(merged));
+    console.log("[Firebase] Seeded demo players successfully!");
+    return { success: true, count: DEMO_PLAYERS.length };
+  } catch (err) {
+    console.error("[Firebase] Error seeding demo players:", err);
+    return { success: false, error: err.message };
+  }
+};
+
