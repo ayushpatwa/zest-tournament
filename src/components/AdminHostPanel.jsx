@@ -12,7 +12,9 @@ import {
   sendNotificationRealtime,
   deleteNotificationRealtime,
   subscribeToNotificationsRealtime,
-  seedDemoPlayersRealtime
+  seedDemoPlayersRealtime,
+  addDemoPlayersToTournamentRealtime,
+  addDemoPlayersToAllMatchesRealtime
 } from '../services/firebase';
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView, currentUser }) {
@@ -1479,13 +1481,40 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
       {/* MODE 3: MANAGE & DELETE TOURNAMENTS */}
       {activeTab === 'manage' && (
         <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <h3 style={{ fontSize: '1.1rem', color: 'var(--danger)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>🗑️</span> Manage & Delete Tournaments ({tournaments.length})
-            </h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-              Permanently remove tournament matches from the Arena and Firebase database in real-time.
-            </p>
+          <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', color: 'var(--danger)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🗑️</span> Manage & Delete Tournaments ({tournaments.length})
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                Permanently remove matches or populate them with demo players in real-time.
+              </p>
+            </div>
+            {tournaments.length > 0 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await addDemoPlayersToAllMatchesRealtime();
+                  if (res.success) {
+                    alert(`🌱 Successfully added demo players to all active matches!`);
+                  } else {
+                    alert(`⚠️ ${res.error || 'Failed to add demo players'}`);
+                  }
+                }}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  background: 'rgba(0, 230, 118, 0.15)',
+                  color: '#00e676',
+                  border: '1px solid rgba(0, 230, 118, 0.4)',
+                  borderRadius: '8px',
+                  fontWeight: '800',
+                  cursor: 'pointer'
+                }}
+              >
+                🌱 +Demo Players to All Matches
+              </button>
+            )}
           </div>
 
           {deleteStatusMsg && (
@@ -1534,22 +1563,49 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleDeleteMatch(t.id, t.title)}
-                    disabled={deletingId === t.id}
-                    className="btn btn-danger"
-                    style={{
-                      padding: '8px 14px',
-                      fontSize: '0.78rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      borderRadius: '8px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <span>🗑️</span> {deletingId === t.id ? 'Deleting...' : 'Delete Match'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const res = await addDemoPlayersToTournamentRealtime(t.id);
+                        if (res.success) {
+                          alert(`✓ Added demo players to "${t.title}"!`);
+                        } else {
+                          alert(`⚠️ ${res.error || 'Failed to add demo players'}`);
+                        }
+                      }}
+                      className="btn"
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '0.75rem',
+                        background: 'rgba(0, 230, 118, 0.15)',
+                        color: '#00e676',
+                        border: '1px solid rgba(0, 230, 118, 0.4)',
+                        borderRadius: '8px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      👥 +Demo Players
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteMatch(t.id, t.title)}
+                      disabled={deletingId === t.id}
+                      className="btn btn-danger"
+                      style={{
+                        padding: '8px 14px',
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <span>🗑️</span> {deletingId === t.id ? 'Deleting...' : 'Delete Match'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

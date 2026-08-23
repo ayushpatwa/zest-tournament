@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { addDemoPlayersToTournamentRealtime } from '../services/firebase';
 
 export default function TournamentLobby({ 
   tournament, 
@@ -366,7 +367,34 @@ export default function TournamentLobby({
       {/* TAB 2: BRACKET & PLAYERS */}
       {activeTab === 'brackets' && (
         <div className="glass-panel animate-slide-in" style={{ padding: '16px' }}>
-          <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>👥 Joined Players ({tournament.joinedPlayers?.length || 0})</h3>
+          <div className="flex-between" style={{ marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 style={{ fontSize: '1rem', margin: 0 }}>👥 Joined Players ({tournament.joinedPlayers?.length || 0}/{tournament.slotsTotal || tournament.maxSlots || 48})</h3>
+            {(userProfile?.role === 'admin' || userProfile?.role === 'host' || userProfile?.isHost) && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await addDemoPlayersToTournamentRealtime(tournament.id);
+                  if (res.success) {
+                    alert(`✓ Added demo players to this tournament lobby!`);
+                  } else {
+                    alert(`⚠️ ${res.error || 'Failed to add demo players'}`);
+                  }
+                }}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.72rem',
+                  background: 'rgba(0, 230, 118, 0.15)',
+                  color: '#00e676',
+                  border: '1px solid rgba(0, 230, 118, 0.4)',
+                  borderRadius: '6px',
+                  fontWeight: '800',
+                  cursor: 'pointer'
+                }}
+              >
+                🌱 +8 Demo Players
+              </button>
+            )}
+          </div>
           
           {tournament.joinedPlayers && tournament.joinedPlayers.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

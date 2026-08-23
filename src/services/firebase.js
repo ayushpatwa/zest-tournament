@@ -1068,3 +1068,89 @@ export const seedDemoPlayersRealtime = async () => {
   }
 };
 
+/**
+ * Adds demo players to a specific tournament in Firestore
+ */
+export const addDemoPlayersToTournamentRealtime = async (tournamentId) => {
+  try {
+    const tourneyRef = doc(db, "tournaments", tournamentId);
+    const tourneySnap = await getDoc(tourneyRef);
+    if (!tourneySnap.exists()) {
+      return { success: false, error: "Tournament not found" };
+    }
+    const tData = tourneySnap.data();
+    const existingJoined = Array.isArray(tData.joinedPlayers) ? tData.joinedPlayers : [];
+    const existingUids = new Set(existingJoined.map(p => String(p.uid || '').trim()));
+
+    const toAdd = DEMO_PLAYERS.filter(dp => !existingUids.has(dp.uid));
+    if (toAdd.length === 0) {
+      return { success: true, message: "Demo players already in match", added: 0 };
+    }
+
+    const newJoined = [
+      ...existingJoined,
+      ...toAdd.map(p => ({
+        uid: p.uid,
+        nickname: p.nickname,
+        email: p.email,
+        phone: p.phone,
+        joinedAt: new Date().toISOString()
+      }))
+    ];
+
+    await updateDoc(tourneyRef, {
+      joinedPlayers: newJoined,
+      slotsJoined: newJoined.length,
+      updatedAt: serverTimestamp()
+    });
+
+    console.log(`[Firebase] Added ${toAdd.length} demo players to tournament ${tournamentId}`);
+    return { success: true, added: toAdd.length, total: newJoined.length };
+  } catch (err) {
+    console.error("[Firebase] Error adding demo players to tournament:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Adds demo players to all active tournaments in Firestore
+ */
+export const addDemoPlayersToAllMatchesRealtime = async () => {
+  try {
+    const tourneysSnap = await getDocs(collection(db, "tournaments"));
+    let totalAdded = 0;
+
+    for (const docSnap of tourneysSnap.docs) {
+      const tData = docSnap.data();
+      const tId = docSnap.id;
+      const existingJoined = Array.isArray(tData.joinedPlayers) ? tData.joinedPlayers : [];
+      const existingUids = new Set(existingJoined.map(p => String(p.uid || '').trim()));
+
+      const toAdd = DEMO_PLAYERS.filter(dp => !existingUids.has(dp.uid));
+      if (toAdd.length > 0) {
+        const newJoined = [
+          ...existingJoined,
+          ...toAdd.map(p => ({
+            uid: p.uid,
+            nickname: p.nickname,
+            email: p.email,
+            phone: p.phone,
+            joinedAt: new Date().toISOString()
+          }))
+        ];
+
+        await updateDoc(doc(db, "tournaments", tId), {
+          joinedPlayers: newJoined,
+          slotsJoined: newJoined.length,
+          updatedAt: serverTimestamp()
+        });
+        totalAdded += toAdd.length;
+      }
+    }
+    return { success: true, count: totalAdded };
+  } catch (err) {
+    console.error("[Firebase] Error adding demo players to all matches:", err);
+    return { success: false, error: err.message };
+  }
+};
+
