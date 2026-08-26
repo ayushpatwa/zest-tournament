@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 import { getRazorpayConfig, setRazorpayConfig } from '../services/razorpayService';
+import { getInstamojoConfig, setInstamojoConfig } from '../services/instamojoService';
 import { 
   saveAppSettingsRealtime, 
   creditUserWalletRealtime, 
@@ -68,6 +69,10 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   // Razorpay Gateway Settings states
   const [razorpaySettings, setRazorpaySettings] = useState(getRazorpayConfig());
   const [razorpaySavedStatus, setRazorpaySavedStatus] = useState('');
+
+  // Instamojo Gateway Settings states
+  const [instamojoSettings, setInstamojoSettings] = useState(getInstamojoConfig());
+  const [instamojoSavedStatus, setInstamojoSavedStatus] = useState('');
 
   // Webhook states
   const [webhookInput, setWebhookInput] = useState(getWebhookUrl());
@@ -298,6 +303,16 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     setTimeout(() => setRazorpaySavedStatus(''), 4000);
   };
 
+  const handleSaveInstamojoConfig = async (e) => {
+    e.preventDefault();
+    setInstamojoConfig(instamojoSettings);
+    await saveAppSettingsRealtime({
+      instamojo: instamojoSettings
+    });
+    setInstamojoSavedStatus('✅ Instamojo Gateway configurations synced to cloud and all APK/Web players in real-time!');
+    setTimeout(() => setInstamojoSavedStatus(''), 4000);
+  };
+
   const handleSaveWebhook = async (e) => {
     e.preventDefault();
     setWebhookUrl(webhookInput);
@@ -496,6 +511,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                 }}
               >
                 🔔 Announcements ({broadcastList.length})
+              </button>
+
+              <button
+                onClick={() => setActiveTab('instamojo')}
+                className="btn"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  borderRadius: '8px',
+                  background: activeTab === 'instamojo' ? 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'instamojo' ? '#000' : '#fff',
+                  border: '1px solid var(--border-color)',
+                  fontWeight: '900'
+                }}
+              >
+                ⚡ Gateway (Instamojo)
               </button>
 
               <button
@@ -1611,6 +1642,96 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
             </div>
           )}
         </div>
+      )}
+
+      {/* MODE: INSTAMOJO PAYMENT GATEWAY CONFIGURATION */}
+      {activeTab === 'instamojo' && (
+        <form onSubmit={handleSaveInstamojoConfig} className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', color: '#00e676', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>⚡</span> Instamojo Payment Gateway Settings
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+              Configure your <strong>Instamojo Private API Key</strong> and <strong>Auth Token</strong> to accept instant UPI, QR, Debit/Credit Cards, and NetBanking deposits.
+            </p>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Private API Key (X-Api-Key) <span style={{ color: 'var(--primary)' }}>*</span></label>
+            <input 
+              type="text"
+              value={instamojoSettings.apiKey}
+              onChange={(e) => setInstamojoSettings({ ...instamojoSettings, apiKey: e.target.value })}
+              placeholder="e.g. 6da99d471d3bd09da2bd882824f241b6"
+              className="form-input"
+              required
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Private Auth Token (X-Auth-Token) <span style={{ color: 'var(--primary)' }}>*</span></label>
+            <input 
+              type="text"
+              value={instamojoSettings.authToken}
+              onChange={(e) => setInstamojoSettings({ ...instamojoSettings, authToken: e.target.value })}
+              placeholder="e.g. 992ffc838647c316437ba2699ceb6e0d"
+              className="form-input"
+              required
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Private Salt (for Webhook validation)</label>
+            <input 
+              type="text"
+              value={instamojoSettings.privateSalt}
+              onChange={(e) => setInstamojoSettings({ ...instamojoSettings, privateSalt: e.target.value })}
+              placeholder="e.g. ed14acad1168445291d0174a5ab35cae"
+              className="form-input"
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Optional: Custom Instamojo Smart Page / Quick Pay URL</label>
+            <input 
+              type="text"
+              value={instamojoSettings.customPaymentLink || ''}
+              onChange={(e) => setInstamojoSettings({ ...instamojoSettings, customPaymentLink: e.target.value })}
+              placeholder="e.g. https://www.instamojo.com/@yourusername/"
+              className="form-input"
+            />
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+              Leave blank to automatically use Instamojo Dynamic API Requests.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <input 
+              type="checkbox"
+              id="instamojoLiveCheck"
+              checked={instamojoSettings.isLive}
+              onChange={(e) => setInstamojoSettings({ ...instamojoSettings, isLive: e.target.checked })}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--success)' }}
+            />
+            <label htmlFor="instamojoLiveCheck" style={{ fontSize: '0.82rem', color: '#fff', cursor: 'pointer', margin: 0 }}>
+              <strong>Production / Live Mode:</strong> Enable real payments (uncheck for Test/Sandbox environment).
+            </label>
+          </div>
+
+          {instamojoSavedStatus && (
+            <div style={{ color: 'var(--success)', background: 'rgba(0,230,118,0.1)', padding: '10px', borderRadius: '8px', border: '1px solid var(--success)', fontSize: '0.85rem' }}>
+              {instamojoSavedStatus}
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            className="btn btn-secondary"
+            style={{ width: '100%', height: '46px', fontWeight: '900', background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)', color: '#000' }}
+          >
+            💾 Save Instamojo Gateway to Cloud in Real-Time
+          </button>
+        </form>
       )}
 
       {/* MODE 4: RAZORPAY PAYMENT GATEWAY CONFIGURATION */}

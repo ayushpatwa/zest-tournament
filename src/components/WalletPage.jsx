@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { openRazorpayCheckout } from '../services/razorpayService';
+import { createInstamojoPaymentRequest, openInstamojoCheckout } from '../services/instamojoService';
 import { sendToMakeWebhook } from '../services/webhookService';
 
 export default function WalletPage({ 
@@ -11,8 +12,10 @@ export default function WalletPage({
 }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState('100');
+  const [paymentGateway, setPaymentGateway] = useState('instamojo'); // 'instamojo' | 'razorpay'
   const [processingStatus, setProcessingStatus] = useState('');
   const [depositErrorMsg, setDepositErrorMsg] = useState('');
+  const [pendingInstamojoPayment, setPendingInstamojoPayment] = useState(null);
 
   // Withdrawal States
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -27,8 +30,8 @@ export default function WalletPage({
     ? walletBalance 
     : (parseFloat(walletBalance) || 0);
 
-  // 1. Trigger Official Razorpay Checkout Modal for Deposits
-  const handleProceedRazorpayDeposit = (e) => {
+  // Unified Deposit Handler (Instamojo / Razorpay)
+  const handleProceedDeposit = async (e) => {
     e.preventDefault();
     const amt = parseFloat(depositAmount);
     if (isNaN(amt) || amt < 10) {
@@ -36,8 +39,44 @@ export default function WalletPage({
       return;
     }
     setDepositErrorMsg('');
-    setProcessingStatus('Opening Razorpay Secure Checkout...');
 
+    if (paymentGateway === 'instamojo') {
+      setProcessingStatus('⚡ Creating Instamojo Secure Payment Request...');
+      try {
+        const res = await createInstamojoPaymentRequest({
+          amount: amt,
+          nickname: userProfile?.nickname || 'Zest Player',
+          uid: userProfile?.uid || 'Gamer',
+          email: userProfile?.email || 'player@zest.gg',
+          phone: userProfile?.phone || '9876543210'
+        });
+
+        if (res.success && res.paymentUrl) {
+          setProcessingStatus('Opening Instamojo Checkout (UPI / Cards / QR)...');
+          setPendingInstamojoPayment({ amount: amt, requestId: res.requestId });
+
+          await openInstamojoCheckout({
+            paymentUrl: res.paymentUrl,
+            onComplete: () => {
+              setProcessingStatus('');
+            },
+            onDismiss: () => {
+              setProcessingStatus('');
+            }
+          });
+        } else {
+          setProcessingStatus('');
+          setDepositErrorMsg('Failed to generate payment request. Please try again.');
+        }
+      } catch (err) {
+        setProcessingStatus('');
+        setDepositErrorMsg(err.message || 'Error connecting to Instamojo.');
+      }
+      return;
+    }
+
+    // Razorpay Flow
+    setProcessingStatus('Opening Razorpay Secure Checkout...');
     openRazorpayCheckout({
       amount: amt,
       customerName: userProfile?.nickname || 'Zest Gamer',
@@ -79,6 +118,39 @@ export default function WalletPage({
         setProcessingStatus('');
         setDepositErrorMsg(typeof err === 'string' ? err : 'Payment canceled or failed.');
       }
+    });
+  };
+
+  // Confirm Instamojo Deposit
+  const handleConfirmInstamojoPayment = async () => {
+    if (!pendingInstamojoPayment) return;
+    const amt = pendingInstamojoPayment.amount;
+
+    if (typeof setWalletBalance === 'function') {
+      setWalletBalance(prev => (typeof prev === 'number' ? prev : parseFloat(prev) || 0) + amt);
+    }
+
+    const newTx = {
+      id: Date.now(),
+      type: 'deposit',
+      amount: amt,
+      title: `Instamojo Deposit (₹${amt})`,
+      date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'Success'
+    };
+
+    setTransactions(prev => [newTx, ...prev]);
+    setPendingInstamojoPayment(null);
+    setShowAddModal(false);
+
+    // Dispatch to Google Sheets
+    await sendToMakeWebhook({
+      eventType: 'WALLET_DEPOSIT',
+      nickname: userProfile?.nickname || 'Player',
+      ffUid: userProfile?.uid || 'N/A',
+      email: userProfile?.email || 'N/A',
+      phone: userProfile?.phone || 'N/A',
+      details: `₹${amt} added via Instamojo Payment Gateway (Instant Deposit)`
     });
   };
 
@@ -372,7 +444,70 @@ export default function WalletPage({
               </button>
             </div>
 
-            <form onSubmit={handleProceedRazorpayDeposit}>
+            <form onSubmit={handleProceedDeposit}>
+
+              {/* Payment Gateway Selector */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  Select Payment Method:
+                </label>
+                <div style={{
+                  display: 'flex',
+                  background: 'rgba(7, 9, 14, 0.6)',
+                  borderRadius: '10px',
+                  padding: '4px',
+                  border: '1px solid var(--border-color)',
+                  gap: '6px'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => { setPaymentGateway('instamojo'); setDepositErrorMsg(''); }}
+                    style={{
+                      flex: 1,
+                      padding: '8px 4px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      background: paymentGateway === 'instamojo' ? 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)' : 'transparent',
+                      color: paymentGateway === 'instamojo' ? '#000' : '#fff',
+                      fontFamily: 'var(--font-heading)',
+                      fontSize: '0.78rem',
+                      fontWeight: '900',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>⚡</span> Instamojo (UPI)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setPaymentGateway('razorpay'); setDepositErrorMsg(''); }}
+                    style={{
+                      flex: 1,
+                      padding: '8px 4px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      background: paymentGateway === 'razorpay' ? 'linear-gradient(135deg, #00e5ff 0%, #7c4dff 100%)' : 'transparent',
+                      color: '#fff',
+                      fontFamily: 'var(--font-heading)',
+                      fontSize: '0.78rem',
+                      fontWeight: '900',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>💳</span> Razorpay
+                  </button>
+                </div>
+              </div>
               
               <div className="form-group">
                 <label>Enter Amount to Add (₹)</label>
@@ -424,20 +559,45 @@ export default function WalletPage({
                 </div>
               )}
 
-              <button 
-                type="submit" 
-                className="btn btn-secondary"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  fontSize: '0.92rem',
-                  fontWeight: '900',
-                  background: 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)',
-                  color: '#000'
-                }}
-              >
-                🚀 Proceed to Pay ₹{depositAmount} ➔
-              </button>
+              {pendingInstamojoPayment ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ background: 'rgba(0, 230, 118, 0.12)', border: '1px solid var(--success)', borderRadius: '8px', padding: '10px', fontSize: '0.78rem', color: '#00e676', textAlign: 'center' }}>
+                    Payment window opened. Once you finish payment in UPI/browser, tap below:
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleConfirmInstamojoPayment}
+                    className="btn btn-primary"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      fontSize: '0.9rem',
+                      fontWeight: '900',
+                      background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)',
+                      color: '#000'
+                    }}
+                  >
+                    ✅ I Have Completed Payment (Credit ₹{pendingInstamojoPayment.amount})
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  type="submit" 
+                  className="btn btn-secondary"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '0.92rem',
+                    fontWeight: '900',
+                    background: paymentGateway === 'instamojo' 
+                      ? 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)' 
+                      : 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)',
+                    color: '#000'
+                  }}
+                >
+                  🚀 Proceed with {paymentGateway === 'instamojo' ? 'Instamojo' : 'Razorpay'} (₹{depositAmount}) ➔
+                </button>
+              )}
             </form>
           </div>
         </div>
