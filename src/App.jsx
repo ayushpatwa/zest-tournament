@@ -11,8 +11,6 @@ import RulesPage from './components/RulesPage';
 import AppUpdateModal from './components/AppUpdateModal';
 import { isNewVersionAvailable, CURRENT_APP_VERSION } from './services/appUpdateService';
 import { sendToMakeWebhook, updateLiveWebhookUrl } from './services/webhookService';
-import { updateLiveRazorpayConfig } from './services/razorpayService';
-import { updateLiveInstamojoConfig } from './services/instamojoService';
 import { 
   subscribeToTournamentsRealtime, 
   subscribeToAppSettingsRealtime,
@@ -87,18 +85,9 @@ export default function App() {
       setCloudNotifications(notifs);
     });
 
-    // Subscribe to dynamic cloud app settings (Razorpay Key ID, Webhook, App Version Updates)
+    // Subscribe to dynamic cloud app settings (Webhook, App Version Updates)
     const unsubscribeSettings = subscribeToAppSettingsRealtime((settings) => {
       if (settings) {
-        if (settings.razorpayKeyId) {
-          updateLiveRazorpayConfig({
-            keyId: settings.razorpayKeyId,
-            merchantName: settings.razorpayMerchantName || 'Zest Tournament Esports'
-          });
-        }
-        if (settings.instamojo) {
-          updateLiveInstamojoConfig(settings.instamojo);
-        }
         if (settings.webhookUrl) {
           updateLiveWebhookUrl(settings.webhookUrl);
         }
