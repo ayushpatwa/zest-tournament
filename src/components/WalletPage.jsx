@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { sendToMakeWebhook } from '../services/webhookService';
+import paymentQrImg from '../assets/payment_qr.jpg';
 
 export default function WalletPage({ 
   walletBalance = 0, 
@@ -14,6 +15,15 @@ export default function WalletPage({
   const [depositSuccessMsg, setDepositSuccessMsg] = useState('');
   const [depositErrorMsg, setDepositErrorMsg] = useState('');
   const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
+
+  const handleCopyUpi = () => {
+    try {
+      navigator.clipboard.writeText('divyansh-308@ptyes');
+      setCopiedUpi(true);
+      setTimeout(() => setCopiedUpi(false), 2500);
+    } catch (_) {}
+  };
 
   // Withdrawal States
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -354,22 +364,119 @@ export default function WalletPage({
               position: 'relative'
             }}
           >
-            <div className="flex-between" style={{ marginBottom: '16px' }}>
-              <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.15rem', margin: 0, color: 'var(--secondary)' }}>
-                ADD FUNDS TO WALLET
-              </h2>
+            <div className="flex-between" style={{ marginBottom: '14px' }}>
+              <div>
+                <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>⚡</span> SCAN & PAY VIA UPI
+                </h2>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                  Scan QR code or pay via any UPI app, then submit details below.
+                </p>
+              </div>
               <button 
                 onClick={() => setShowAddModal(false)}
-                style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer', padding: '4px' }}
               >
                 ✕
               </button>
             </div>
 
+            {/* QR Code & UPI Information Box */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              padding: '14px',
+              textAlign: 'center',
+              marginBottom: '16px',
+              boxShadow: '0 8px 25px rgba(0,0,0,0.5)',
+              border: '2px solid var(--secondary)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
+                <span style={{ color: '#002e6e', fontWeight: '900', fontSize: '0.85rem' }}>Paytm / Any UPI</span>
+                <span style={{ color: '#00baf2', fontWeight: '900', fontSize: '0.85rem' }}>Accepted Here</span>
+              </div>
+
+              {/* QR Image */}
+              <div style={{ 
+                display: 'inline-block',
+                background: '#fff',
+                padding: '6px',
+                borderRadius: '10px',
+                border: '1px solid #e0e0e0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <img 
+                  src={paymentQrImg} 
+                  alt="Paytm UPI QR - Divyansh Maheshwari" 
+                  style={{
+                    width: '180px',
+                    height: 'auto',
+                    maxHeight: '220px',
+                    objectFit: 'contain',
+                    borderRadius: '8px',
+                    display: 'block'
+                  }}
+                />
+              </div>
+
+              {/* Receiver Details */}
+              <div style={{ marginTop: '8px' }}>
+                <div style={{ fontWeight: '800', color: '#111', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                  <span>Divyansh Maheshwari</span>
+                  <span style={{ color: '#00baf2', fontSize: '0.85rem' }}>✓</span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#444', fontFamily: 'monospace', fontWeight: '700', marginTop: '2px' }}>
+                  UPI ID: <span style={{ color: '#002e6e', userSelect: 'all' }}>divyansh-308@ptyes</span>
+                </div>
+              </div>
+
+              {/* Action Buttons: Copy UPI & Direct Intent Pay */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={handleCopyUpi}
+                  style={{
+                    flex: 1,
+                    padding: '7px 8px',
+                    fontSize: '0.74rem',
+                    background: copiedUpi ? '#00e676' : '#002e6e',
+                    color: copiedUpi ? '#000' : '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {copiedUpi ? '✓ UPI ID Copied!' : '📋 Copy UPI ID'}
+                </button>
+
+                <a
+                  href={`upi://pay?pa=divyansh-308@ptyes&pn=Divyansh%20Maheshwari&am=${depositAmount}&cu=INR`}
+                  style={{
+                    flex: 1,
+                    padding: '7px 8px',
+                    fontSize: '0.74rem',
+                    background: 'linear-gradient(135deg, #00baf2 0%, #002e6e 100%)',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '800',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span>⚡</span> Pay via App
+                </a>
+              </div>
+            </div>
+
             <form onSubmit={handleProceedDeposit}>
               
-              <div className="form-group">
-                <label>Amount to Deposit (₹) <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <div className="form-group" style={{ marginBottom: '10px' }}>
+                <label>Deposit Amount (₹) <span style={{ color: 'var(--primary)' }}>*</span></label>
                 <input 
                   type="number" 
                   value={depositAmount}
@@ -383,7 +490,7 @@ export default function WalletPage({
               </div>
 
               {/* Quick selection chips */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
                 {['50', '100', '200', '500'].map(val => (
                   <button
                     key={val}
@@ -395,8 +502,8 @@ export default function WalletPage({
                       color: depositAmount === val ? '#000' : '#fff',
                       border: '1px solid var(--border-color)',
                       borderRadius: '8px',
-                      padding: '8px 4px',
-                      fontSize: '0.8rem',
+                      padding: '6px 2px',
+                      fontSize: '0.78rem',
                       cursor: 'pointer',
                       fontWeight: '700'
                     }}
@@ -406,8 +513,8 @@ export default function WalletPage({
                 ))}
               </div>
 
-              <div className="form-group">
-                <label>Payment Reference / UTR Number / UPI Ref <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>(Optional)</span></label>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label>Payment UTR / Ref No. <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>(After payment in UPI app)</span></label>
                 <input 
                   type="text" 
                   value={depositUtr}
@@ -415,20 +522,6 @@ export default function WalletPage({
                   placeholder="e.g. 423984712093"
                   className="form-input"
                 />
-              </div>
-
-              {/* Telegram Support notice */}
-              <div style={{ 
-                background: 'rgba(0, 229, 255, 0.06)', 
-                border: '1px solid rgba(0, 229, 255, 0.2)', 
-                borderRadius: '8px', 
-                padding: '10px', 
-                marginBottom: '14px',
-                fontSize: '0.75rem',
-                color: 'var(--text-muted)',
-                lineHeight: '1.4'
-              }}>
-                ℹ️ After sending payment via UPI or QR, submit this request or message <strong>@zesttournament</strong> on Telegram. Coins are credited directly after verification.
               </div>
 
               {depositSuccessMsg && (
