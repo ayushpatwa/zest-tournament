@@ -358,6 +358,7 @@ export const checkUserExistsRealtime = async (ffUid, email) => {
 
 /**
  * Real-time subscription to a single user's profile and live wallet balance
+ * Automatically detects account deletion and notifies client for auto-logout
  */
 export const subscribeToUserProfileRealtime = (userIdOrUid, onUpdate) => {
   try {
@@ -365,11 +366,28 @@ export const subscribeToUserProfileRealtime = (userIdOrUid, onUpdate) => {
     const userId = String(userIdOrUid).trim();
     const docRef = doc(db, "users", userId);
     
+    let hasReceivedInitial = false;
+
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
+        hasReceivedInitial = true;
         const data = docSnap.data();
-        console.log(`[Firebase] Live balance/profile update for ${userId}:`, data.wallet);
-        onUpdate(data);
+        if (data.isDeleted) {
+          console.log(`[Firebase] User document ${userId} is marked deleted.`);
+          onUpdate(null);
+        } else {
+          console.log(`[Firebase] Live balance/profile update for ${userId}:`, data.wallet);
+          onUpdate(data);
+        }
+      } else {
+        if (hasReceivedInitial) {
+          console.log(`[Firebase] User document ${userId} was deleted in real-time.`);
+          onUpdate(null);
+        } else {
+          // Check if document was initially missing
+          hasReceivedInitial = true;
+          onUpdate(null);
+        }
       }
     }, (err) => {
       console.warn("[Firebase] User profile subscription warning:", err);
@@ -804,8 +822,8 @@ export const deleteUserRealtime = async (userIdOrUid) => {
     const usersCollection = collection(db, "users");
     const snapshot = await getDocs(usersCollection);
     
-    let targetDocId = null;
     let targetNickname = '';
+    const docsToDelete = [];
 
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
@@ -814,15 +832,21 @@ export const deleteUserRealtime = async (userIdOrUid) => {
       const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
       
       if (docIdMatch || uidMatch || emailMatch) {
-        targetDocId = docSnap.id;
+        docsToDelete.push(docSnap.id);
         targetNickname = data.nickname || data.uid || docSnap.id;
       }
     });
 
-    if (targetDocId) {
-      await deleteDoc(doc(db, "users", targetDocId));
-      console.log(`[Firebase] Successfully deleted user ${targetDocId}`);
-    } else {
+    // Mark as deleted first then delete doc to ensure live listeners trigger auto-logout
+    for (const dId of docsToDelete) {
+      try {
+        await updateDoc(doc(db, "users", dId), { isDeleted: true, status: 'deleted' });
+        await deleteDoc(doc(db, "users", dId));
+        console.log(`[Firebase] Successfully deleted user doc ${dId}`);
+      } catch (_) {}
+    }
+
+    if (docsToDelete.length === 0) {
       try {
         await deleteDoc(doc(db, "users", rawQuery));
       } catch (_) {}

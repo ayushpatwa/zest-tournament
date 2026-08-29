@@ -106,52 +106,68 @@ export default function App() {
     };
   }, []);
 
-  // 2. Real-time Live Wallet & User Profile sync with Firestore Cloud
+  // 2. Real-time Live Wallet & User Profile sync with Firestore Cloud & Auto-Logout on Deletion
   useEffect(() => {
     if (!currentUser?.uid && !currentUser?.id) return;
     const userIdentifier = String(currentUser.uid || currentUser.id).trim();
     console.log(`[Firebase Realtime] Listening to live wallet balance for ${userIdentifier}`);
     
     const unsubscribeUser = subscribeToUserProfileRealtime(userIdentifier, (liveUserData) => {
-      if (liveUserData) {
-        if (typeof liveUserData.wallet === 'number') {
-          setWalletBalance(liveUserData.wallet);
+      // If user account is null (deleted) or marked isDeleted: true
+      if (!liveUserData || liveUserData.isDeleted) {
+        const isMasterAdmin = currentUser.role === 'admin' && (
+          currentUser.uid === '9084311275' || 
+          currentUser.email === 'admin@zest.gg' || 
+          String(currentUser.phone) === '9084311275'
+        );
+
+        if (!isMasterAdmin) {
+          console.warn(`[App] Current player account was deleted from database. Auto-logging out...`);
+          localStorage.removeItem('zest_current_user');
+          localStorage.removeItem('zest_wallet_transactions');
+          setCurrentUser(null);
+          alert('⚠️ Your account has been removed by the Admin. You have been logged out.');
         }
-        if (Array.isArray(liveUserData.transactions) && liveUserData.transactions.length > 0) {
-          // Sort newest transactions first
-          const sorted = [...liveUserData.transactions].sort((a, b) => {
-            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return timeB - timeA;
-          });
-          setTransactions(sorted);
+        return;
+      }
+
+      if (typeof liveUserData.wallet === 'number') {
+        setWalletBalance(liveUserData.wallet);
+      }
+      if (Array.isArray(liveUserData.transactions) && liveUserData.transactions.length > 0) {
+        // Sort newest transactions first
+        const sorted = [...liveUserData.transactions].sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+        setTransactions(sorted);
+      }
+      setUserProfile(prev => ({
+        ...prev,
+        ...liveUserData,
+        wallet: typeof liveUserData.wallet === 'number' ? liveUserData.wallet : prev.wallet
+      }));
+
+      // Real-time instant role synchronization across all tabs & connected devices
+      setCurrentUser(prev => {
+        if (!prev) return prev;
+        const updatedRole = liveUserData.role !== undefined ? liveUserData.role : prev.role;
+        const updatedIsHost = liveUserData.isHost !== undefined ? liveUserData.isHost : prev.isHost;
+        
+        // If host permissions were revoked and player is currently on host panel, exit immediately
+        if (prev.role !== 'admin' && updatedRole !== 'host' && !updatedIsHost) {
+          setCurrentView(v => v === 'admin' ? 'dashboard' : v);
         }
-        setUserProfile(prev => ({
+
+        return {
           ...prev,
           ...liveUserData,
+          role: updatedRole,
+          isHost: updatedIsHost,
           wallet: typeof liveUserData.wallet === 'number' ? liveUserData.wallet : prev.wallet
-        }));
-
-        // Real-time instant role synchronization across all tabs & connected devices
-        setCurrentUser(prev => {
-          if (!prev) return prev;
-          const updatedRole = liveUserData.role !== undefined ? liveUserData.role : prev.role;
-          const updatedIsHost = liveUserData.isHost !== undefined ? liveUserData.isHost : prev.isHost;
-          
-          // If host permissions were revoked and player is currently on host panel, exit immediately
-          if (prev.role !== 'admin' && updatedRole !== 'host' && !updatedIsHost) {
-            setCurrentView(v => v === 'admin' ? 'dashboard' : v);
-          }
-
-          return {
-            ...prev,
-            ...liveUserData,
-            role: updatedRole,
-            isHost: updatedIsHost,
-            wallet: typeof liveUserData.wallet === 'number' ? liveUserData.wallet : prev.wallet
-          };
-        });
-      }
+        };
+      });
     });
 
     return () => unsubscribeUser();
