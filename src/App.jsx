@@ -173,7 +173,12 @@ export default function App() {
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
     setUserProfile(user);
-    setWalletBalance(user.wallet ?? 0);
+    const initialWallet = typeof user.wallet === 'number' ? user.wallet : 10;
+    setWalletBalance(initialWallet);
+    if (user.transactions && user.transactions.length > 0) {
+      setTransactions(user.transactions);
+      localStorage.setItem('zest_wallet_transactions', JSON.stringify(user.transactions));
+    }
     localStorage.setItem('zest_current_user', JSON.stringify(user));
     saveUserProfileRealtime(user);
     setCurrentView('dashboard');

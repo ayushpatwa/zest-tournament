@@ -117,7 +117,7 @@ export default function LoginPage({ onLoginSuccess }) {
       phone: phone.trim(),
       password: password,
       role: 'player',
-      wallet: 0,
+      wallet: 10,
       isVerified: true,
       verifiedMethod: verifyChannel,
       verifiedAt: new Date().toISOString(),
@@ -125,8 +125,20 @@ export default function LoginPage({ onLoginSuccess }) {
         matches: 0,
         wins: 0,
         kills: 0,
-        earnings: 0
+        earnings: 10
       },
+      transactions: [
+        {
+          id: `tx_${Date.now()}`,
+          type: 'CREDIT',
+          amount: 10,
+          title: '🎁 Welcome Bonus',
+          reason: '10 Coins Free Registration Reward',
+          date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+          timestamp: new Date().toISOString(),
+          status: 'Success'
+        }
+      ],
       createdAt: new Date().toISOString()
     };
 
@@ -855,6 +867,25 @@ export default function LoginPage({ onLoginSuccess }) {
         {/* MODE 2: PLAYER SIGN UP (STEP 1) */}
         {authMode === 'signup' && (
           <form onSubmit={handleInitiateSignUp} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            
+            {/* Welcome Bonus Notice */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(255, 214, 0, 0.15) 0%, rgba(0, 230, 118, 0.15) 100%)',
+              border: '1px solid rgba(255, 214, 0, 0.4)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.8rem',
+              color: '#ffd600',
+              fontWeight: '800',
+              boxShadow: '0 2px 10px rgba(255, 214, 0, 0.1)'
+            }}>
+              <span style={{ fontSize: '1.1rem' }}>🎁</span>
+              <span>WELCOME BONUS: Get 10 Coins Free Added Instantly!</span>
+            </div>
+
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Free Fire Nickname <span style={{ color: 'var(--primary)' }}>*</span></label>
               <input
