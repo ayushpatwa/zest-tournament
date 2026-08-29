@@ -179,11 +179,11 @@ export default function WalletPage({
 
         <div style={{ display: 'flex', width: '100%', gap: '12px', marginTop: '8px' }}>
           <button 
-            onClick={() => { setShowAddModal(true); setProcessingStatus(''); setDepositErrorMsg(''); }}
+            onClick={() => { setShowAddModal(true); setDepositErrorMsg(''); setDepositSuccessMsg(''); }}
             className="btn btn-secondary" 
             style={{ flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '900', background: 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)', color: '#000' }}
           >
-            ⚡ Add Money (Razorpay)
+            ⚡ Add Money / Deposit
           </button>
           <button 
             onClick={() => { setShowWithdrawModal(true); setWithdrawErrorMsg(''); setWithdrawSuccessMsg(''); }}
@@ -195,12 +195,12 @@ export default function WalletPage({
         </div>
       </div>
 
-      {/* Razorpay Trust Banner */}
+      {/* Trust & Payout Banner */}
       <div className="glass-panel" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '1.2rem' }}>🛡️</span>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            Deposits secured by <strong>Razorpay</strong> • Instant Withdrawals
+            100% Fairplay Esports Arena • Verified Instant Withdrawals
           </span>
         </div>
         <div style={{ display: 'flex', gap: '10px', fontSize: '0.78rem', fontWeight: '700' }}>
@@ -328,7 +328,7 @@ export default function WalletPage({
         </a>
       </div>
 
-      {/* 1. RAZORPAY DEPOSIT MODAL */}
+      {/* 1. DEPOSIT REQUEST MODAL */}
       {showAddModal && (
         <div 
           className="flex-center" 

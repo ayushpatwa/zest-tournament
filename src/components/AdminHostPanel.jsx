@@ -19,7 +19,7 @@ import {
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView, currentUser }) {
   const isSuperAdmin = currentUser?.role === 'admin';
   const isHost = currentUser?.role === 'host' || currentUser?.isHost || isSuperAdmin;
-  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'broadcast' | 'manage' | 'razorpay' | 'webhook' | 'app_update'
+  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'broadcast' | 'manage' | 'webhook' | 'app_update'
   
   // Host Form states
   const [title, setTitle] = useState('');
@@ -72,7 +72,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   // App Update Publisher states
   const [updateVersion, setUpdateVersion] = useState('1.1.0');
   const [updateTitle, setUpdateTitle] = useState('🔥 New Tournament Updates & Features!');
-  const [updateNotes, setUpdateNotes] = useState('• Added Clash Squad 2v2 & Headshot Modes\n• Instant Room ID updates\n• Seamless Razorpay deposits');
+  const [updateNotes, setUpdateNotes] = useState('• Added Clash Squad 2v2 & Headshot Modes\n• Instant Room ID updates\n• Instant wallet payouts');
   const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatePublishStatus, setUpdatePublishStatus] = useState('');
@@ -392,7 +392,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
           </h2>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
             {isSuperAdmin 
-              ? 'Manage tournaments, player payouts & host roles, Razorpay gateway, and app updates.' 
+              ? 'Manage tournaments, player payouts & host roles, webhooks, and app updates.' 
               : 'Create matches, drop Custom Room IDs, and broadcast announcements.'}
           </p>
         </div>

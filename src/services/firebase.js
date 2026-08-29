@@ -83,8 +83,8 @@ export const saveTournamentRealtime = async (tournamentData) => {
 };
 
 /**
- * Real-time listener for app configurations (Razorpay keys, Webhook URLs)
- * Automatically syncs live keys to all installed APKs and Web users in real-time!
+ * Real-time listener for app configurations (Webhook URLs, App Updates)
+ * Automatically syncs live config to all installed APKs and Web users in real-time!
  */
 export const subscribeToAppSettingsRealtime = (onUpdate, onError) => {
   try {
@@ -107,7 +107,7 @@ export const subscribeToAppSettingsRealtime = (onUpdate, onError) => {
 };
 
 /**
- * Saves app configurations (Razorpay keys, Webhooks) to Firestore cloud
+ * Saves app configurations (Webhooks, App Updates) to Firestore cloud
  */
 export const saveAppSettingsRealtime = async (settings) => {
   try {
