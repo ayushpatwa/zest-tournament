@@ -269,6 +269,12 @@ export default function App() {
     await saveTournamentRealtime(newTourney);
   };
 
+  // Update/Edit tournament via Admin/Host Panel -> Direct to Firebase
+  const handleUpdateTournament = async (updatedTourney) => {
+    setTournaments(prev => prev.map(t => t.id === updatedTourney.id ? { ...t, ...updatedTourney } : t));
+    await saveTournamentRealtime(updatedTourney);
+  };
+
   // Delete tournament via Admin Panel -> Direct to Firebase
   const handleDeleteTournament = async (tournamentId) => {
     setTournaments(prev => prev.filter(t => t.id !== tournamentId));
@@ -373,6 +379,7 @@ export default function App() {
           <AdminHostPanel 
             tournaments={tournaments}
             onAddTournament={handleAddTournament}
+            onUpdateTournament={handleUpdateTournament}
             onDeleteTournament={handleDeleteTournament}
             onBroadcastRoomCredentials={handleBroadcastRoomCredentials}
             setCurrentView={setCurrentView}

@@ -16,12 +16,13 @@ import {
   addDemoPlayersToAllMatchesRealtime
 } from '../services/firebase';
 
-export default function AdminHostPanel({ tournaments = [], onAddTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView, currentUser }) {
+export default function AdminHostPanel({ tournaments = [], onAddTournament, onUpdateTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView, currentUser }) {
   const isSuperAdmin = currentUser?.role === 'admin';
   const isHost = currentUser?.role === 'host' || currentUser?.isHost || isSuperAdmin;
   const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'broadcast' | 'manage' | 'webhook' | 'app_update'
   
   // Host Form states
+  const [editingTournament, setEditingTournament] = useState(null);
   const [title, setTitle] = useState('');
   const [mode, setMode] = useState('Solo');
   const [type, setType] = useState('Classic');
@@ -31,6 +32,10 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
   const [entryFee, setEntryFee] = useState('20');
   const [slotsTotal, setSlotsTotal] = useState('48');
   const [matchTiming, setMatchTiming] = useState('03:00 PM - 04:00 PM');
+  const [editRoomId, setEditRoomId] = useState('');
+  const [editRoomPassword, setEditRoomPassword] = useState('');
+  const [editStatus, setEditStatus] = useState('upcoming');
+  const [editSuccessMsg, setEditSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [deleteStatusMsg, setDeleteStatusMsg] = useState('');
   const [deletingId, setDeletingId] = useState(null);
@@ -149,7 +154,43 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleStartEditTournament = (t) => {
+    setEditingTournament(t);
+    setTitle(t.title || '');
+    setMode(t.mode || 'Solo');
+    setType(t.type || 'Classic');
+    setMapName(t.map || 'Bermuda');
+    setPrizePool(t.prizePool?.toString() || '0');
+    setPerKillPrize(t.perKillPrize?.toString() || '0');
+    setEntryFee(t.entryFee?.toString() || '0');
+    setSlotsTotal((t.slotsTotal || t.maxSlots || 48).toString());
+    setMatchTiming(t.startTime || '');
+    setEditRoomId(t.roomId || '');
+    setEditRoomPassword(t.roomPassword || '');
+    setEditStatus(t.status || 'upcoming');
+    setErrorMsg('');
+    setActiveTab('host');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTournament(null);
+    setTitle('');
+    setMode('Solo');
+    setType('Classic');
+    setMapName('Bermuda');
+    setPrizePool('2000');
+    setPerKillPrize('25');
+    setEntryFee('20');
+    setSlotsTotal('48');
+    setMatchTiming('03:00 PM - 04:00 PM');
+    setEditRoomId('');
+    setEditRoomPassword('');
+    setEditStatus('upcoming');
+    setErrorMsg('');
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -178,6 +219,36 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
 
     if (isNaN(prize) || prize < 0 || isNaN(fee) || fee < 0 || isNaN(slots) || slots < 2 || isNaN(killBounty) || killBounty < 0) {
       setErrorMsg('Please enter valid numeric parameters.');
+      return;
+    }
+
+    if (editingTournament) {
+      const updatedTournament = {
+        ...editingTournament,
+        title: title.trim(),
+        mode: is1v1 ? 'Solo' : is2v2 ? 'Duo' : isClashSquad4v4 ? 'Squad' : mode,
+        type: type,
+        map: mapName,
+        prizePool: prize,
+        perKillPrize: killBounty,
+        entryFee: fee,
+        slotsTotal: slots,
+        maxSlots: slots,
+        startTime: matchTiming.trim(),
+        roomId: editRoomId.trim(),
+        roomPassword: editRoomPassword.trim(),
+        status: editStatus
+      };
+
+      if (onUpdateTournament) {
+        await onUpdateTournament(updatedTournament);
+      } else {
+        await saveTournamentRealtime(updatedTournament);
+      }
+
+      setEditSuccessMsg(`✅ Successfully updated "${updatedTournament.title}" in real-time!`);
+      setTimeout(() => setEditSuccessMsg(''), 4000);
+      handleCancelEdit();
       return;
     }
 
@@ -516,208 +587,390 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
         </div>
       </div>
 
-      {/* MODE 1: HOST MATCH */}
+      {/* MODE 1: HOST & EDIT MATCH */}
       {activeTab === 'host' && (
-        <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <h3 style={{ fontSize: '1.05rem', color: 'var(--primary)', marginBottom: '4px' }}>
-            🔥 Create New Tournament Match
-          </h3>
-
-          <div className="form-group">
-            <label>Tournament Title</label>
-            <input 
-              type="text" 
-              value={title} 
-              onChange={(e) => setTitle(e.target.value)} 
-              placeholder="e.g. Bermuda Midnight Solo Rush" 
-              className="form-input"
-              required
-            />
-          </div>
-
-          <div className="grid-2">
-            <div className="form-group">
-              <label>Match Mode</label>
-              <select value={mode} onChange={(e) => setMode(e.target.value)} className="form-input">
-                <option value="Solo">Solo</option>
-                <option value="Duo">Duo</option>
-                <option value="Squad">Squad</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Game Type</label>
-              <select value={type} onChange={(e) => handleTypeChange(e.target.value)} className="form-input">
-                <option value="Classic">Classic Battle Royale</option>
-                <option value="Clash Squad">Clash Squad 4v4</option>
-                <option value="Clash Squad Headshot">Clash Squad Headshot 4v4 🎯</option>
-                <option value="Clash Squad 2v2">Clash Squad 2v2 ⚔️ (4 Players)</option>
-                <option value="Clash Squad 2v2 Headshot">Clash Squad 2v2 Headshot 🎯 (4 Players)</option>
-                <option value="Lone Wolf Headshot 1v1">Lone Wolf Headshot 1v1 🎯 (2 Players)</option>
-                <option value="Lone Wolf Headshot 2v2">Lone Wolf Headshot 2v2 🎯 (4 Players)</option>
-                <option value="Lone Wolf 2v2">Lone Wolf 2v2 🐺 (4 Players)</option>
-                <option value="Lone Wolf 1v1">Lone Wolf 1v1 🐺 (2 Players)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Mode Rules Dynamic Helper Badge */}
-          {type.toLowerCase().includes('lone wolf') && (
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, rgba(255, 214, 0, 0.1) 100%)',
-              border: '1px solid var(--secondary)',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              fontSize: '0.78rem',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <span>🐺</span>
-              <div>
-                <strong>LONE WOLF RULES:</strong> {type.includes('1v1') ? 'Max 2 Players (1 vs 1).' : 'Max 4 Players (2 vs 2).'} 
-                <span style={{ color: 'var(--accent)' }}> Winning Prize Only (No Per-Kill Bounty).</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', border: editingTournament ? '1px solid var(--secondary)' : '1px solid var(--border-color)' }}>
+            
+            {/* Edit Mode Banner */}
+            {editingTournament ? (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.15) 0%, rgba(0, 230, 118, 0.15) 100%)',
+                border: '1px solid var(--secondary)',
+                padding: '12px 14px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.2rem' }}>✏️</span>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--secondary)' }}>
+                      EDITING MATCH: {editingTournament.title}
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      ID: {editingTournament.id} • Updates sync across all players in real-time
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="btn btn-outline"
+                  style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+                >
+                  ✕ Cancel Edit
+                </button>
               </div>
-            </div>
-          )}
+            ) : (
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--primary)', marginBottom: '4px' }}>
+                🔥 Create New Tournament Match
+              </h3>
+            )}
 
-          {type.toLowerCase().includes('clash') && (
-            <div style={{
-              background: 'rgba(255, 87, 34, 0.1)',
-              border: '1px solid var(--primary)',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              fontSize: '0.78rem',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <span>⚔️</span>
-              <div>
-                <strong>CLASH SQUAD RULES:</strong> {type.includes('2v2') ? 'Exactly 4 Players (Two Duo Teams / 2 vs 2).' : 'Exactly 8 Players (Two 4-Player Teams / 4 vs 4).'}
+            {editSuccessMsg && (
+              <div style={{ color: 'var(--success)', background: 'rgba(0,230,118,0.1)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--success)', fontSize: '0.85rem' }}>
+                {editSuccessMsg}
               </div>
-            </div>
-          )}
-
-          <div className="grid-2">
-            <div className="form-group">
-              <label>Map</label>
-              <select value={mapName} onChange={(e) => setMapName(e.target.value)} className="form-input">
-                <option value="Bermuda">Bermuda</option>
-                <option value="Bermuda (CS)">Bermuda (CS)</option>
-                <option value="Iron Cage">Iron Cage (Lone Wolf)</option>
-                <option value="Iron Dome">Iron Dome (Lone Wolf)</option>
-                <option value="Science Center">Science Center (Lone Wolf)</option>
-                <option value="Purgatory">Purgatory</option>
-                <option value="Kalahari">Kalahari</option>
-                <option value="Alpine">Alpine</option>
-                <option value="NeXTerra">NeXTerra</option>
-              </select>
-            </div>
+            )}
 
             <div className="form-group">
-              <label>Match Timing / Slot (e.g. 3:00 PM - 4:00 PM)</label>
+              <label>Tournament Title</label>
               <input 
                 type="text" 
-                value={matchTiming} 
-                onChange={(e) => setMatchTiming(e.target.value)} 
-                placeholder="e.g. 03:00 PM - 04:00 PM or Tonight, 08:30 PM"
+                value={title} 
+                onChange={(e) => setTitle(e.target.value)} 
+                placeholder="e.g. Bermuda Midnight Solo Rush" 
                 className="form-input"
                 required
               />
-              <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
-                {['03:00 PM - 04:00 PM', '06:00 PM - 07:00 PM', '08:30 PM - 09:30 PM', '10:00 PM - 11:00 PM'].map(slot => (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => setMatchTiming(slot)}
-                    style={{
-                      background: matchTiming === slot ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      color: '#fff',
-                      borderRadius: '12px',
-                      padding: '3px 8px',
-                      fontSize: '0.68rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {slot}
-                  </button>
-                ))}
+            </div>
+
+            <div className="grid-2">
+              <div className="form-group">
+                <label>Match Mode</label>
+                <select value={mode} onChange={(e) => setMode(e.target.value)} className="form-input">
+                  <option value="Solo">Solo</option>
+                  <option value="Duo">Duo</option>
+                  <option value="Squad">Squad</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Game Type</label>
+                <select value={type} onChange={(e) => handleTypeChange(e.target.value)} className="form-input">
+                  <option value="Classic">Classic Battle Royale</option>
+                  <option value="Clash Squad">Clash Squad 4v4</option>
+                  <option value="Clash Squad Headshot">Clash Squad Headshot 4v4 🎯</option>
+                  <option value="Clash Squad 2v2">Clash Squad 2v2 ⚔️ (4 Players)</option>
+                  <option value="Clash Squad 2v2 Headshot">Clash Squad 2v2 Headshot 🎯 (4 Players)</option>
+                  <option value="Lone Wolf Headshot 1v1">Lone Wolf Headshot 1v1 🎯 (2 Players)</option>
+                  <option value="Lone Wolf Headshot 2v2">Lone Wolf Headshot 2v2 🎯 (4 Players)</option>
+                  <option value="Lone Wolf 2v2">Lone Wolf 2v2 🐺 (4 Players)</option>
+                  <option value="Lone Wolf 1v1">Lone Wolf 1v1 🐺 (2 Players)</option>
+                </select>
               </div>
             </div>
+
+            {/* Mode Rules Dynamic Helper Badge */}
+            {type.toLowerCase().includes('lone wolf') && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, rgba(255, 214, 0, 0.1) 100%)',
+                border: '1px solid var(--secondary)',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span>🐺</span>
+                <div>
+                  <strong>LONE WOLF RULES:</strong> {type.includes('1v1') ? 'Max 2 Players (1 vs 1).' : 'Max 4 Players (2 vs 2).'} 
+                  <span style={{ color: 'var(--accent)' }}> Winning Prize Only (No Per-Kill Bounty).</span>
+                </div>
+              </div>
+            )}
+
+            {type.toLowerCase().includes('clash') && (
+              <div style={{
+                background: 'rgba(255, 87, 34, 0.1)',
+                border: '1px solid var(--primary)',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span>⚔️</span>
+                <div>
+                  <strong>CLASH SQUAD RULES:</strong> {type.includes('2v2') ? 'Exactly 4 Players (Two Duo Teams / 2 vs 2).' : 'Exactly 8 Players (Two 4-Player Teams / 4 vs 4).'}
+                </div>
+              </div>
+            )}
+
+            <div className="grid-2">
+              <div className="form-group">
+                <label>Map</label>
+                <select value={mapName} onChange={(e) => setMapName(e.target.value)} className="form-input">
+                  <option value="Bermuda">Bermuda</option>
+                  <option value="Bermuda (CS)">Bermuda (CS)</option>
+                  <option value="Iron Cage">Iron Cage (Lone Wolf)</option>
+                  <option value="Iron Dome">Iron Dome (Lone Wolf)</option>
+                  <option value="Science Center">Science Center (Lone Wolf)</option>
+                  <option value="Purgatory">Purgatory</option>
+                  <option value="Kalahari">Kalahari</option>
+                  <option value="Alpine">Alpine</option>
+                  <option value="NeXTerra">NeXTerra</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Match Timing / Slot (e.g. 3:00 PM - 4:00 PM)</label>
+                <input 
+                  type="text" 
+                  value={matchTiming} 
+                  onChange={(e) => setMatchTiming(e.target.value)} 
+                  placeholder="e.g. 03:00 PM - 04:00 PM or Tonight, 08:30 PM" 
+                  className="form-input"
+                  required
+                />
+                <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {['03:00 PM - 04:00 PM', '06:00 PM - 07:00 PM', '08:30 PM - 09:30 PM', '10:00 PM - 11:00 PM'].map(slot => (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => setMatchTiming(slot)}
+                      style={{
+                        background: matchTiming === slot ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: '#fff',
+                        borderRadius: '12px',
+                        padding: '3px 8px',
+                        fontSize: '0.68rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {slot}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="form-group">
+                <label>Winning Prize Pool (₹)</label>
+                <input 
+                  type="number" 
+                  value={prizePool} 
+                  onChange={(e) => setPrizePool(e.target.value)} 
+                  className="form-input"
+                  min="0"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Per Kill Bounty (₹)</label>
+                <input 
+                  type="number" 
+                  value={perKillPrize} 
+                  onChange={(e) => setPerKillPrize(e.target.value)} 
+                  placeholder="e.g. 25 (0 for Lone Wolf)"
+                  className="form-input"
+                  min="0"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="form-group">
+                <label>Entry Fee (₹)</label>
+                <input 
+                  type="number" 
+                  value={entryFee} 
+                  onChange={(e) => setEntryFee(e.target.value)} 
+                  className="form-input"
+                  min="0"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Total Slots ({type.includes('1v1') ? '2 for 1v1' : (type.includes('Lone Wolf') || type.includes('2v2')) ? '4 for 2v2' : type.includes('Clash') ? '8 for CS' : 'Slots'})</label>
+                <input 
+                  type="number" 
+                  value={slotsTotal} 
+                  onChange={(e) => setSlotsTotal(e.target.value)} 
+                  className="form-input"
+                  min="2"
+                  max="100"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Extra fields if editing */}
+            {editingTournament && (
+              <div className="glass-panel" style={{ padding: '14px', background: 'rgba(0, 229, 255, 0.03)', borderRadius: '8px', border: '1px solid rgba(0, 229, 255, 0.2)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.85rem', color: 'var(--secondary)' }}>
+                  🔑 Room ID & Match Status Settings
+                </h4>
+                <div className="grid-3">
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Custom Room ID</label>
+                    <input 
+                      type="text"
+                      value={editRoomId}
+                      onChange={(e) => setEditRoomId(e.target.value)}
+                      placeholder="e.g. 7829103"
+                      className="form-input"
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Room Password</label>
+                    <input 
+                      type="text"
+                      value={editRoomPassword}
+                      onChange={(e) => setEditRoomPassword(e.target.value)}
+                      placeholder="e.g. 1234"
+                      className="form-input"
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Match Status</label>
+                    <select 
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value)}
+                      className="form-input"
+                    >
+                      <option value="upcoming">Upcoming (Joinable)</option>
+                      <option value="live">Live (Ongoing)</option>
+                      <option value="completed">Completed (Ended)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {errorMsg && (
+              <div style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '8px' }}>
+                ⚠️ {errorMsg}
+              </div>
+            )}
+
+            <button 
+              type="submit" 
+              className="btn btn-primary"
+              style={{ width: '100%', height: '48px', marginTop: '8px', background: editingTournament ? 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)' : undefined, color: editingTournament ? '#000' : undefined, fontWeight: '900' }}
+            >
+              {editingTournament ? '💾 Save & Update Match in Real-Time ➔' : '🚀 Publish Tournament to Live Arena'}
+            </button>
+          </form>
+
+          {/* Quick Edit Existing Tournaments Card */}
+          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <h3 style={{ fontSize: '1rem', color: 'var(--secondary)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>✏️</span> Active Tournaments ({tournaments.length})
+                </h3>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
+                  Tap <strong>Edit Match</strong> on any match below to modify its details, timing, prize pool, or room ID.
+                </p>
+              </div>
+            </div>
+
+            {tournaments.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', fontSize: '0.85rem' }}>
+                No matches found in the catalog.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {tournaments.map(t => (
+                  <div 
+                    key={t.id} 
+                    className="glass-panel flex-between"
+                    style={{
+                      padding: '12px 14px',
+                      background: editingTournament?.id === t.id ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                      border: editingTournament?.id === t.id ? '1px solid var(--secondary)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '10px',
+                      flexWrap: 'wrap',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#fff' }}>
+                          {t.title}
+                        </h4>
+                        <span className="badge" style={{ fontSize: '0.65rem' }}>
+                          {t.mode} • {t.type}
+                        </span>
+                        {t.status && (
+                          <span className={`badge ${t.status === 'live' ? 'badge-live' : ''}`} style={{ fontSize: '0.65rem' }}>
+                            {t.status.toUpperCase()}
+                          </span>
+                        )}
+                        {t.roomId && (
+                          <span className="badge" style={{ background: 'rgba(0, 229, 255, 0.2)', color: '#00e5ff', fontSize: '0.65rem' }}>
+                            Room: {t.roomId}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <span>🗺️ {t.map}</span>
+                        <span>⏰ {t.startTime || 'TBD'}</span>
+                        <span>💰 ₹{t.prizePool}</span>
+                        <span>👥 Slots: {t.slotsJoined || 0}/{t.slotsTotal || t.maxSlots || 48}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditTournament(t)}
+                        className="btn btn-secondary"
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: '0.75rem',
+                          fontWeight: '800',
+                          background: 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)',
+                          color: '#000',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        ✏️ Edit Match
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMatch(t.id, t.title)}
+                        disabled={deletingId === t.id}
+                        className="btn btn-danger"
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.75rem',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-
-          <div className="grid-2">
-            <div className="form-group">
-              <label>Winning Prize Pool (₹)</label>
-              <input 
-                type="number" 
-                value={prizePool} 
-                onChange={(e) => setPrizePool(e.target.value)} 
-                className="form-input"
-                min="0"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Per Kill Bounty (₹)</label>
-              <input 
-                type="number" 
-                value={perKillPrize} 
-                onChange={(e) => setPerKillPrize(e.target.value)} 
-                placeholder="e.g. 25 (0 for Lone Wolf)"
-                className="form-input"
-                min="0"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid-2">
-            <div className="form-group">
-              <label>Entry Fee (₹)</label>
-              <input 
-                type="number" 
-                value={entryFee} 
-                onChange={(e) => setEntryFee(e.target.value)} 
-                className="form-input"
-                min="0"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Total Slots ({type.includes('1v1') ? '2 for 1v1' : (type.includes('Lone Wolf') || type.includes('2v2')) ? '4 for 2v2' : type.includes('Clash') ? '8 for CS' : 'Slots'})</label>
-              <input 
-                type="number" 
-                value={slotsTotal} 
-                onChange={(e) => setSlotsTotal(e.target.value)} 
-                className="form-input"
-                min="2"
-                max="100"
-                required
-              />
-            </div>
-          </div>
-
-          {errorMsg && (
-            <div style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '8px' }}>
-              ⚠️ {errorMsg}
-            </div>
-          )}
-
-          <button 
-            type="submit" 
-            className="btn btn-primary"
-            style={{ width: '100%', height: '48px', marginTop: '8px' }}
-          >
-            🚀 Publish Tournament to Live Arena
-          </button>
-        </form>
+        </div>
       )}
 
       {/* MODE 2: ROOM ID BROADCASTER */}
@@ -1530,7 +1783,24 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onDe
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleStartEditTournament(t)}
+                      className="btn btn-secondary"
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '0.75rem',
+                        background: 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)',
+                        color: '#000',
+                        borderRadius: '8px',
+                        fontWeight: '800',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ✏️ Edit Match
+                    </button>
+
                     <button
                       type="button"
                       onClick={async () => {
