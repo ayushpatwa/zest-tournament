@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { addDemoPlayersToTournamentRealtime } from '../services/firebase';
+import { formatMatchDate } from '../services/dateUtils';
 
 export default function TournamentLobby({ 
   tournament, 
@@ -180,20 +181,26 @@ export default function TournamentLobby({
               <p style={{ fontWeight: '700', margin: '2px 0 0 0' }}>{tournament.map}</p>
             </div>
             <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Start Time:</span>
-              <p style={{ fontWeight: '700', margin: '2px 0 0 0', color: 'var(--secondary)' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>📅 Match Date:</span>
+              <p style={{ fontWeight: '800', margin: '2px 0 0 0', color: 'var(--secondary)' }}>
+                {formatMatchDate(tournament.matchDate, tournament.startTime)}
+              </p>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>⏰ Start Time:</span>
+              <p style={{ fontWeight: '700', margin: '2px 0 0 0', color: '#fff' }}>
                 {tournament.startTime 
                   ? (!isNaN(new Date(tournament.startTime).getTime()) 
                       ? new Date(tournament.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) 
                       : tournament.startTime) 
-                  : 'Today, Live'}
+                  : 'Live'}
               </p>
             </div>
             <div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Entry Fee:</span>
               <p style={{ fontWeight: '700', color: 'var(--accent)', margin: '2px 0 0 0' }}>₹{tournament.entryFee}</p>
             </div>
-            <div>
+            <div style={{ gridColumn: 'span 2' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                 {isLoneWolf ? 'Prize Structure:' : 'Per Kill Bounty:'}
               </span>

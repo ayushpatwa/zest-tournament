@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatMatchDate } from '../services/dateUtils';
 
 // Countdown Timer Component
 function CountdownTimer({ startTime }) {
@@ -458,8 +459,13 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                         )}
                       </div>
 
-                      <div style={{ fontSize: '0.8rem' }}>
-                        {t.startTime ? <CountdownTimer startTime={t.startTime} /> : <span style={{ color: 'var(--secondary)' }}>LIVE</span>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <span className="badge" style={{ background: 'rgba(0, 229, 255, 0.12)', color: 'var(--secondary)', border: '1px solid rgba(0, 229, 255, 0.3)', fontSize: '0.7rem', fontWeight: '800', padding: '3px 8px' }}>
+                          📅 {formatMatchDate(t.matchDate, t.startTime)}
+                        </span>
+                        <div style={{ fontSize: '0.78rem' }}>
+                          {t.startTime ? <CountdownTimer startTime={t.startTime} /> : <span style={{ color: 'var(--secondary)' }}>LIVE</span>}
+                        </div>
                       </div>
                     </div>
 

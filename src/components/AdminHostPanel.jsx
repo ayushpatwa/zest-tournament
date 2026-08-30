@@ -16,6 +16,12 @@ import {
   addDemoPlayersToAllMatchesRealtime
 } from '../services/firebase';
 
+import { 
+  getTodayDateString, 
+  getTomorrowDateString, 
+  formatMatchDate 
+} from '../services/dateUtils';
+
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onUpdateTournament, onDeleteTournament, onRemovePlayerFromTournament, onBroadcastRoomCredentials, setCurrentView, currentUser }) {
   const isSuperAdmin = currentUser?.role === 'admin';
   const isHost = currentUser?.role === 'host' || currentUser?.isHost || isSuperAdmin;
@@ -33,6 +39,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [perKillPrize, setPerKillPrize] = useState('25');
   const [entryFee, setEntryFee] = useState('20');
   const [slotsTotal, setSlotsTotal] = useState('48');
+  const [matchDate, setMatchDate] = useState(getTodayDateString());
   const [matchTiming, setMatchTiming] = useState('03:00 PM - 04:00 PM');
   const [editRoomId, setEditRoomId] = useState('');
   const [editRoomPassword, setEditRoomPassword] = useState('');
@@ -166,6 +173,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     setPerKillPrize(t.perKillPrize?.toString() || '0');
     setEntryFee(t.entryFee?.toString() || '0');
     setSlotsTotal((t.slotsTotal || t.maxSlots || 48).toString());
+    setMatchDate(t.matchDate || getTodayDateString());
     setMatchTiming(t.startTime || '');
     setEditRoomId(t.roomId || '');
     setEditRoomPassword(t.roomPassword || '');
@@ -185,6 +193,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     setPerKillPrize('25');
     setEntryFee('20');
     setSlotsTotal('48');
+    setMatchDate(getTodayDateString());
     setMatchTiming('03:00 PM - 04:00 PM');
     setEditRoomId('');
     setEditRoomPassword('');
@@ -224,6 +233,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
       return;
     }
 
+    const selectedDate = matchDate ? matchDate.trim() : getTodayDateString();
+
     if (editingTournament) {
       const updatedTournament = {
         ...editingTournament,
@@ -236,6 +247,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         entryFee: fee,
         slotsTotal: slots,
         maxSlots: slots,
+        matchDate: selectedDate,
         startTime: matchTiming.trim(),
         roomId: editRoomId.trim(),
         roomPassword: editRoomPassword.trim(),
@@ -267,6 +279,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
       maxSlots: slots,
       slotsJoined: 0,
       joinedPlayers: [],
+      matchDate: selectedDate,
       startTime: matchTiming.trim(),
       status: 'upcoming',
       roomId: '',
@@ -734,35 +747,80 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
               </div>
 
               <div className="form-group">
-                <label>Match Timing / Slot (e.g. 3:00 PM - 4:00 PM)</label>
+                <label>📅 Match Date</label>
                 <input 
-                  type="text" 
-                  value={matchTiming} 
-                  onChange={(e) => setMatchTiming(e.target.value)} 
-                  placeholder="e.g. 03:00 PM - 04:00 PM or Tonight, 08:30 PM" 
+                  type="date" 
+                  value={matchDate} 
+                  onChange={(e) => setMatchDate(e.target.value)} 
                   className="form-input"
                   required
                 />
                 <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
-                  {['03:00 PM - 04:00 PM', '06:00 PM - 07:00 PM', '08:30 PM - 09:30 PM', '10:00 PM - 11:00 PM'].map(slot => (
-                    <button
-                      key={slot}
-                      type="button"
-                      onClick={() => setMatchTiming(slot)}
-                      style={{
-                        background: matchTiming === slot ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        color: '#fff',
-                        borderRadius: '12px',
-                        padding: '3px 8px',
-                        fontSize: '0.68rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {slot}
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setMatchDate(getTodayDateString())}
+                    style={{
+                      background: matchDate === getTodayDateString() ? 'var(--secondary)' : 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: matchDate === getTodayDateString() ? '#000' : '#fff',
+                      borderRadius: '12px',
+                      padding: '3px 10px',
+                      fontSize: '0.7rem',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📅 Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMatchDate(getTomorrowDateString())}
+                    style={{
+                      background: matchDate === getTomorrowDateString() ? 'var(--secondary)' : 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: matchDate === getTomorrowDateString() ? '#000' : '#fff',
+                      borderRadius: '12px',
+                      padding: '3px 10px',
+                      fontSize: '0.7rem',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📅 Tomorrow
+                  </button>
                 </div>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>⏰ Match Timing / Slot (e.g. 03:00 PM - 04:00 PM)</label>
+              <input 
+                type="text" 
+                value={matchTiming} 
+                onChange={(e) => setMatchTiming(e.target.value)} 
+                placeholder="e.g. 03:00 PM - 04:00 PM or 08:30 PM" 
+                className="form-input"
+                required
+              />
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                {['03:00 PM - 04:00 PM', '06:00 PM - 07:00 PM', '08:30 PM - 09:30 PM', '10:00 PM - 11:00 PM'].map(slot => (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setMatchTiming(slot)}
+                    style={{
+                      background: matchTiming === slot ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: '#fff',
+                      borderRadius: '12px',
+                      padding: '3px 8px',
+                      fontSize: '0.68rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {slot}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -931,6 +989,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                         <span>🗺️ {t.map}</span>
+                        <span>📅 <strong style={{ color: 'var(--secondary)' }}>{formatMatchDate(t.matchDate, t.startTime)}</strong></span>
                         <span>⏰ {t.startTime || 'TBD'}</span>
                         <span>💰 ₹{t.prizePool}</span>
                         <span>👥 Slots: {t.slotsJoined || 0}/{t.slotsTotal || t.maxSlots || 48}</span>
@@ -1795,8 +1854,10 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '12px' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                       <span>🗺️ {t.map}</span>
+                      <span>📅 <strong style={{ color: 'var(--secondary)' }}>{formatMatchDate(t.matchDate, t.startTime)}</strong></span>
+                      <span>⏰ {t.startTime || 'TBD'}</span>
                       <span>💰 Prize: ₹{t.prizePool}</span>
                       <span>👥 Slots: {t.slotsJoined || 0}/{t.slotsTotal || t.maxSlots || 48}</span>
                     </div>
