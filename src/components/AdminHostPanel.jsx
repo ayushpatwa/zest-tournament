@@ -77,9 +77,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [testingWebhook, setTestingWebhook] = useState(false);
 
   // App Update Publisher states
-  const [updateVersion, setUpdateVersion] = useState('1.1.0');
-  const [updateTitle, setUpdateTitle] = useState('🔥 New Tournament Updates & Features!');
-  const [updateNotes, setUpdateNotes] = useState('• Added Clash Squad 2v2 & Headshot Modes\n• Instant Room ID updates\n• Instant wallet payouts');
+  const [updateVersion, setUpdateVersion] = useState('1.4.3');
+  const [updateTitle, setUpdateTitle] = useState('🔥 New Tournament Updates & Features (v1.4.3)!');
+  const [updateNotes, setUpdateNotes] = useState('• Full Match / Housefull automatic lock\n• Host & Admin player management\n• Auto-logout on account delete\n• Enhanced performance & real-time sync');
   const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatePublishStatus, setUpdatePublishStatus] = useState('');
