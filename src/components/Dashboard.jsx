@@ -387,8 +387,20 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {filteredTournaments.map(t => {
                 const totalSlots = t.slotsTotal || t.maxSlots || 48;
-                const joinedSlots = t.slotsJoined || 0;
+                const joinedSlots = Math.max(t.slotsJoined || 0, (t.joinedPlayers || []).length);
+                const isMatchFull = joinedSlots >= totalSlots;
                 const slotsPct = Math.min(Math.round((joinedSlots / totalSlots) * 100), 100);
+
+                const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
+                const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
+                const isUserJoined = Boolean(
+                  (cleanUserUid || cleanUserEmail) &&
+                  t.joinedPlayers?.some(p => {
+                    const pUid = String(p.uid || '').trim().toLowerCase();
+                    const pEmail = String(p.email || '').trim().toLowerCase();
+                    return (cleanUserUid && pUid === cleanUserUid) || (cleanUserEmail && pEmail === cleanUserEmail);
+                  })
+                );
 
                 return (
                   <div 
@@ -399,7 +411,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '12px',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      border: isMatchFull ? '1px solid rgba(255, 23, 68, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
                       transition: 'all 0.3s ease',
                       cursor: 'pointer',
                       position: 'relative'
@@ -409,12 +421,18 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                     {/* Header info */}
                     <div className="flex-between">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span className={`badge ${
-                          t.status === 'live' ? 'badge-live' : 
-                          t.status === 'upcoming' ? 'badge-upcoming' : 'badge-completed'
-                        }`}>
-                          {t.status || 'open'}
-                        </span>
+                        {isMatchFull ? (
+                          <span className="badge" style={{ background: '#ff1744', color: '#fff', fontWeight: '900', fontSize: '0.65rem', boxShadow: '0 0 10px rgba(255,23,68,0.5)' }}>
+                            🔴 HOUSEFULL
+                          </span>
+                        ) : (
+                          <span className={`badge ${
+                            t.status === 'live' ? 'badge-live' : 
+                            t.status === 'upcoming' ? 'badge-upcoming' : 'badge-completed'
+                          }`}>
+                            {t.status || 'open'}
+                          </span>
+                        )}
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                           {t.mode}
                         </span>
@@ -490,8 +508,8 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                           {t.type?.includes('1v1') ? '1v1 Slots' : (t.type?.includes('2v2') || t.type?.includes('Lone Wolf')) ? '2v2 Slots' : t.type?.includes('Clash') ? '4v4 Slots' : 'Slots'}
                         </div>
-                        <div style={{ fontSize: '0.95rem', color: 'var(--secondary)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
-                          {joinedSlots}/{totalSlots}
+                        <div style={{ fontSize: '0.95rem', color: isMatchFull ? '#ff1744' : 'var(--secondary)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
+                          {joinedSlots}/{totalSlots} {isMatchFull && '🔥'}
                         </div>
                       </div>
                     </div>
@@ -500,25 +518,43 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                     <div style={{ width: '100%' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
                         <span>Lobby Capacity</span>
-                        <span>{slotsPct}% Filled</span>
+                        <span style={{ color: isMatchFull ? '#ff1744' : 'inherit', fontWeight: isMatchFull ? '800' : 'normal' }}>
+                          {isMatchFull ? '100% (FULL)' : `${slotsPct}% Filled`}
+                        </span>
                       </div>
                       <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
                         <div style={{
                           width: `${slotsPct}%`,
                           height: '100%',
-                          background: 'linear-gradient(90deg, var(--secondary) 0%, var(--primary) 100%)',
+                          background: isMatchFull ? '#ff1744' : 'linear-gradient(90deg, var(--secondary) 0%, var(--primary) 100%)',
                           borderRadius: '3px'
                         }} />
                       </div>
                     </div>
 
                     {/* Action button */}
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ width: '100%', padding: '10px', fontSize: '0.8rem', marginTop: '4px' }}
-                    >
-                      ENTER LOBBY & JOIN MATCH ➔
-                    </button>
+                    {isUserJoined ? (
+                      <button 
+                        className="btn btn-outline" 
+                        style={{ width: '100%', padding: '10px', fontSize: '0.8rem', marginTop: '4px', borderColor: 'var(--success)', color: 'var(--success)', fontWeight: '800' }}
+                      >
+                        ✅ YOU ARE REGISTERED • ENTER LOBBY ➔
+                      </button>
+                    ) : isMatchFull ? (
+                      <button 
+                        className="btn btn-outline" 
+                        style={{ width: '100%', padding: '10px', fontSize: '0.8rem', marginTop: '4px', background: 'rgba(255, 23, 68, 0.1)', borderColor: 'rgba(255, 23, 68, 0.4)', color: '#ff5252', fontWeight: '800' }}
+                      >
+                        🔒 HOUSEFULL (NO SLOTS LEFT) • VIEW LOBBY ➔
+                      </button>
+                    ) : (
+                      <button 
+                        className="btn btn-outline" 
+                        style={{ width: '100%', padding: '10px', fontSize: '0.8rem', marginTop: '4px' }}
+                      >
+                        ENTER LOBBY & JOIN MATCH ➔
+                      </button>
+                    )}
                   </div>
                 );
               })}

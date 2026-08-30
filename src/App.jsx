@@ -20,6 +20,7 @@ import {
   saveTournamentRealtime, 
   deleteTournamentRealtime,
   joinTournamentRealtime, 
+  removePlayerFromTournamentRealtime,
   updateRoomCredentialsRealtime,
   saveUserProfileRealtime,
   deductUserWalletRealtime
@@ -210,6 +211,16 @@ export default function App() {
   const handleRegisterUser = async (tournamentId, uid, nickname, fee) => {
     const numFee = parseFloat(fee) || 0;
 
+    // Strict validation: Check if match is already completely full
+    const targetTourney = tournaments.find(t => t.id === tournamentId);
+    const maxSlots = targetTourney?.slotsTotal || targetTourney?.maxSlots || 48;
+    const currentJoined = Math.max(targetTourney?.slotsJoined || 0, (targetTourney?.joinedPlayers || []).length);
+    
+    if (currentJoined >= maxSlots) {
+      alert('⚠️ This match is already completely full (Housefull)! Registration is closed.');
+      return { success: false, error: 'Match is full' };
+    }
+
     // 1. Deduct Entry Fee locally and in Firestore Cloud
     setWalletBalance(prev => Math.max(0, prev - numFee));
     const targetUserId = userProfile.uid || userProfile.id || uid;
@@ -250,18 +261,48 @@ export default function App() {
     };
 
     // 4. Update Firestore in Real-Time
-    await joinTournamentRealtime(tournamentId, userParticipant);
+    const joinRes = await joinTournamentRealtime(tournamentId, userParticipant);
+    if (!joinRes.success) {
+      alert(`⚠️ ${joinRes.error || 'Failed to join tournament'}`);
+      return joinRes;
+    }
 
     // 5. Dispatch Webhook Event to Make.com -> Google Sheets
-    const tourney = tournaments.find(t => t.id === tournamentId);
     sendToMakeWebhook({
       eventType: 'TOURNAMENT_JOIN',
       nickname: nickname,
       ffUid: uid,
       email: userProfile.email || 'N/A',
       phone: userProfile.phone || 'N/A',
-      details: `${tourney?.title || 'Tournament'} (Map: ${tourney?.map || 'Bermuda'}, Fee: ₹${numFee})`
+      details: `${targetTourney?.title || 'Tournament'} (Map: ${targetTourney?.map || 'Bermuda'}, Fee: ₹${numFee})`
     });
+
+    return { success: true };
+  };
+
+  // Remove / Kick player from tournament in real-time
+  const handleRemovePlayerFromTournament = async (tournamentId, playerIdentifier) => {
+    // 0ms instant local optimistic update
+    setTournaments(prev => prev.map(t => {
+      if (t.id === tournamentId) {
+        const query = String(playerIdentifier).trim().toLowerCase();
+        const updatedPlayers = (t.joinedPlayers || []).filter(p => {
+          const pUid = String(p.uid || '').trim().toLowerCase();
+          const pEmail = String(p.email || '').trim().toLowerCase();
+          const pNick = String(p.nickname || '').trim().toLowerCase();
+          return pUid !== query && pEmail !== query && pNick !== query;
+        });
+        return {
+          ...t,
+          joinedPlayers: updatedPlayers,
+          slotsJoined: Math.max(0, updatedPlayers.length)
+        };
+      }
+      return t;
+    }));
+
+    // Real-time Firestore sync
+    await removePlayerFromTournamentRealtime(tournamentId, playerIdentifier);
   };
 
   // Wrapper for Wallet deposit to trigger webhook
@@ -364,6 +405,7 @@ export default function App() {
             setWalletBalance={setWalletBalance}
             onBack={() => setCurrentView('dashboard')}
             onRegisterUser={handleRegisterUser}
+            onRemovePlayerFromTournament={handleRemovePlayerFromTournament}
             setCurrentView={setCurrentView}
           />
         )}
@@ -397,6 +439,7 @@ export default function App() {
             onAddTournament={handleAddTournament}
             onUpdateTournament={handleUpdateTournament}
             onDeleteTournament={handleDeleteTournament}
+            onRemovePlayerFromTournament={handleRemovePlayerFromTournament}
             onBroadcastRoomCredentials={handleBroadcastRoomCredentials}
             setCurrentView={setCurrentView}
             currentUser={currentUser}

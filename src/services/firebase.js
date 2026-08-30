@@ -142,6 +142,15 @@ export const deleteTournamentRealtime = async (tournamentId) => {
 export const joinTournamentRealtime = async (tournamentId, participantData) => {
   try {
     const tourneyRef = doc(db, "tournaments", tournamentId);
+    const tourneySnap = await getDoc(tourneyRef);
+    if (tourneySnap.exists()) {
+      const data = tourneySnap.data();
+      const maxSlots = data.slotsTotal || data.maxSlots || 48;
+      const currentJoined = Math.max(data.slotsJoined || 0, (data.joinedPlayers || []).length);
+      if (currentJoined >= maxSlots) {
+        return { success: false, error: 'Tournament match is already full! No more slots available.' };
+      }
+    }
     
     // Add participant and increment slot counter
     await updateDoc(tourneyRef, {
@@ -154,6 +163,49 @@ export const joinTournamentRealtime = async (tournamentId, participantData) => {
     return { success: true };
   } catch (error) {
     console.error("[Firebase] Error joining tournament:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Removes / kicks a player from a tournament in Firestore in real-time
+ */
+export const removePlayerFromTournamentRealtime = async (tournamentId, playerUidOrEmail) => {
+  try {
+    const tourneyRef = doc(db, "tournaments", tournamentId);
+    const tourneySnap = await getDoc(tourneyRef);
+    if (!tourneySnap.exists()) {
+      return { success: false, error: 'Tournament not found.' };
+    }
+
+    const data = tourneySnap.data();
+    const query = String(playerUidOrEmail).trim().toLowerCase();
+    const currentPlayers = Array.isArray(data.joinedPlayers) ? data.joinedPlayers : [];
+    
+    let removedPlayer = null;
+    const updatedPlayers = currentPlayers.filter(p => {
+      const pUid = String(p.uid || '').trim().toLowerCase();
+      const pEmail = String(p.email || '').trim().toLowerCase();
+      const pNick = String(p.nickname || '').trim().toLowerCase();
+      if (pUid === query || pEmail === query || pNick === query) {
+        removedPlayer = p;
+        return false;
+      }
+      return true;
+    });
+
+    const newSlotsJoined = Math.max(0, updatedPlayers.length);
+
+    await updateDoc(tourneyRef, {
+      joinedPlayers: updatedPlayers,
+      slotsJoined: newSlotsJoined,
+      updatedAt: serverTimestamp()
+    });
+
+    console.log(`[Firebase Realtime] Removed player from ${tournamentId}. New slots count: ${newSlotsJoined}`);
+    return { success: true, removedPlayer, newSlotsJoined };
+  } catch (error) {
+    console.error("[Firebase] Error removing player from tournament:", error);
     return { success: false, error: error.message };
   }
 };

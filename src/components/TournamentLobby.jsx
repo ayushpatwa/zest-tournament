@@ -9,6 +9,7 @@ export default function TournamentLobby({
   setWalletBalance, 
   onBack, 
   onRegisterUser,
+  onRemovePlayerFromTournament,
   setCurrentView
 }) {
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'brackets'
@@ -20,6 +21,7 @@ export default function TournamentLobby({
   const [ffNickname, setFfNickname] = useState(userProfile.nickname || '');
   const [copiedId, setCopiedId] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [removingPlayerId, setRemovingPlayerId] = useState(null);
 
   const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
   const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
@@ -35,6 +37,11 @@ export default function TournamentLobby({
   const isSquadMode = tournament.mode === 'Duo' || tournament.mode === 'Squad';
   const isLoneWolf = tournament.type?.toLowerCase().includes('lone wolf');
 
+  const totalSlots = tournament.slotsTotal || tournament.maxSlots || 48;
+  const joinedSlots = Math.max(tournament.slotsJoined || 0, (tournament.joinedPlayers || []).length);
+  const isMatchFull = joinedSlots >= totalSlots;
+  const isHostOrAdmin = userProfile?.role === 'admin' || userProfile?.role === 'host' || userProfile?.isHost;
+
   const copyToClipboard = (text, key) => {
     navigator.clipboard.writeText(text);
     setCopiedId(key);
@@ -44,6 +51,11 @@ export default function TournamentLobby({
   const handleJoin = (e) => {
     e.preventDefault();
     setErrorMsg('');
+
+    if (isMatchFull) {
+      setErrorMsg('This match is completely full (Housefull)! No more slots available.');
+      return;
+    }
 
     if (!ffUid.trim() || !ffNickname.trim()) {
       setErrorMsg('Please fill in Free Fire UID and in-game nickname.');
@@ -339,6 +351,22 @@ export default function TournamentLobby({
               }}>
                 ✅ You are Registered for this Tournament!
               </div>
+            ) : isMatchFull ? (
+              <div style={{
+                background: 'rgba(255, 23, 68, 0.12)',
+                border: '1px solid #ff1744',
+                padding: '16px',
+                borderRadius: '10px',
+                textAlign: 'center',
+                color: '#ff1744',
+                fontWeight: '800',
+                fontSize: '0.95rem'
+              }}>
+                🚫 THIS MATCH IS HOUSEFULL (0 SLOTS LEFT)
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  All {totalSlots} player slots have been filled. Registration is now closed for this match.
+                </p>
+              </div>
             ) : (
               <button 
                 onClick={() => {
@@ -368,8 +396,17 @@ export default function TournamentLobby({
       {activeTab === 'brackets' && (
         <div className="glass-panel animate-slide-in" style={{ padding: '16px' }}>
           <div className="flex-between" style={{ marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-            <h3 style={{ fontSize: '1rem', margin: 0 }}>👥 Joined Players ({tournament.joinedPlayers?.length || 0}/{tournament.slotsTotal || tournament.maxSlots || 48})</h3>
-            {(userProfile?.role === 'admin' || userProfile?.role === 'host' || userProfile?.isHost) && (
+            <div>
+              <h3 style={{ fontSize: '1rem', margin: '0 0 2px 0' }}>
+                👥 Joined Players ({tournament.joinedPlayers?.length || 0}/{totalSlots})
+              </h3>
+              {isMatchFull && (
+                <span className="badge" style={{ background: '#ff1744', color: '#fff', fontSize: '0.65rem', fontWeight: '900' }}>
+                  🔴 FULL / HOUSEFULL
+                </span>
+              )}
+            </div>
+            {isHostOrAdmin && (
               <button
                 type="button"
                 onClick={async () => {
@@ -391,7 +428,7 @@ export default function TournamentLobby({
                   cursor: 'pointer'
                 }}
               >
-                🌱 +8 Demo Players
+                🌱 +Demo Players
               </button>
             )}
           </div>
@@ -399,7 +436,7 @@ export default function TournamentLobby({
           {tournament.joinedPlayers && tournament.joinedPlayers.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {tournament.joinedPlayers.map((player, idx) => (
-                <div key={idx} className="flex-between glass-panel" style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)' }}>
+                <div key={idx} className="flex-between glass-panel" style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontWeight: '900', color: player.isUser ? 'var(--secondary)' : 'var(--text-muted)' }}>
                       #{idx + 1}
@@ -413,11 +450,40 @@ export default function TournamentLobby({
                       </div>
                     </div>
                   </div>
-                  {player.squadCode && (
-                    <span className="badge" style={{ background: 'rgba(255,214,0,0.15)', color: 'var(--accent)', fontSize: '0.68rem' }}>
-                      Squad: {player.squadCode}
-                    </span>
-                  )}
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {player.squadCode && (
+                      <span className="badge" style={{ background: 'rgba(255,214,0,0.15)', color: 'var(--accent)', fontSize: '0.68rem' }}>
+                        Squad: {player.squadCode}
+                      </span>
+                    )}
+                    {isHostOrAdmin && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const pName = player.nickname || player.uid || 'this player';
+                          if (window.confirm(`⚠️ Remove player "${pName}" (UID: ${player.uid}) from this match?`)) {
+                            setRemovingPlayerId(player.uid || player.email || player.nickname);
+                            if (onRemovePlayerFromTournament) {
+                              await onRemovePlayerFromTournament(tournament.id, player.uid || player.email || player.nickname);
+                            }
+                            setRemovingPlayerId(null);
+                          }
+                        }}
+                        disabled={removingPlayerId === (player.uid || player.email || player.nickname)}
+                        className="btn btn-danger"
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '0.7rem',
+                          borderRadius: '6px',
+                          fontWeight: '800',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {removingPlayerId === (player.uid || player.email || player.nickname) ? 'Removing...' : '🗑️ Kick Player'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

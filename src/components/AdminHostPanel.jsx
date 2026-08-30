@@ -16,13 +16,15 @@ import {
   addDemoPlayersToAllMatchesRealtime
 } from '../services/firebase';
 
-export default function AdminHostPanel({ tournaments = [], onAddTournament, onUpdateTournament, onDeleteTournament, onBroadcastRoomCredentials, setCurrentView, currentUser }) {
+export default function AdminHostPanel({ tournaments = [], onAddTournament, onUpdateTournament, onDeleteTournament, onRemovePlayerFromTournament, onBroadcastRoomCredentials, setCurrentView, currentUser }) {
   const isSuperAdmin = currentUser?.role === 'admin';
   const isHost = currentUser?.role === 'host' || currentUser?.isHost || isSuperAdmin;
   const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'broadcast' | 'manage' | 'webhook' | 'app_update'
   
   // Host Form states
   const [editingTournament, setEditingTournament] = useState(null);
+  const [managingPlayersTourney, setManagingPlayersTourney] = useState(null);
+  const [removingPlayerId, setRemovingPlayerId] = useState(null);
   const [title, setTitle] = useState('');
   const [mode, setMode] = useState('Solo');
   const [type, setType] = useState('Classic');
@@ -935,7 +937,24 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => setManagingPlayersTourney(t)}
+                        className="btn"
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: '800',
+                          background: 'rgba(255, 214, 0, 0.15)',
+                          color: 'var(--accent)',
+                          border: '1px solid rgba(255, 214, 0, 0.4)',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        👥 Players ({t.joinedPlayers?.length || 0})
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleStartEditTournament(t)}
@@ -1786,6 +1805,24 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button
                       type="button"
+                      onClick={() => setManagingPlayersTourney(t)}
+                      className="btn"
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: '800',
+                        background: 'rgba(255, 214, 0, 0.15)',
+                        color: 'var(--accent)',
+                        border: '1px solid rgba(255, 214, 0, 0.4)',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      👥 Players ({t.joinedPlayers?.length || 0})
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => handleStartEditTournament(t)}
                       className="btn btn-secondary"
                       style={{
@@ -1995,6 +2032,136 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
           </button>
         </form>
       )}
+
+      {/* POPUP MODAL: MANAGE & DELETE PLAYERS FROM TOURNAMENT */}
+      {managingPlayersTourney && (() => {
+        const latestTourney = tournaments.find(t => t.id === managingPlayersTourney.id) || managingPlayersTourney;
+        const playerList = latestTourney.joinedPlayers || [];
+        const maxSlots = latestTourney.slotsTotal || latestTourney.maxSlots || 48;
+
+        return (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px'
+          }}>
+            <div className="glass-panel animate-slide-in" style={{
+              width: '100%',
+              maxWidth: '640px',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              border: '1px solid var(--secondary)',
+              background: '#0d1326',
+              borderRadius: '16px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.8)'
+            }}>
+              <div className="flex-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>👥</span> Match Roster: {latestTourney.title}
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Joined: <strong style={{ color: '#fff' }}>{playerList.length} / {maxSlots} Players</strong> {playerList.length >= maxSlots && <span style={{ color: '#ff1744', fontWeight: '900' }}>(HOUSEFULL)</span>}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setManagingPlayersTourney(null)}
+                  className="btn btn-outline"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              {/* Player list */}
+              {playerList.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {playerList.map((player, idx) => (
+                    <div
+                      key={idx}
+                      className="flex-between glass-panel"
+                      style={{
+                        padding: '12px 14px',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '10px',
+                        flexWrap: 'wrap',
+                        gap: '10px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontWeight: '900', color: 'var(--secondary)', fontSize: '0.95rem' }}>
+                          #{idx + 1}
+                        </span>
+                        <div>
+                          <div style={{ fontWeight: '800', color: '#fff', fontSize: '0.92rem' }}>
+                            {player.nickname}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '2px' }}>
+                            <span>UID: <strong style={{ color: 'var(--secondary)' }}>{player.uid}</strong></span>
+                            {player.email && player.email !== 'N/A' && <span>✉️ {player.email}</span>}
+                            {player.phone && player.phone !== 'N/A' && <span>📞 {player.phone}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {player.squadCode && (
+                          <span className="badge" style={{ background: 'rgba(255,214,0,0.15)', color: 'var(--accent)', fontSize: '0.7rem' }}>
+                            Squad: {player.squadCode}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const pName = player.nickname || player.uid || 'this player';
+                            if (window.confirm(`⚠️ Remove player "${pName}" (UID: ${player.uid}) from this match? This will free up 1 slot in real-time.`)) {
+                              setRemovingPlayerId(player.uid || player.email || player.nickname);
+                              if (onRemovePlayerFromTournament) {
+                                await onRemovePlayerFromTournament(latestTourney.id, player.uid || player.email || player.nickname);
+                              }
+                              setRemovingPlayerId(null);
+                            }
+                          }}
+                          disabled={removingPlayerId === (player.uid || player.email || player.nickname)}
+                          className="btn btn-danger"
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '0.75rem',
+                            fontWeight: '800',
+                            borderRadius: '8px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {removingPlayerId === (player.uid || player.email || player.nickname) ? 'Removing...' : '🗑️ Kick Player'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '36px 0', fontSize: '0.9rem' }}>
+                  No players currently registered in this match.
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );
