@@ -130,15 +130,17 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
     
     if (selectedFilter === 'All') {
       matchesFilter = true;
-    } else if (selectedFilter === 'CS Headshot' || selectedFilter === 'CS Headshot 🎯') {
-      matchesFilter = (t.type?.toLowerCase().includes('headshot') && t.type?.toLowerCase().includes('clash')) || t.title?.toLowerCase().includes('headshot');
+    } else if (selectedFilter === 'CS 1v1' || selectedFilter === 'CS 1v1 ⚔️') {
+      matchesFilter = t.type?.toLowerCase().includes('clash') && (t.type?.toLowerCase().includes('1v1') || t.title?.toLowerCase().includes('1v1'));
     } else if (selectedFilter === 'CS 2v2' || selectedFilter === 'CS 2v2 ⚔️') {
       matchesFilter = t.type?.toLowerCase().includes('clash') && t.type?.toLowerCase().includes('2v2');
+    } else if (selectedFilter === '1v1 Headshot' || selectedFilter === '1v1 Headshot 🎯') {
+      matchesFilter = (t.type?.toLowerCase().includes('headshot') && (t.type?.toLowerCase().includes('1v1') || t.title?.toLowerCase().includes('1v1'))) || (t.title?.toLowerCase().includes('1v1') && t.title?.toLowerCase().includes('headshot'));
     } else if (selectedFilter === 'Lone Wolf 1v1' || selectedFilter === 'Lone Wolf 1v1 🐺') {
       matchesFilter = t.type?.toLowerCase().includes('lone wolf') && (t.type?.toLowerCase().includes('1v1') || t.mode?.toLowerCase() === 'solo');
     } else if (selectedFilter === 'Lone Wolf 2v2' || selectedFilter === 'Lone Wolf 2v2 🐺') {
       matchesFilter = t.type?.toLowerCase().includes('lone wolf') && (t.type?.toLowerCase().includes('2v2') || t.mode?.toLowerCase() === 'duo');
-    } else if (selectedFilter === 'Headshot Only' || selectedFilter === 'Headshot Only 🎯') {
+    } else if (selectedFilter === 'Headshot Only' || selectedFilter === 'Headshot Only 🎯' || selectedFilter === 'CS Headshot 🎯') {
       matchesFilter = t.type?.toLowerCase().includes('headshot') || t.title?.toLowerCase().includes('headshot');
     } else if (selectedFilter === 'Clash Squad' || selectedFilter === 'Clash Squad ⚔️') {
       matchesFilter = t.type?.toLowerCase().includes('clash') || t.title?.toLowerCase().includes('clash');
@@ -326,8 +328,10 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
               {[
                 'All', 
-                'CS Headshot 🎯', 
+                'CS 1v1 ⚔️',
+                '1v1 Headshot 🎯',
                 'CS 2v2 ⚔️',
+                'CS Headshot 🎯', 
                 'Lone Wolf 1v1 🐺', 
                 'Lone Wolf 2v2 🐺', 
                 'Solo', 
@@ -439,7 +443,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                         </span>
                         {t.type?.toLowerCase().includes('headshot') && (
                           <span className="badge" style={{ background: 'linear-gradient(135deg, rgba(255,214,0,0.2) 0%, rgba(255,87,34,0.2) 100%)', color: 'var(--accent)', border: '1px solid rgba(255,214,0,0.4)', fontSize: '0.65rem', fontWeight: '900' }}>
-                            🎯 HEADSHOT ONLY
+                            🎯 {t.type?.toLowerCase().includes('1v1') ? '1v1 HEADSHOT' : 'HEADSHOT ONLY'}
                           </span>
                         )}
                         {t.type?.toLowerCase().includes('lone wolf') && (
@@ -449,7 +453,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                         )}
                         {t.type?.toLowerCase().includes('clash') && (
                           <span className="badge" style={{ background: 'rgba(255, 87, 34, 0.15)', color: 'var(--primary)', border: '1px solid rgba(255, 87, 34, 0.3)', fontSize: '0.65rem', fontWeight: '700' }}>
-                            ⚔️ {t.type?.includes('2v2') ? 'CS 2v2' : 'CS 4v4'}
+                            ⚔️ {t.type?.includes('1v1') ? 'CS 1v1' : t.type?.includes('2v2') ? 'CS 2v2' : 'CS 4v4'}
                           </span>
                         )}
                         {t.type === 'Classic' && (

@@ -174,6 +174,29 @@ export default function TournamentLobby({
       {activeTab === 'details' && (
         <div className="animate-slide-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
+          {/* Headshot Only / 1v1 Mode Highlight Banner */}
+          {(tournament.type?.toLowerCase().includes('headshot') || tournament.title?.toLowerCase().includes('headshot')) && (
+            <div className="glass-panel" style={{
+              background: 'linear-gradient(135deg, rgba(255, 23, 68, 0.15) 0%, rgba(255, 214, 0, 0.12) 100%)',
+              border: '1px solid #ff1744',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <span style={{ fontSize: '1.6rem' }}>🎯</span>
+              <div>
+                <strong style={{ color: '#ff5252', fontSize: '0.9rem', display: 'block' }}>
+                  {tournament.type?.toLowerCase().includes('1v1') ? '1V1 ONLY HEADSHOT DUEL' : 'ONLY HEADSHOT MATCH'}
+                </strong>
+                <span style={{ fontSize: '0.75rem', color: '#fff' }}>
+                  Sirf Headshot kills count honge. Body kills strictly forbidden.
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Quick Match stats Card */}
           <div className="glass-panel" style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
             <div>

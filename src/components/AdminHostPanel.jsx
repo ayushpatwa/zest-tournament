@@ -143,8 +143,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     if (newType.includes('1v1')) {
       setSlotsTotal('2');
       setMode('Solo');
-      setMapName('Iron Dome');
-      setPerKillPrize('0');
+      setMapName(newType.includes('Clash') ? 'Bermuda (CS)' : 'Iron Dome');
+      setPerKillPrize(newType.includes('Lone Wolf') ? '0' : '25');
     } else if (newType.includes('2v2')) {
       setSlotsTotal('4');
       setMode('Duo');
@@ -222,7 +222,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     // Enforce exact rules
     const is1v1 = type.toLowerCase().includes('1v1');
     const is2v2 = type.toLowerCase().includes('2v2');
-    const isClashSquad4v4 = type.toLowerCase().includes('clash') && !is2v2;
+    const isClashSquad4v4 = type.toLowerCase().includes('clash') && !is2v2 && !is1v1;
 
     if (is1v1) slots = 2;
     else if (is2v2) slots = 4;
@@ -678,19 +678,41 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                 <label>Game Type</label>
                 <select value={type} onChange={(e) => handleTypeChange(e.target.value)} className="form-input">
                   <option value="Classic">Classic Battle Royale</option>
-                  <option value="Clash Squad">Clash Squad 4v4</option>
-                  <option value="Clash Squad Headshot">Clash Squad Headshot 4v4 🎯</option>
+                  <option value="Clash Squad 1v1">Clash Squad 1v1 ⚔️ (2 Players)</option>
+                  <option value="Clash Squad 1v1 Headshot">Clash Squad 1v1 Headshot 🎯 (2 Players)</option>
+                  <option value="1v1 Only Headshot">1v1 Only Headshot 🎯 (2 Players)</option>
+                  <option value="Lone Wolf 1v1">Lone Wolf 1v1 🐺 (2 Players)</option>
+                  <option value="Lone Wolf Headshot 1v1">Lone Wolf Headshot 1v1 🎯 (2 Players)</option>
                   <option value="Clash Squad 2v2">Clash Squad 2v2 ⚔️ (4 Players)</option>
                   <option value="Clash Squad 2v2 Headshot">Clash Squad 2v2 Headshot 🎯 (4 Players)</option>
-                  <option value="Lone Wolf Headshot 1v1">Lone Wolf Headshot 1v1 🎯 (2 Players)</option>
-                  <option value="Lone Wolf Headshot 2v2">Lone Wolf Headshot 2v2 🎯 (4 Players)</option>
                   <option value="Lone Wolf 2v2">Lone Wolf 2v2 🐺 (4 Players)</option>
-                  <option value="Lone Wolf 1v1">Lone Wolf 1v1 🐺 (2 Players)</option>
+                  <option value="Lone Wolf Headshot 2v2">Lone Wolf Headshot 2v2 🎯 (4 Players)</option>
+                  <option value="Clash Squad">Clash Squad 4v4 ⚔️ (8 Players)</option>
+                  <option value="Clash Squad Headshot">Clash Squad Headshot 4v4 🎯 (8 Players)</option>
                 </select>
               </div>
             </div>
 
-            {/* Mode Rules Dynamic Helper Badge */}
+            {/* Mode Rules Dynamic Helper Badges */}
+            {type.toLowerCase().includes('headshot') && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(255, 23, 68, 0.15) 0%, rgba(255, 214, 0, 0.1) 100%)',
+                border: '1px solid #ff1744',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span style={{ fontSize: '1.1rem' }}>🎯</span>
+                <div>
+                  <strong style={{ color: '#ff5252' }}>ONLY HEADSHOT RULE:</strong> Only headshot kills are counted! Any body shot kill will result in match penalty or disqualification.
+                </div>
+              </div>
+            )}
+
             {type.toLowerCase().includes('lone wolf') && (
               <div style={{
                 background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, rgba(255, 214, 0, 0.1) 100%)',
@@ -725,7 +747,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
               }}>
                 <span>⚔️</span>
                 <div>
-                  <strong>CLASH SQUAD RULES:</strong> {type.includes('2v2') ? 'Exactly 4 Players (Two Duo Teams / 2 vs 2).' : 'Exactly 8 Players (Two 4-Player Teams / 4 vs 4).'}
+                  <strong>CLASH SQUAD RULES:</strong> {type.includes('1v1') ? 'Exactly 2 Players (1 vs 1 Duel).' : type.includes('2v2') ? 'Exactly 4 Players (Two Duo Teams / 2 vs 2).' : 'Exactly 8 Players (Two 4-Player Teams / 4 vs 4).'}
                 </div>
               </div>
             )}
