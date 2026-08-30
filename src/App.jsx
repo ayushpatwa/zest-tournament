@@ -68,9 +68,10 @@ export default function App() {
     };
   });
 
-  // App update states
+  // App update & deposit QR states
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [depositQrConfig, setDepositQrConfig] = useState(null);
 
   // 1. Subscribe to Real-Time Firebase Firestore Tournaments, Notifications & App Settings
   useEffect(() => {
@@ -86,11 +87,14 @@ export default function App() {
       setCloudNotifications(notifs);
     });
 
-    // Subscribe to dynamic cloud app settings (Webhook, App Version Updates)
+    // Subscribe to dynamic cloud app settings (Webhook, App Version Updates, Deposit QR)
     const unsubscribeSettings = subscribeToAppSettingsRealtime((settings) => {
       if (settings) {
         if (settings.webhookUrl) {
           updateLiveWebhookUrl(settings.webhookUrl);
+        }
+        if (settings.depositQr) {
+          setDepositQrConfig(settings.depositQr);
         }
         if (settings.appUpdate && isNewVersionAvailable(CURRENT_APP_VERSION, settings.appUpdate.latestVersion, false, settings.appUpdate.forceUpdate)) {
           console.log('[App Update] New version detected:', settings.appUpdate.latestVersion);
@@ -419,6 +423,7 @@ export default function App() {
             transactions={transactions}
             setTransactions={setTransactions}
             userProfile={userProfile}
+            depositQrConfig={depositQrConfig}
           />
         )}
 
@@ -443,6 +448,7 @@ export default function App() {
             onDeleteTournament={handleDeleteTournament}
             onRemovePlayerFromTournament={handleRemovePlayerFromTournament}
             onBroadcastRoomCredentials={handleBroadcastRoomCredentials}
+            depositQrConfig={depositQrConfig}
             setCurrentView={setCurrentView}
             currentUser={currentUser}
           />

@@ -7,7 +7,8 @@ export default function WalletPage({
   setWalletBalance, 
   transactions = [], 
   setTransactions,
-  userProfile 
+  userProfile,
+  depositQrConfig
 }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState('100');
@@ -17,9 +18,13 @@ export default function WalletPage({
   const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
 
+  const currentQrImg = depositQrConfig?.qrImageUrl || paymentQrImg;
+  const currentReceiverName = depositQrConfig?.receiverName || 'Divyansh Maheshwari';
+  const currentUpiId = depositQrConfig?.upiId || 'divyansh-308@ptyes';
+
   const handleCopyUpi = () => {
     try {
-      navigator.clipboard.writeText('divyansh-308@ptyes');
+      navigator.clipboard.writeText(currentUpiId);
       setCopiedUpi(true);
       setTimeout(() => setCopiedUpi(false), 2500);
     } catch (_) {}
@@ -406,8 +411,8 @@ export default function WalletPage({
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
               }}>
                 <img 
-                  src={paymentQrImg} 
-                  alt="Paytm UPI QR - Divyansh Maheshwari" 
+                  src={currentQrImg} 
+                  alt={`UPI QR - ${currentReceiverName}`} 
                   style={{
                     width: '180px',
                     height: 'auto',
@@ -422,11 +427,11 @@ export default function WalletPage({
               {/* Receiver Details */}
               <div style={{ marginTop: '8px' }}>
                 <div style={{ fontWeight: '800', color: '#111', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                  <span>Divyansh Maheshwari</span>
+                  <span>{currentReceiverName}</span>
                   <span style={{ color: '#00baf2', fontSize: '0.85rem' }}>✓</span>
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#444', fontFamily: 'monospace', fontWeight: '700', marginTop: '2px' }}>
-                  UPI ID: <span style={{ color: '#002e6e', userSelect: 'all' }}>divyansh-308@ptyes</span>
+                  UPI ID: <span style={{ color: '#002e6e', userSelect: 'all' }}>{currentUpiId}</span>
                 </div>
               </div>
 
@@ -452,7 +457,7 @@ export default function WalletPage({
                 </button>
 
                 <a
-                  href={`upi://pay?pa=divyansh-308@ptyes&pn=Divyansh%20Maheshwari&am=${depositAmount}&cu=INR`}
+                  href={`upi://pay?pa=${encodeURIComponent(currentUpiId)}&pn=${encodeURIComponent(currentReceiverName)}&am=${depositAmount}&cu=INR`}
                   style={{
                     flex: 1,
                     padding: '7px 8px',

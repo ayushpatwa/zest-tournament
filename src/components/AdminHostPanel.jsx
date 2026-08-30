@@ -22,10 +22,12 @@ import {
   formatMatchDate 
 } from '../services/dateUtils';
 
-export default function AdminHostPanel({ tournaments = [], onAddTournament, onUpdateTournament, onDeleteTournament, onRemovePlayerFromTournament, onBroadcastRoomCredentials, setCurrentView, currentUser }) {
+import paymentQrImg from '../assets/payment_qr.jpg';
+
+export default function AdminHostPanel({ tournaments = [], onAddTournament, onUpdateTournament, onDeleteTournament, onRemovePlayerFromTournament, onBroadcastRoomCredentials, depositQrConfig, setCurrentView, currentUser }) {
   const isSuperAdmin = currentUser?.role === 'admin';
   const isHost = currentUser?.role === 'host' || currentUser?.isHost || isSuperAdmin;
-  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'broadcast' | 'manage' | 'webhook' | 'app_update'
+  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'deposit_qr' | 'broadcast' | 'manage' | 'webhook' | 'app_update'
   
   // Host Form states
   const [editingTournament, setEditingTournament] = useState(null);
@@ -90,6 +92,121 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatePublishStatus, setUpdatePublishStatus] = useState('');
+
+  // Deposit QR & UPI Management states
+  const [qrImageUrl, setQrImageUrl] = useState(depositQrConfig?.qrImageUrl || '');
+  const [qrReceiverName, setQrReceiverName] = useState(depositQrConfig?.receiverName || 'Divyansh Maheshwari');
+  const [qrUpiId, setQrUpiId] = useState(depositQrConfig?.upiId || 'divyansh-308@ptyes');
+  const [qrSaveStatus, setQrSaveStatus] = useState('');
+  const [isSavingQr, setIsSavingQr] = useState(false);
+  const [qrUploadPreview, setQrUploadPreview] = useState(depositQrConfig?.qrImageUrl || '');
+
+  useEffect(() => {
+    if (depositQrConfig) {
+      if (depositQrConfig.qrImageUrl) {
+        setQrImageUrl(depositQrConfig.qrImageUrl);
+        setQrUploadPreview(depositQrConfig.qrImageUrl);
+      }
+      if (depositQrConfig.receiverName) setQrReceiverName(depositQrConfig.receiverName);
+      if (depositQrConfig.upiId) setQrUpiId(depositQrConfig.upiId);
+    }
+  }, [depositQrConfig]);
+
+  const handleQrFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (JPG, PNG).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 500;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        setQrUploadPreview(compressedDataUrl);
+        setQrImageUrl(compressedDataUrl);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveDepositQr = async (e) => {
+    e.preventDefault();
+    if (!qrReceiverName.trim() || !qrUpiId.trim() || !qrUpiId.includes('@')) {
+      setQrSaveStatus('⚠️ Please enter a valid Receiver Name and UPI ID (e.g. name@bank).');
+      return;
+    }
+
+    setIsSavingQr(true);
+    setQrSaveStatus('');
+
+    const res = await saveAppSettingsRealtime({
+      depositQr: {
+        qrImageUrl: qrImageUrl.trim() || '',
+        receiverName: qrReceiverName.trim(),
+        upiId: qrUpiId.trim(),
+        updatedAt: new Date().toISOString()
+      }
+    });
+
+    setIsSavingQr(false);
+    if (res.success) {
+      setQrSaveStatus('✅ Live Deposit QR & UPI ID updated successfully across all players in real-time!');
+      setTimeout(() => setQrSaveStatus(''), 5000);
+    } else {
+      setQrSaveStatus(`⚠️ Error saving: ${res.error || 'Failed'}`);
+    }
+  };
+
+  const handleResetToDefaultQr = async () => {
+    if (window.confirm('Reset Deposit QR & UPI to default (Divyansh Maheshwari / divyansh-308@ptyes)?')) {
+      setIsSavingQr(true);
+      setQrSaveStatus('');
+      const res = await saveAppSettingsRealtime({
+        depositQr: {
+          qrImageUrl: '',
+          receiverName: 'Divyansh Maheshwari',
+          upiId: 'divyansh-308@ptyes',
+          updatedAt: new Date().toISOString()
+        }
+      });
+      setIsSavingQr(false);
+      if (res.success) {
+        setQrImageUrl('');
+        setQrUploadPreview('');
+        setQrReceiverName('Divyansh Maheshwari');
+        setQrUpiId('divyansh-308@ptyes');
+        setQrSaveStatus('✅ Reset to default payment QR & UPI ID!');
+        setTimeout(() => setQrSaveStatus(''), 4000);
+      }
+    }
+  };
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('zest_match_proofs') || '[]');
@@ -549,6 +666,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                 }}
               >
                 💰 Give Prize Money
+              </button>
+
+              <button
+                onClick={() => setActiveTab('deposit_qr')}
+                className="btn"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  borderRadius: '8px',
+                  background: activeTab === 'deposit_qr' ? 'linear-gradient(135deg, #00baf2 0%, #002e6e 100%)' : 'rgba(255,255,255,0.05)',
+                  color: '#fff',
+                  border: '1px solid var(--border-color)',
+                  fontWeight: '900'
+                }}
+              >
+                💳 Deposit QR / UPI
               </button>
 
               <button
@@ -1967,6 +2100,168 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* MODE: DEPOSIT QR & UPI MANAGEMENT */}
+      {activeTab === 'deposit_qr' && (
+        <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', color: 'var(--secondary)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>💳</span> Live Deposit QR & UPI Management
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+              Update your payment QR code and UPI ID. Whenever a player opens <strong>Wallet ➔ Add Money</strong>, they will instantly see your updated QR code and receiver details in real-time!
+            </p>
+          </div>
+
+          <div className="grid-2" style={{ alignItems: 'start', gap: '20px' }}>
+            {/* Live Wallet Preview Box */}
+            <div style={{
+              background: '#fff',
+              borderRadius: '12px',
+              padding: '16px',
+              textAlign: 'center',
+              boxShadow: '0 8px 25px rgba(0,0,0,0.5)',
+              border: '2px solid var(--secondary)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
+                <span style={{ color: '#002e6e', fontWeight: '900', fontSize: '0.85rem' }}>Paytm / Any UPI</span>
+                <span style={{ color: '#00baf2', fontWeight: '900', fontSize: '0.85rem' }}>Accepted Here</span>
+              </div>
+
+              {/* QR Image Preview */}
+              <div style={{ 
+                display: 'inline-block',
+                background: '#fff',
+                padding: '6px',
+                borderRadius: '10px',
+                border: '1px solid #e0e0e0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <img 
+                  src={qrUploadPreview || qrImageUrl || paymentQrImg} 
+                  alt="Deposit QR Preview" 
+                  style={{
+                    width: '180px',
+                    height: 'auto',
+                    maxHeight: '220px',
+                    objectFit: 'contain',
+                    borderRadius: '8px',
+                    display: 'block',
+                    margin: '0 auto'
+                  }}
+                />
+              </div>
+
+              {/* Receiver Details Preview */}
+              <div style={{ marginTop: '8px' }}>
+                <div style={{ fontWeight: '800', color: '#111', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                  <span>{qrReceiverName || 'Receiver Name'}</span>
+                  <span style={{ color: '#00baf2', fontSize: '0.85rem' }}>✓</span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#444', fontFamily: 'monospace', fontWeight: '700', marginTop: '2px' }}>
+                  UPI ID: <span style={{ color: '#002e6e' }}>{qrUpiId || 'your-upi-id@bank'}</span>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '10px', fontSize: '0.7rem', color: '#666', background: 'rgba(0,0,0,0.04)', padding: '6px', borderRadius: '6px' }}>
+                👀 <em>This is how players see your payment QR in their Wallet.</em>
+              </div>
+            </div>
+
+            {/* Edit / Upload Form */}
+            <form onSubmit={handleSaveDepositQr} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* File Upload Option */}
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>🖼️ Upload New QR Code Image (JPG / PNG)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={handleQrFileUpload}
+                  className="form-input"
+                  style={{ padding: '8px' }}
+                />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Auto-compressed for fast instant loading on all mobile networks.
+                </span>
+              </div>
+
+              {/* Or Direct Image URL */}
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>🌐 Or Paste Online QR Image URL</label>
+                <input 
+                  type="url"
+                  value={qrImageUrl.startsWith('data:') ? '' : qrImageUrl}
+                  onChange={(e) => {
+                    setQrImageUrl(e.target.value);
+                    setQrUploadPreview(e.target.value);
+                  }}
+                  placeholder="https://example.com/my-payment-qr.jpg"
+                  className="form-input"
+                />
+              </div>
+
+              {/* Receiver Name */}
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>👤 Receiver / Account Name</label>
+                <input 
+                  type="text"
+                  value={qrReceiverName}
+                  onChange={(e) => setQrReceiverName(e.target.value)}
+                  placeholder="e.g. Divyansh Maheshwari"
+                  className="form-input"
+                  required
+                />
+              </div>
+
+              {/* Receiver UPI ID */}
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>🆔 Receiver UPI ID</label>
+                <input 
+                  type="text"
+                  value={qrUpiId}
+                  onChange={(e) => setQrUpiId(e.target.value)}
+                  placeholder="e.g. 9084311275@paytm or name@ptyes"
+                  className="form-input"
+                  required
+                />
+              </div>
+
+              {qrSaveStatus && (
+                <div style={{ 
+                  color: qrSaveStatus.includes('⚠️') ? 'var(--accent)' : 'var(--success)', 
+                  background: qrSaveStatus.includes('⚠️') ? 'rgba(255,214,0,0.1)' : 'rgba(0,230,118,0.1)', 
+                  padding: '10px', 
+                  borderRadius: '8px', 
+                  border: `1px solid ${qrSaveStatus.includes('⚠️') ? 'var(--accent)' : 'var(--success)'}`, 
+                  fontSize: '0.82rem' 
+                }}>
+                  {qrSaveStatus}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button 
+                  type="submit" 
+                  disabled={isSavingQr}
+                  className="btn btn-primary"
+                  style={{ flex: 1, height: '44px', fontWeight: '900', background: 'linear-gradient(135deg, #00baf2 0%, #002e6e 100%)', color: '#fff' }}
+                >
+                  {isSavingQr ? 'Saving...' : '💾 Save Live Deposit QR'}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleResetToDefaultQr}
+                  disabled={isSavingQr}
+                  className="btn btn-secondary"
+                  style={{ padding: '0 14px', fontSize: '0.78rem' }}
+                >
+                  ↺ Reset Default
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
