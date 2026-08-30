@@ -16,10 +16,10 @@ export const isNativeApp = () => {
 };
 
 /**
- * Compares semantic version strings (e.g., '1.0.1' > '1.0.0')
- * Returns true if latest > current
+ * Compares semantic version strings (e.g., '1.1.0' > '1.0.0')
+ * Returns true if latest > current and not already updated/dismissed
  */
-export const isNewVersionAvailable = (currentVer = CURRENT_APP_VERSION, latestVer = '1.0.0', allowWeb = false) => {
+export const isNewVersionAvailable = (currentVer = CURRENT_APP_VERSION, latestVer = '1.0.0', allowWeb = false, forceUpdate = false) => {
   // If user is on regular web browser and allowWeb is not enabled, do not show APK popup
   if (!allowWeb && !isNativeApp()) {
     return false;
@@ -30,7 +30,17 @@ export const isNewVersionAvailable = (currentVer = CURRENT_APP_VERSION, latestVe
   const cleanCurrent = currentVer.replace(/^v/i, '').trim();
   const cleanLatest = latestVer.replace(/^v/i, '').trim();
   
+  // If user is already on this version or higher, no update needed!
   if (cleanCurrent === cleanLatest) return false;
+
+  // If user has already clicked download/updated to this version or dismissed it, don't show again (unless mandatory forceUpdate)
+  if (!forceUpdate && typeof localStorage !== 'undefined') {
+    const isUpdated = localStorage.getItem('zest_updated_version_' + cleanLatest) === 'true';
+    const isDismissed = localStorage.getItem('zest_last_dismissed_version') === cleanLatest;
+    if (isUpdated || isDismissed) {
+      return false;
+    }
+  }
 
   const currentParts = cleanCurrent.split('.').map(n => parseInt(n, 10) || 0);
   const latestParts = cleanLatest.split('.').map(n => parseInt(n, 10) || 0);

@@ -92,10 +92,12 @@ export default function App() {
         if (settings.webhookUrl) {
           updateLiveWebhookUrl(settings.webhookUrl);
         }
-        if (settings.appUpdate && isNewVersionAvailable(CURRENT_APP_VERSION, settings.appUpdate.latestVersion)) {
+        if (settings.appUpdate && isNewVersionAvailable(CURRENT_APP_VERSION, settings.appUpdate.latestVersion, false, settings.appUpdate.forceUpdate)) {
           console.log('[App Update] New version detected:', settings.appUpdate.latestVersion);
           setUpdateInfo(settings.appUpdate);
           setShowUpdateModal(true);
+        } else {
+          setShowUpdateModal(false);
         }
       }
     });

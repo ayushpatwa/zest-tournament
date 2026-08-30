@@ -13,10 +13,31 @@ export default function AppUpdateModal({ updateInfo, onDismiss }) {
   } = updateInfo;
 
   const handleDownload = () => {
+    const cleanVer = String(latestVersion).replace(/^v/i, '').trim();
+    try {
+      localStorage.setItem('zest_updated_version_' + cleanVer, 'true');
+      localStorage.setItem('zest_last_dismissed_version', cleanVer);
+    } catch (_) {}
+
     if (downloadUrl && downloadUrl.trim()) {
       window.open(downloadUrl, '_blank', 'noopener,noreferrer');
     } else {
       alert('Download link not provided. Please check back shortly.');
+    }
+
+    if (onDismiss && !forceUpdate) {
+      onDismiss();
+    }
+  };
+
+  const handleDismiss = () => {
+    const cleanVer = String(latestVersion).replace(/^v/i, '').trim();
+    try {
+      localStorage.setItem('zest_last_dismissed_version', cleanVer);
+    } catch (_) {}
+
+    if (onDismiss) {
+      onDismiss();
     }
   };
 
@@ -116,7 +137,7 @@ export default function AppUpdateModal({ updateInfo, onDismiss }) {
 
           {!forceUpdate && (
             <button
-              onClick={onDismiss}
+              onClick={handleDismiss}
               style={{
                 background: 'transparent',
                 border: 'none',
