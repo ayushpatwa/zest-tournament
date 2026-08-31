@@ -86,9 +86,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [testingWebhook, setTestingWebhook] = useState(false);
 
   // App Update Publisher states
-  const [updateVersion, setUpdateVersion] = useState('1.4.4');
-  const [updateTitle, setUpdateTitle] = useState('🔥 New Features & Match Updates (v1.4.4)!');
-  const [updateNotes, setUpdateNotes] = useState('• Clash Squad 1v1 & 1v1 Only Headshot Matches\n• Match Date scheduling & dynamic calendar\n• Live Deposit QR & UPI Management\n• Instant cloud sync & bug fixes');
+  const [updateVersion, setUpdateVersion] = useState('1.4.5');
+  const [updateTitle, setUpdateTitle] = useState('🔥 5 Coins Signup Bonus & Match Upgrades (v1.4.5)!');
+  const [updateNotes, setUpdateNotes] = useState('• 5 Coins Welcome Bonus on Signup\n• Clash Squad 1v1 & Custom Bounty\n• Match Date scheduling & calendar\n• Live Deposit QR & UPI Management');
   const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatePublishStatus, setUpdatePublishStatus] = useState('');
