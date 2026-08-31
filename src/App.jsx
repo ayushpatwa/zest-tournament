@@ -196,7 +196,7 @@ export default function App() {
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
     setUserProfile(user);
-    const initialWallet = typeof user.wallet === 'number' ? user.wallet : 10;
+    const initialWallet = typeof user.wallet === 'number' ? user.wallet : 5;
     setWalletBalance(initialWallet);
     if (user.transactions && user.transactions.length > 0) {
       setTransactions(user.transactions);

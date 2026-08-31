@@ -117,7 +117,7 @@ export default function LoginPage({ onLoginSuccess }) {
       phone: phone.trim(),
       password: password,
       role: 'player',
-      wallet: 10,
+      wallet: 5,
       isVerified: true,
       verifiedMethod: verifyChannel,
       verifiedAt: new Date().toISOString(),
@@ -125,15 +125,15 @@ export default function LoginPage({ onLoginSuccess }) {
         matches: 0,
         wins: 0,
         kills: 0,
-        earnings: 10
+        earnings: 5
       },
       transactions: [
         {
           id: `tx_${Date.now()}`,
           type: 'CREDIT',
-          amount: 10,
+          amount: 5,
           title: '🎁 Welcome Bonus',
-          reason: '10 Coins Free Registration Reward',
+          reason: '5 Coins Free Registration Reward',
           date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
           timestamp: new Date().toISOString(),
           status: 'Success'
@@ -883,7 +883,7 @@ export default function LoginPage({ onLoginSuccess }) {
               boxShadow: '0 2px 10px rgba(255, 214, 0, 0.1)'
             }}>
               <span style={{ fontSize: '1.1rem' }}>🎁</span>
-              <span>WELCOME BONUS: Get 10 Coins Free Added Instantly!</span>
+              <span>WELCOME BONUS: Get 5 Coins Free Added Instantly!</span>
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
