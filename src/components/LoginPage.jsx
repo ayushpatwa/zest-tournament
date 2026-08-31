@@ -5,12 +5,23 @@ import {
   saveUserProfileRealtime, 
   authenticateUserRealtime, 
   checkUserExistsRealtime,
-  findUserForPasswordReset
+  findUserForPasswordReset,
+  subscribeToAppSettingsRealtime
 } from '../services/firebase';
 import { dispatchRealOtp } from '../services/otpService';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'admin' | 'forgot'
+  const [welcomeBonus, setWelcomeBonus] = useState(5);
+
+  useEffect(() => {
+    const unsub = subscribeToAppSettingsRealtime((settings) => {
+      if (settings && typeof settings.welcomeBonus === 'number') {
+        setWelcomeBonus(settings.welcomeBonus);
+      }
+    });
+    return () => unsub();
+  }, []);
   
   // Sign Up form state
   const [nickname, setNickname] = useState('');
@@ -109,6 +120,7 @@ export default function LoginPage({ onLoginSuccess }) {
     setGeneratedOtp(code);
     setEnteredOtp('');
 
+    const bonusAmount = typeof welcomeBonus === 'number' ? welcomeBonus : 5;
     const targetUser = {
       id: `user_${Date.now()}`,
       nickname: nickname.trim(),
@@ -117,7 +129,7 @@ export default function LoginPage({ onLoginSuccess }) {
       phone: phone.trim(),
       password: password,
       role: 'player',
-      wallet: 5,
+      wallet: bonusAmount,
       isVerified: true,
       verifiedMethod: verifyChannel,
       verifiedAt: new Date().toISOString(),
@@ -125,15 +137,15 @@ export default function LoginPage({ onLoginSuccess }) {
         matches: 0,
         wins: 0,
         kills: 0,
-        earnings: 5
+        earnings: bonusAmount
       },
       transactions: [
         {
           id: `tx_${Date.now()}`,
           type: 'CREDIT',
-          amount: 5,
+          amount: bonusAmount,
           title: '🎁 Welcome Bonus',
-          reason: '5 Coins Free Registration Reward',
+          reason: `${bonusAmount} Coins Free Registration Reward`,
           date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
           timestamp: new Date().toISOString(),
           status: 'Success'
@@ -883,7 +895,7 @@ export default function LoginPage({ onLoginSuccess }) {
               boxShadow: '0 2px 10px rgba(255, 214, 0, 0.1)'
             }}>
               <span style={{ fontSize: '1.1rem' }}>🎁</span>
-              <span>WELCOME BONUS: Get 5 Coins Free Added Instantly!</span>
+              <span>WELCOME BONUS: Get {welcomeBonus} Coins Free Added Instantly!</span>
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
