@@ -480,9 +480,9 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                       </h3>
                       <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                         <span>🗺️ Map: <strong>{t.map}</strong></span>
-                        <span>{t.type?.toLowerCase().includes('lone wolf') ? '🏆 Prize Type: ' : '💰 Bounty: '}
-                          <strong style={{ color: t.type?.toLowerCase().includes('lone wolf') ? 'var(--accent)' : 'inherit' }}>
-                            {t.type?.toLowerCase().includes('lone wolf') ? 'Winner Takes All' : `₹${t.perKillPrize || 25}/Kill`}
+                        <span>{t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash') ? '🏆 Prize Type: ' : '💰 Bounty: '}
+                          <strong style={{ color: (t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash')) ? 'var(--accent)' : 'inherit' }}>
+                            {(t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash')) ? 'Winner Takes All' : `₹${t.perKillPrize !== undefined && t.perKillPrize !== null && t.perKillPrize !== '' ? t.perKillPrize : 25}/Kill`}
                           </strong>
                         </span>
                       </div>

@@ -225,10 +225,10 @@ export default function TournamentLobby({
             </div>
             <div style={{ gridColumn: 'span 2' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {isLoneWolf ? 'Prize Structure:' : 'Per Kill Bounty:'}
+                {(isLoneWolf && !tournament.type?.toLowerCase().includes('clash')) ? 'Prize Structure:' : 'Per Kill Bounty:'}
               </span>
-              <p style={{ fontWeight: '700', color: isLoneWolf ? 'var(--accent)' : 'var(--secondary)', margin: '2px 0 0 0' }}>
-                {isLoneWolf ? '🏆 Winner Takes All' : `₹${tournament.perKillPrize || 25}`}
+              <p style={{ fontWeight: '700', color: (isLoneWolf && !tournament.type?.toLowerCase().includes('clash')) ? 'var(--accent)' : 'var(--secondary)', margin: '2px 0 0 0' }}>
+                {(isLoneWolf && !tournament.type?.toLowerCase().includes('clash')) ? '🏆 Winner Takes All' : `₹${tournament.perKillPrize !== undefined && tournament.perKillPrize !== null && tournament.perKillPrize !== '' ? tournament.perKillPrize : 25}`}
               </p>
             </div>
           </div>

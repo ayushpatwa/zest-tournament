@@ -261,22 +261,34 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
       setSlotsTotal('2');
       setMode('Solo');
       setMapName(newType.includes('Clash') ? 'Bermuda (CS)' : 'Iron Dome');
-      setPerKillPrize(newType.includes('Lone Wolf') ? '0' : '25');
+      if (newType.includes('Lone Wolf') && !newType.includes('Clash')) {
+        setPerKillPrize('0');
+      } else if (!perKillPrize || perKillPrize === '0') {
+        setPerKillPrize('25');
+      }
     } else if (newType.includes('2v2')) {
       setSlotsTotal('4');
       setMode('Duo');
       setMapName(newType.includes('Clash') ? 'Bermuda (CS)' : 'Iron Cage');
-      setPerKillPrize(newType.includes('Lone Wolf') ? '0' : '25');
+      if (newType.includes('Lone Wolf') && !newType.includes('Clash')) {
+        setPerKillPrize('0');
+      } else if (!perKillPrize || perKillPrize === '0') {
+        setPerKillPrize('25');
+      }
     } else if (newType.includes('Clash Squad')) {
       setSlotsTotal('8');
       setMode('Squad');
       setMapName('Bermuda (CS)');
-      setPerKillPrize('25');
+      if (!perKillPrize || perKillPrize === '0') {
+        setPerKillPrize('25');
+      }
     } else {
       setSlotsTotal('48');
       setMode('Solo');
       setMapName('Bermuda');
-      setPerKillPrize('25');
+      if (!perKillPrize || perKillPrize === '0') {
+        setPerKillPrize('25');
+      }
     }
   };
 
@@ -993,16 +1005,37 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
               </div>
 
               <div className="form-group">
-                <label>Per Kill Bounty (₹)</label>
+                <label>Per Kill Bounty (₹) {type.includes('1v1') && <span style={{ color: 'var(--secondary)' }}>• Custom</span>}</label>
                 <input 
                   type="number" 
                   value={perKillPrize} 
                   onChange={(e) => setPerKillPrize(e.target.value)} 
-                  placeholder="e.g. 25 (0 for Lone Wolf)"
+                  placeholder="Enter custom bounty (e.g. 25, 50, 100)"
                   className="form-input"
                   min="0"
                   required
                 />
+                <div style={{ display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {['0', '10', '25', '50', '100', '200'].map(bAmt => (
+                    <button
+                      key={bAmt}
+                      type="button"
+                      onClick={() => setPerKillPrize(bAmt)}
+                      style={{
+                        background: perKillPrize === bAmt ? 'var(--secondary)' : 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: perKillPrize === bAmt ? '#000' : '#fff',
+                        borderRadius: '8px',
+                        padding: '2px 8px',
+                        fontSize: '0.68rem',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ₹{bAmt}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
