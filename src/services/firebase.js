@@ -850,6 +850,42 @@ export const sendNotificationRealtime = async (notificationData) => {
 };
 
 /**
+ * Saves a player's FCM device push token to Firestore for closed-app notifications
+ */
+export const saveDeviceTokenRealtime = async (userIdOrUid, token, metadata = {}) => {
+  try {
+    if (!token || !userIdOrUid) return { success: false };
+    const cleanUid = String(userIdOrUid).trim();
+    
+    // 1. Update user document with latest FCM token
+    const userDocRef = doc(db, "users", cleanUid);
+    await setDoc(userDocRef, {
+      fcmToken: token,
+      fcmTokens: arrayUnion(token),
+      lastActivePlatform: metadata.platform || 'android',
+      fcmUpdatedAt: serverTimestamp()
+    }, { merge: true });
+
+    // 2. Add to global device_tokens collection for batch broadcasts
+    const safeTokenId = token.slice(0, 32) + '_' + token.slice(-16);
+    const tokenDocRef = doc(db, "device_tokens", safeTokenId);
+    await setDoc(tokenDocRef, {
+      token,
+      uid: cleanUid,
+      nickname: metadata.nickname || 'Player',
+      platform: metadata.platform || 'android',
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    console.log(`[Firebase Realtime] Saved FCM Push token for ${cleanUid}`);
+    return { success: true };
+  } catch (err) {
+    console.warn("[Firebase Realtime] Error saving device token:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
  * Deletes a broadcast notification from Firestore
  */
 export const deleteNotificationRealtime = async (notificationId) => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
+import { dispatchPushNotification } from '../services/notificationService';
 import { 
   saveAppSettingsRealtime, 
   subscribeToAppSettingsRealtime,
@@ -288,7 +289,14 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
       type: notifType
     });
     if (res.success) {
-      setNotifStatus('✅ Notification broadcasted! All players will now see the red badge on their bell 🔔 in real-time.');
+      // 2. Dispatch Closed-App Push Notification via Webhook / Cloud
+      await dispatchPushNotification({
+        title: notifTitle.trim(),
+        message: notifMessage.trim(),
+        type: notifType
+      });
+
+      setNotifStatus('✅ Notification broadcasted! Sent to in-app bell 🔔 and dispatched push alert for closed apps.');
       setNotifTitle('');
       setNotifMessage('');
     } else {
@@ -499,7 +507,16 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         tournamentTitle: tourneyTitle
       });
 
-      setRoomBroadcastStatus(`✅ Room ID & Password broadcasted strictly to registered players of "${tourneyTitle}" in real-time!`);
+      // Dispatch Closed-App Push Notification strictly to registered match players
+      await dispatchPushNotification({
+        title: `🔑 Custom Room ID Dropped: ${tourneyTitle}`,
+        message: `Room ID: ${inputRoomId.trim()} | Pass: ${inputRoomPass.trim() || 'None'}. Join custom room now!`,
+        type: 'match',
+        targetTournamentId: selectedTourneyId,
+        targetUids: joinedUids
+      });
+
+      setRoomBroadcastStatus(`✅ Room ID & Password broadcasted to registered players & dispatched push notification!`);
       setTimeout(() => setRoomBroadcastStatus(''), 4000);
     }
   };

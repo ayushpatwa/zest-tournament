@@ -14,6 +14,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import AppUpdateModal from './components/AppUpdateModal';
 import { isNewVersionAvailable, CURRENT_APP_VERSION } from './services/appUpdateService';
 import { sendToMakeWebhook, updateLiveWebhookUrl } from './services/webhookService';
+import { initPushNotifications } from './services/notificationService';
 import { 
   subscribeToTournamentsRealtime, 
   subscribeToAppSettingsRealtime,
@@ -115,6 +116,21 @@ export default function App() {
       unsubscribeSettings();
     };
   }, []);
+
+  // Push Notifications: Initialize FCM Token, Android Channels & Closed-App Listeners
+  useEffect(() => {
+    if (currentUser) {
+      initPushNotifications(currentUser, (notificationData) => {
+        console.log('[App] Push notification clicked, navigating:', notificationData);
+        if (notificationData?.tournamentId) {
+          setSelectedTournamentId(notificationData.tournamentId);
+          setCurrentView('lobby');
+        } else if (notificationData?.view) {
+          setCurrentView(notificationData.view);
+        }
+      });
+    }
+  }, [currentUser?.uid, currentUser?.id]);
 
   // 2. Real-time Live Wallet & User Profile sync with Firestore Cloud & Auto-Logout on Deletion
   useEffect(() => {
