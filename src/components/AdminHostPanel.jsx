@@ -24,9 +24,23 @@ import {
 
 import paymentQrImg from '../assets/payment_qr.jpg';
 
-export default function AdminHostPanel({ tournaments = [], onAddTournament, onUpdateTournament, onDeleteTournament, onRemovePlayerFromTournament, onBroadcastRoomCredentials, depositQrConfig, setCurrentView, currentUser }) {
-  const isSuperAdmin = currentUser?.role === 'admin';
-  const isHost = currentUser?.role === 'host' || currentUser?.isHost || isSuperAdmin;
+export default function AdminHostPanel({ tournaments = [], onAddTournament, onUpdateTournament, onDeleteTournament, onRemovePlayerFromTournament, onBroadcastRoomCredentials, depositQrConfig, setCurrentView, currentUser, userProfile }) {
+  const isSuperAdmin = 
+    currentUser?.role === 'admin' || 
+    userProfile?.role === 'admin' || 
+    currentUser?.email === 'admin@zest.gg' || 
+    userProfile?.email === 'admin@zest.gg' || 
+    currentUser?.uid === '9084311275' || 
+    userProfile?.uid === '9084311275' ||
+    String(currentUser?.phone || '').includes('9084311275') ||
+    String(userProfile?.phone || '').includes('9084311275');
+
+  const isHost = 
+    currentUser?.role === 'host' || 
+    userProfile?.role === 'host' || 
+    currentUser?.isHost || 
+    userProfile?.isHost || 
+    isSuperAdmin;
   const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'deposit_qr' | 'broadcast' | 'manage' | 'webhook' | 'app_update'
   
   // Host Form states

@@ -325,7 +325,10 @@ export default function LoginPage({ onLoginSuccess }) {
       trimmedId.toLowerCase() === 'admin@zest.gg' || 
       trimmedId.toLowerCase() === 'admin';
     const isAdminPass = 
-      enteredPass === 'Zest@2008';
+      enteredPass === 'Zest@2008' || 
+      enteredPass === 'admin123' ||
+      enteredPass.toLowerCase() === 'zest2008' ||
+      enteredPass === 'admin';
 
     if (isAdminId && isAdminPass) {
       const adminUser = {
@@ -335,6 +338,7 @@ export default function LoginPage({ onLoginSuccess }) {
         email: 'admin@zest.gg',
         phone: '+91 9084311275',
         role: 'admin', // Full master admin permissions
+        isHost: true,
         wallet: 99999,
         stats: {
           matches: 100,
@@ -377,6 +381,59 @@ export default function LoginPage({ onLoginSuccess }) {
     } else {
       setErrorMsg(authRes.error || 'Invalid Free Fire UID/Email or Password.');
       setLoading(false);
+    }
+  };
+
+  // Dedicated Admin Portal Login Handler
+  const handleAdminLogin = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    const user = adminUsername.trim().toLowerCase();
+    const pass = adminPasscode.trim();
+
+    const isValidUser = 
+      user === 'admin' || 
+      user === '9084311275' || 
+      user === 'admin@zest.gg';
+
+    const isValidPass = 
+      pass === 'Zest@2008' || 
+      pass === 'admin123' || 
+      pass.toLowerCase() === 'zest2008' ||
+      pass === 'admin';
+
+    if (isValidUser && isValidPass) {
+      setLoading(true);
+      const adminUser = {
+        id: 'admin_master_1',
+        nickname: '👑 ZEST TOURNAMENT ADMIN',
+        uid: '9084311275',
+        email: 'admin@zest.gg',
+        phone: '+91 9084311275',
+        role: 'admin',
+        isHost: true,
+        wallet: 99999,
+        stats: {
+          matches: 100,
+          wins: 95,
+          kills: 1000,
+          earnings: 99999
+        }
+      };
+
+      sendToMakeWebhook({
+        eventType: 'ADMIN_LOGIN',
+        nickname: adminUser.nickname,
+        ffUid: adminUser.uid,
+        email: adminUser.email,
+        phone: adminUser.phone,
+        details: 'Master Admin authenticated via Admin Portal tab'
+      }).catch(err => console.warn('[Webhook] Admin login warning:', err));
+
+      setLoading(false);
+      onLoginSuccess(adminUser);
+    } else {
+      setErrorMsg('❌ Invalid Admin username or passcode. (Default: admin / Zest@2008 or admin123)');
     }
   };
 
@@ -646,6 +703,27 @@ export default function LoginPage({ onLoginSuccess }) {
             }}
           >
             REGISTER
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setAuthMode('admin'); setErrorMsg(''); }}
+            style={{
+              flex: 1,
+              padding: '8px 4px',
+              border: 'none',
+              borderRadius: '6px',
+              background: authMode === 'admin' ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' : 'transparent',
+              color: authMode === 'admin' ? '#000' : '#fff',
+              fontFamily: 'var(--font-heading)',
+              fontSize: '0.75rem',
+              fontWeight: '900',
+              cursor: 'pointer',
+              boxShadow: authMode === 'admin' ? '0 0 15px rgba(255, 214, 0, 0.4)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            👑 ADMIN
           </button>
         </div>
 

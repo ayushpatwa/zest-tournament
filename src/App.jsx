@@ -5,6 +5,7 @@ import TournamentLobby from './components/TournamentLobby';
 import WalletPage from './components/WalletPage';
 import ProfilePage from './components/ProfilePage';
 import AdminHostPanel from './components/AdminHostPanel';
+import AdminHostUnlockScreen from './components/AdminHostUnlockScreen';
 import LoginPage from './components/LoginPage';
 import MyMatchesPage from './components/MyMatchesPage';
 import RulesPage from './components/RulesPage';
@@ -151,20 +152,39 @@ export default function App() {
         });
         setTransactions(sorted);
       }
+      const isMasterAdmin = 
+        currentUser?.role === 'admin' || 
+        currentUser?.uid === '9084311275' || 
+        currentUser?.email === 'admin@zest.gg' || 
+        String(currentUser?.phone || '').includes('9084311275') ||
+        liveUserData?.uid === '9084311275' ||
+        liveUserData?.email === 'admin@zest.gg';
+
       setUserProfile(prev => ({
         ...prev,
         ...liveUserData,
+        role: isMasterAdmin ? 'admin' : (liveUserData.role || prev.role),
+        isHost: isMasterAdmin ? true : (liveUserData.isHost !== undefined ? liveUserData.isHost : prev.isHost),
         wallet: typeof liveUserData.wallet === 'number' ? liveUserData.wallet : prev.wallet
       }));
 
       // Real-time instant role synchronization across all tabs & connected devices
       setCurrentUser(prev => {
         if (!prev) return prev;
-        const updatedRole = liveUserData.role !== undefined ? liveUserData.role : prev.role;
-        const updatedIsHost = liveUserData.isHost !== undefined ? liveUserData.isHost : prev.isHost;
+
+        const isMaster = 
+          prev.role === 'admin' || 
+          prev.uid === '9084311275' || 
+          prev.email === 'admin@zest.gg' || 
+          String(prev.phone || '').includes('9084311275') ||
+          liveUserData.uid === '9084311275' ||
+          liveUserData.email === 'admin@zest.gg';
+
+        const updatedRole = isMaster ? 'admin' : (liveUserData.role !== undefined ? liveUserData.role : prev.role);
+        const updatedIsHost = isMaster ? true : (liveUserData.isHost !== undefined ? liveUserData.isHost : prev.isHost);
         
-        // If host permissions were revoked and player is currently on host panel, exit immediately
-        if (prev.role !== 'admin' && updatedRole !== 'host' && !updatedIsHost) {
+        // If host permissions were explicitly revoked for a regular player who is currently on host panel, exit to dashboard
+        if (!isMaster && updatedRole !== 'host' && !updatedIsHost && prev.role === 'host') {
           setCurrentView(v => v === 'admin' ? 'dashboard' : v);
         }
 
@@ -364,6 +384,20 @@ export default function App() {
 
   const selectedTournament = tournaments.find(t => t.id === selectedTournamentId);
 
+  const isAdminOrHost = 
+    currentUser?.role === 'admin' || 
+    userProfile?.role === 'admin' || 
+    currentUser?.role === 'host' || 
+    userProfile?.role === 'host' || 
+    currentUser?.isHost || 
+    userProfile?.isHost || 
+    currentUser?.uid === '9084311275' || 
+    userProfile?.uid === '9084311275' || 
+    currentUser?.email === 'admin@zest.gg' || 
+    userProfile?.email === 'admin@zest.gg' ||
+    String(currentUser?.phone || '').includes('9084311275') ||
+    String(userProfile?.phone || '').includes('9084311275');
+
   return (
     <div className="app-container">
       {/* Header and navigation bar component */}
@@ -451,18 +485,40 @@ export default function App() {
           />
         )}
 
-        {currentView === 'admin' && (currentUser?.role === 'admin' || currentUser?.role === 'host' || currentUser?.isHost) && (
-          <AdminHostPanel 
-            tournaments={tournaments}
-            onAddTournament={handleAddTournament}
-            onUpdateTournament={handleUpdateTournament}
-            onDeleteTournament={handleDeleteTournament}
-            onRemovePlayerFromTournament={handleRemovePlayerFromTournament}
-            onBroadcastRoomCredentials={handleBroadcastRoomCredentials}
-            depositQrConfig={depositQrConfig}
-            setCurrentView={setCurrentView}
-            currentUser={currentUser}
-          />
+        {currentView === 'admin' && (
+          isAdminOrHost ? (
+            <AdminHostPanel 
+              tournaments={tournaments}
+              onAddTournament={handleAddTournament}
+              onUpdateTournament={handleUpdateTournament}
+              onDeleteTournament={handleDeleteTournament}
+              onRemovePlayerFromTournament={handleRemovePlayerFromTournament}
+              onBroadcastRoomCredentials={handleBroadcastRoomCredentials}
+              depositQrConfig={depositQrConfig}
+              setCurrentView={setCurrentView}
+              currentUser={currentUser}
+              userProfile={userProfile}
+            />
+          ) : (
+            <AdminHostUnlockScreen 
+              onUnlockSuccess={(adminPerms) => {
+                const updated = {
+                  ...currentUser,
+                  ...adminPerms
+                };
+                setCurrentUser(updated);
+                setUserProfile(prev => ({ ...prev, ...adminPerms }));
+                localStorage.setItem('zest_current_user', JSON.stringify(updated));
+                if (currentUser?.uid || userProfile?.uid) {
+                  saveUserProfileRealtime({
+                    uid: currentUser?.uid || userProfile?.uid,
+                    ...adminPerms
+                  }).catch(e => console.warn('[Unlock] Cloud sync notice:', e));
+                }
+              }}
+              onCancel={() => setCurrentView('dashboard')}
+            />
+          )
         )}
       </main>
 
