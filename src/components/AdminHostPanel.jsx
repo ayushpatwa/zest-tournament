@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 import { 
   saveAppSettingsRealtime, 
+  subscribeToAppSettingsRealtime,
+  saveTournamentRealtime,
   creditUserWalletRealtime, 
   deductUserWalletRealtime, 
   subscribeToAllUsersRealtime,

@@ -10,6 +10,7 @@ import LoginPage from './components/LoginPage';
 import MyMatchesPage from './components/MyMatchesPage';
 import RulesPage from './components/RulesPage';
 import ReferEarnPage from './components/ReferEarnPage';
+import ErrorBoundary from './components/ErrorBoundary';
 import AppUpdateModal from './components/AppUpdateModal';
 import { isNewVersionAvailable, CURRENT_APP_VERSION } from './services/appUpdateService';
 import { sendToMakeWebhook, updateLiveWebhookUrl } from './services/webhookService';
@@ -413,6 +414,7 @@ export default function App() {
 
       {/* Main viewport */}
       <main className="main-content">
+        <ErrorBoundary onReset={() => setCurrentView('dashboard')}>
         {currentView === 'dashboard' && (
           <Dashboard 
             tournaments={tournaments} 
@@ -520,6 +522,7 @@ export default function App() {
             />
           )
         )}
+        </ErrorBoundary>
       </main>
 
       {/* Real-time In-App Update Notice Modal (Option C) */}
