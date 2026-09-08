@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { saveUserProfileRealtime } from '../services/firebase';
 import { sendToMakeWebhook } from '../services/webhookService';
 
-export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
+export default function ProfilePage({ userProfile, setUserProfile, onLogout, setCurrentView }) {
   const [isEditing, setIsEditing] = useState(false);
   const [nick, setNick] = useState(userProfile.nickname || '');
   const [uid, setUid] = useState(userProfile.uid || '');
@@ -309,6 +309,65 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout }) {
           ✓ {successMsg}
         </div>
       )}
+
+      {/* Refer & Earn Promo Card */}
+      <div 
+        className="glass-panel" 
+        onClick={() => typeof setCurrentView === 'function' && setCurrentView('refer')}
+        style={{
+          background: 'linear-gradient(135deg, rgba(255, 214, 0, 0.12) 0%, rgba(255, 87, 34, 0.1) 100%)',
+          border: '1px solid rgba(255, 214, 0, 0.35)',
+          borderRadius: '16px',
+          padding: '16px',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px',
+          boxShadow: '0 4px 18px rgba(255, 214, 0, 0.1)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '44px',
+            height: '44px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #ffd600 0%, #ff9100 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.4rem',
+            color: '#000',
+            flexShrink: 0
+          }}>
+            🎁
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#ffd600', fontFamily: 'var(--font-heading)' }}>
+              REFER & EARN FREE COINS
+            </h4>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+              Invite friends to ZEST & earn instant bonus coins!
+            </p>
+          </div>
+        </div>
+
+        <button 
+          style={{
+            background: 'var(--primary)',
+            border: 'none',
+            color: '#fff',
+            borderRadius: '8px',
+            padding: '6px 12px',
+            fontSize: '0.75rem',
+            fontWeight: '800',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          Invite →
+        </button>
+      </div>
 
       {/* Player Career Stats */}
       <div>

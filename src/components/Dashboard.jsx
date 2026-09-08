@@ -313,6 +313,53 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             </div>
           </div>
 
+          {/* Refer & Earn Promo Strip */}
+          <div
+            onClick={() => typeof setCurrentView === 'function' && setCurrentView('refer')}
+            style={{
+              background: 'linear-gradient(135deg, rgba(255, 214, 0, 0.15) 0%, rgba(255, 87, 34, 0.12) 50%, rgba(0, 229, 255, 0.1) 100%)',
+              border: '1px solid rgba(255, 214, 0, 0.35)',
+              borderRadius: '12px',
+              padding: '10px 14px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              boxShadow: '0 4px 15px rgba(255, 214, 0, 0.1)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.2rem' }}>🎁</span>
+              <div>
+                <strong style={{ fontSize: '0.8rem', color: '#ffd600', display: 'block' }}>
+                  Refer Friends & Win Free Coins!
+                </strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  Earn ₹5 instant bonus coins on every friend's signup.
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              style={{
+                background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)',
+                border: 'none',
+                color: '#000',
+                fontWeight: '900',
+                fontFamily: 'var(--font-heading)',
+                fontSize: '0.7rem',
+                padding: '5px 10px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Refer Now →
+            </button>
+          </div>
+
           {/* Search and Filters */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
             <input 

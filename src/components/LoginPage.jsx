@@ -6,18 +6,25 @@ import {
   authenticateUserRealtime, 
   checkUserExistsRealtime,
   findUserForPasswordReset,
-  subscribeToAppSettingsRealtime
+  subscribeToAppSettingsRealtime,
+  findUserByReferralCodeOrUid,
+  creditReferralRewardRealtime
 } from '../services/firebase';
 import { dispatchRealOtp } from '../services/otpService';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'admin' | 'forgot'
   const [welcomeBonus, setWelcomeBonus] = useState(5);
+  const [referralRewardAmount, setReferralRewardAmount] = useState(5);
+  const [referralCodeInput, setReferralCodeInput] = useState('');
 
   useEffect(() => {
     const unsub = subscribeToAppSettingsRealtime((settings) => {
       if (settings && typeof settings.welcomeBonus === 'number') {
         setWelcomeBonus(settings.welcomeBonus);
+      }
+      if (settings && typeof settings.referralReward === 'number') {
+        setReferralRewardAmount(settings.referralReward);
       }
     });
     return () => unsub();
@@ -115,12 +122,43 @@ export default function LoginPage({ onLoginSuccess }) {
       return;
     }
 
+    // Check referral code if provided
+    let matchedReferrer = null;
+    const cleanRefInput = referralCodeInput.trim();
+    if (cleanRefInput) {
+      const refCheck = await findUserByReferralCodeOrUid(cleanRefInput);
+      if (!refCheck.success || !refCheck.referrer) {
+        setErrorMsg('❌ Invalid Referral Code. Please check the code or leave it blank.');
+        setLoading(false);
+        return;
+      }
+      if (String(refCheck.referrer.uid).trim() === ffUid.trim()) {
+        setErrorMsg('❌ You cannot use your own Free Fire UID as a referral code.');
+        setLoading(false);
+        return;
+      }
+      matchedReferrer = refCheck.referrer;
+    }
+
     // Generate secure 6-digit OTP
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(code);
     setEnteredOtp('');
 
     const bonusAmount = typeof welcomeBonus === 'number' ? welcomeBonus : 5;
+    const initialTransactions = [
+      {
+        id: `tx_${Date.now()}`,
+        type: 'CREDIT',
+        amount: bonusAmount,
+        title: '🎁 Welcome Bonus',
+        reason: `${bonusAmount} Coins Free Registration Reward`,
+        date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        timestamp: new Date().toISOString(),
+        status: 'Success'
+      }
+    ];
+
     const targetUser = {
       id: `user_${Date.now()}`,
       nickname: nickname.trim(),
@@ -133,24 +171,18 @@ export default function LoginPage({ onLoginSuccess }) {
       isVerified: true,
       verifiedMethod: verifyChannel,
       verifiedAt: new Date().toISOString(),
+      referralCode: `ZEST${ffUid.trim()}`,
+      referredBy: matchedReferrer ? String(matchedReferrer.uid) : null,
+      referredByNickname: matchedReferrer ? (matchedReferrer.nickname || 'Friend') : null,
+      referralCount: 0,
+      referralEarnings: 0,
       stats: {
         matches: 0,
         wins: 0,
         kills: 0,
         earnings: bonusAmount
       },
-      transactions: [
-        {
-          id: `tx_${Date.now()}`,
-          type: 'CREDIT',
-          amount: bonusAmount,
-          title: '🎁 Welcome Bonus',
-          reason: `${bonusAmount} Coins Free Registration Reward`,
-          date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-          timestamp: new Date().toISOString(),
-          status: 'Success'
-        }
-      ],
+      transactions: initialTransactions,
       createdAt: new Date().toISOString()
     };
 
@@ -224,7 +256,32 @@ export default function LoginPage({ onLoginSuccess }) {
     filtered.push(pendingUser);
     localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
 
-    // 3. Final registration webhook to Google Sheet
+    // 3. If user signed up with a referral code, credit the referrer instantly
+    if (pendingUser.referredBy) {
+      try {
+        await creditReferralRewardRealtime(
+          pendingUser.referredBy, 
+          referralRewardAmount, 
+          pendingUser.nickname, 
+          pendingUser.uid
+        );
+        console.log(`[Referral] Credited ₹${referralRewardAmount} to referrer ${pendingUser.referredBy}`);
+        
+        // Dispatch referral webhook event
+        await sendToMakeWebhook({
+          eventType: 'USER_REFERRAL',
+          nickname: pendingUser.nickname,
+          ffUid: pendingUser.uid,
+          email: pendingUser.email,
+          phone: pendingUser.phone,
+          details: `Referred by UID ${pendingUser.referredBy} (${pendingUser.referredByNickname || 'Referrer'}). Referrer awarded ₹${referralRewardAmount} coins.`
+        });
+      } catch (refErr) {
+        console.warn("[Referral] Failed to credit referral reward:", refErr);
+      }
+    }
+
+    // 4. Final registration webhook to Google Sheet
     await sendToMakeWebhook({
       eventType: 'USER_SIGNUP',
       nickname: pendingUser.nickname,
@@ -233,7 +290,7 @@ export default function LoginPage({ onLoginSuccess }) {
       phone: pendingUser.phone,
       password: pendingUser.password,
       verifiedMethod: verifyChannel,
-      details: `New Player Registration Verified via ${verifyChannel.toUpperCase()} OTP`
+      details: `New Player Registration Verified via ${verifyChannel.toUpperCase()} OTP${pendingUser.referredBy ? ` (Referred by ${pendingUser.referredByNickname || pendingUser.referredBy})` : ''}`
     });
 
     setOtpSuccessMsg('🎉 Account verified and registered successfully in Cloud! Loading your arena...');
@@ -955,6 +1012,21 @@ export default function LoginPage({ onLoginSuccess }) {
                 placeholder="••••••••"
                 className="form-input"
                 required
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{ margin: 0 }}>Referral Code <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>(Optional)</span></label>
+                <span style={{ fontSize: '0.72rem', color: '#ffd600', fontWeight: '800' }}>🎁 Get Instant Rewards</span>
+              </div>
+              <input
+                type="text"
+                value={referralCodeInput}
+                onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
+                placeholder="e.g. 482910384 or ZEST4829"
+                className="form-input"
+                style={{ letterSpacing: '1px' }}
               />
             </div>
 

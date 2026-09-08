@@ -77,6 +77,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
       case 'my_matches': return 'MY MATCHES';
       case 'lobby': return 'MATCH LOBBY';
       case 'wallet': return 'MY WALLET';
+      case 'refer': return 'REFER & EARN';
       case 'rules': return 'RULES & FAIRPLAY';
       case 'profile': return 'PLAYER PROFILE';
       case 'admin': return isAdmin ? 'ORGANIZER ADMIN' : 'HOST ARENA';
@@ -245,6 +246,32 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
             >
               <span>✈️</span>
             </a>
+
+            {/* Refer & Earn Header Button */}
+            <button 
+              onClick={() => setCurrentView('refer')}
+              style={{
+                background: currentView === 'refer' ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' : 'rgba(255, 214, 0, 0.12)',
+                border: '1px solid rgba(255, 214, 0, 0.4)',
+                color: currentView === 'refer' ? '#000' : '#ffd600',
+                height: '28px',
+                padding: '0 8px',
+                borderRadius: '14px',
+                fontSize: '0.72rem',
+                fontWeight: '900',
+                fontFamily: 'var(--font-heading)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px',
+                boxShadow: '0 2px 8px rgba(255, 214, 0, 0.2)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
+            >
+              <span style={{ fontSize: '0.78rem' }}>🎁</span>
+              <span>REFER</span>
+            </button>
 
             {/* Wallet Cash Button */}
             <div 

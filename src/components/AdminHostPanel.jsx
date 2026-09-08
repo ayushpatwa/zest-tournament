@@ -101,6 +101,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [isSavingQr, setIsSavingQr] = useState(false);
   const [qrUploadPreview, setQrUploadPreview] = useState(depositQrConfig?.qrImageUrl || '');
 
+  // Referral & Signup Bonus Settings
+  const [referralRewardSetting, setReferralRewardSetting] = useState(5);
+  const [welcomeBonusSetting, setWelcomeBonusSetting] = useState(5);
+  const [referralSaveStatus, setReferralSaveStatus] = useState('');
+  const [isSavingReferralSettings, setIsSavingReferralSettings] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeToAppSettingsRealtime((settings) => {
+      if (settings) {
+        if (typeof settings.referralReward === 'number') setReferralRewardSetting(settings.referralReward);
+        if (typeof settings.welcomeBonus === 'number') setWelcomeBonusSetting(settings.welcomeBonus);
+      }
+    });
+    return () => unsub();
+  }, []);
+
   useEffect(() => {
     if (depositQrConfig) {
       if (depositQrConfig.qrImageUrl) {
@@ -111,6 +127,23 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
       if (depositQrConfig.upiId) setQrUpiId(depositQrConfig.upiId);
     }
   }, [depositQrConfig]);
+
+  const handleSaveReferralSettings = async (e) => {
+    e.preventDefault();
+    setIsSavingReferralSettings(true);
+    setReferralSaveStatus('');
+    const res = await saveAppSettingsRealtime({
+      referralReward: Number(referralRewardSetting) || 5,
+      welcomeBonus: Number(welcomeBonusSetting) || 5
+    });
+    setIsSavingReferralSettings(false);
+    if (res.success) {
+      setReferralSaveStatus('✅ Referral and Welcome Bonus rewards saved to Cloud successfully!');
+      setTimeout(() => setReferralSaveStatus(''), 4000);
+    } else {
+      setReferralSaveStatus(`❌ Error saving settings: ${res.error}`);
+    }
+  };
 
   const handleQrFileUpload = (e) => {
     const file = e.target.files?.[0];
@@ -741,6 +774,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                 }}
               >
                 🚀 App Update (APK)
+              </button>
+
+              <button
+                onClick={() => setActiveTab('refer_settings')}
+                className="btn"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  borderRadius: '8px',
+                  background: activeTab === 'refer_settings' ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'refer_settings' ? '#000' : '#ffd600',
+                  border: '1px solid rgba(255,214,0,0.3)',
+                  fontWeight: '900'
+                }}
+              >
+                🎁 Refer & Bonus
               </button>
             </>
           )}
@@ -2440,6 +2489,116 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
             style={{ width: '100%', height: '48px', fontWeight: '900', background: 'linear-gradient(135deg, #00e5ff 0%, #7c4dff 100%)', color: '#fff' }}
           >
             🚀 Publish Update Alert to All Players Now
+          </button>
+        </form>
+      )}
+
+      {/* MODE 9: REFERRAL & WELCOME BONUS SETTINGS */}
+      {activeTab === 'refer_settings' && (
+        <form onSubmit={handleSaveReferralSettings} className="glass-panel animate-slide-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '24px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.15rem', color: '#ffd600', marginBottom: '6px', fontFamily: 'var(--font-heading)' }}>
+              🎁 REFER & SIGNUP BONUS CONTROLS
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+              Control real-time reward coins for new player signups and referral invites. Changes sync across all player apps instantly!
+            </p>
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label>Referral Reward per Friend (₹ Coins)</label>
+              <input 
+                type="number"
+                value={referralRewardSetting}
+                onChange={(e) => setReferralRewardSetting(e.target.value)}
+                min="0"
+                max="500"
+                className="form-input"
+                required
+              />
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                Amount credited to the referrer when an invited player completes registration.
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>Signup Welcome Bonus (₹ Coins)</label>
+              <input 
+                type="number"
+                value={welcomeBonusSetting}
+                onChange={(e) => setWelcomeBonusSetting(e.target.value)}
+                min="0"
+                max="500"
+                className="form-input"
+                required
+              />
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                Amount credited immediately to every newly registered player.
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Presets */}
+          <div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '700' }}>Quick Presets:</span>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+              {[
+                { label: '5 Coins / Invite', ref: 5, wel: 5 },
+                { label: '10 Coins / Invite', ref: 10, wel: 10 },
+                { label: '15 Coins / Invite', ref: 15, wel: 10 },
+                { label: '20 Coins / Invite', ref: 20, wel: 10 },
+              ].map((p, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setReferralRewardSetting(p.ref);
+                    setWelcomeBonusSetting(p.wel);
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff',
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    fontSize: '0.72rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {referralSaveStatus && (
+            <div style={{
+              color: referralSaveStatus.startsWith('✅') ? 'var(--success)' : 'var(--danger)',
+              background: referralSaveStatus.startsWith('✅') ? 'rgba(0,230,118,0.1)' : 'rgba(255,23,68,0.1)',
+              padding: '12px',
+              borderRadius: '8px',
+              border: `1px solid ${referralSaveStatus.startsWith('✅') ? 'var(--success)' : 'var(--danger)'}`,
+              fontSize: '0.85rem'
+            }}>
+              {referralSaveStatus}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSavingReferralSettings}
+            className="btn"
+            style={{
+              width: '100%',
+              height: '46px',
+              fontWeight: '900',
+              background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)',
+              color: '#000',
+              cursor: 'pointer'
+            }}
+          >
+            {isSavingReferralSettings ? 'Saving Settings...' : '💾 Save Bonus & Referral Settings to Cloud'}
           </button>
         </form>
       )}

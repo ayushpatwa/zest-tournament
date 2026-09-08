@@ -8,7 +8,8 @@ export default function WalletPage({
   transactions = [], 
   setTransactions,
   userProfile,
-  depositQrConfig
+  depositQrConfig,
+  setCurrentView
 }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState('100');
@@ -222,6 +223,52 @@ export default function WalletPage({
           <span style={{ color: '#00e5ff' }}>⚡ UPI Payouts</span>
           <span style={{ color: '#ffd600' }}>Min. ₹50</span>
         </div>
+      </div>
+
+      {/* Refer & Earn Promo Banner in Wallet */}
+      <div 
+        className="glass-panel" 
+        onClick={() => typeof setCurrentView === 'function' && setCurrentView('refer')}
+        style={{
+          background: 'linear-gradient(135deg, rgba(255, 214, 0, 0.12) 0%, rgba(0, 229, 255, 0.08) 100%)',
+          border: '1px solid rgba(255, 214, 0, 0.35)',
+          borderRadius: '14px',
+          padding: '14px 16px',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '10px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '1.5rem' }}>🎁</span>
+          <div>
+            <strong style={{ fontSize: '0.85rem', color: '#ffd600', display: 'block' }}>
+              Want Free Coins for Tournaments?
+            </strong>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+              Refer friends & earn coins on every signup!
+            </span>
+          </div>
+        </div>
+
+        <button
+          style={{
+            background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)',
+            border: 'none',
+            color: '#000',
+            fontWeight: '900',
+            fontFamily: 'var(--font-heading)',
+            fontSize: '0.72rem',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          Refer & Earn →
+        </button>
       </div>
 
       {/* Transaction History */}

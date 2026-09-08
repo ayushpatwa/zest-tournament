@@ -1230,3 +1230,178 @@ export const addDemoPlayersToAllMatchesRealtime = async () => {
   }
 };
 
+/**
+ * Looks up a user in Firestore or local cache by their Referral Code or Free Fire UID
+ */
+export const findUserByReferralCodeOrUid = async (referralCodeInput) => {
+  try {
+    if (!referralCodeInput || !referralCodeInput.trim()) {
+      return { success: false, error: 'Please enter a referral code.' };
+    }
+
+    const rawInput = referralCodeInput.trim();
+    // Normalize code by stripping common prefixes like ZEST-, ZEST, etc.
+    const cleanCode = rawInput.replace(/^zest[-_]?/i, '').toLowerCase();
+    const rawLower = rawInput.toLowerCase();
+
+    // 1. Search Firestore users collection
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    let matchedReferrer = null;
+
+    snapshot.forEach((docSnap) => {
+      const u = docSnap.data();
+      const uUid = String(u.uid || '').trim().toLowerCase();
+      const uId = String(u.id || docSnap.id || '').trim().toLowerCase();
+      const uRefCode = String(u.referralCode || '').trim().toLowerCase();
+
+      if (
+        uUid === cleanCode || 
+        uUid === rawLower || 
+        uId === rawLower || 
+        uRefCode === rawLower || 
+        uRefCode === cleanCode
+      ) {
+        matchedReferrer = { id: docSnap.id, ...u };
+      }
+    });
+
+    if (matchedReferrer) {
+      return { success: true, referrer: matchedReferrer };
+    }
+
+    // 2. Local cache fallback
+    const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const foundLocal = localUsers.find(u => {
+      const uUid = String(u.uid || '').trim().toLowerCase();
+      const uId = String(u.id || '').trim().toLowerCase();
+      const uRefCode = String(u.referralCode || '').trim().toLowerCase();
+      return uUid === cleanCode || uUid === rawLower || uId === rawLower || uRefCode === rawLower;
+    });
+
+    if (foundLocal) {
+      return { success: true, referrer: foundLocal };
+    }
+
+    return { success: false, error: 'Invalid referral code. No player found with this code.' };
+  } catch (err) {
+    console.error("[Firebase] findUserByReferralCodeOrUid error:", err);
+    return { success: false, error: err.message || 'Failed to verify referral code.' };
+  }
+};
+
+/**
+ * Credits referral reward coins to the referrer's account in Firestore and logs the referral record
+ */
+export const creditReferralRewardRealtime = async (referrerUidOrId, rewardAmount, refereeNickname, refereeUid) => {
+  try {
+    const amt = Number(rewardAmount) || 5;
+    const cleanReferrer = String(referrerUidOrId || '').trim();
+
+    if (!cleanReferrer) return { success: false, error: 'Missing referrer identifier.' };
+
+    // 1. Locate referrer in Firestore
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    let referrerDocRef = null;
+    let currentReferrerData = null;
+
+    snapshot.forEach((docSnap) => {
+      const u = docSnap.data();
+      const uUid = String(u.uid || '').trim();
+      const uId = String(u.id || docSnap.id).trim();
+      if (uUid === cleanReferrer || uId === cleanReferrer || docSnap.id === cleanReferrer) {
+        referrerDocRef = doc(db, "users", docSnap.id);
+        currentReferrerData = { id: docSnap.id, ...u };
+      }
+    });
+
+    const newTx = {
+      id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      type: 'CREDIT',
+      amount: amt,
+      title: '🎁 Referral Bonus',
+      reason: `Invited ${refereeNickname} (UID: ${refereeUid})`,
+      date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      timestamp: new Date().toISOString(),
+      status: 'Success'
+    };
+
+    if (referrerDocRef) {
+      await updateDoc(referrerDocRef, {
+        wallet: increment(amt),
+        referralCount: increment(1),
+        referralEarnings: increment(amt),
+        transactions: arrayUnion(newTx),
+        updatedAt: serverTimestamp()
+      });
+      console.log(`[Firebase] Successfully credited ₹${amt} referral bonus to ${cleanReferrer}`);
+    }
+
+    // 2. Also log in dedicated "referrals" collection for clear activity streaming
+    const referralLogDoc = doc(db, "referrals", `ref_${refereeUid}_${Date.now()}`);
+    await setDoc(referralLogDoc, {
+      referrerUid: String(currentReferrerData?.uid || cleanReferrer),
+      referrerNickname: currentReferrerData?.nickname || 'Referrer',
+      refereeUid: String(refereeUid),
+      refereeNickname: refereeNickname,
+      rewardAmount: amt,
+      createdAt: serverTimestamp(),
+      dateString: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    });
+
+    // 3. Update local storage cache if referrer is currently logged in locally
+    const currentUser = JSON.parse(localStorage.getItem('zest_current_user') || 'null');
+    if (currentUser && (currentUser.uid === cleanReferrer || currentUser.id === cleanReferrer)) {
+      const updatedUser = {
+        ...currentUser,
+        wallet: (Number(currentUser.wallet) || 0) + amt,
+        referralCount: (Number(currentUser.referralCount) || 0) + 1,
+        referralEarnings: (Number(currentUser.referralEarnings) || 0) + amt,
+        transactions: [newTx, ...(currentUser.transactions || [])]
+      };
+      localStorage.setItem('zest_current_user', JSON.stringify(updatedUser));
+      localStorage.setItem('zest_user_profile', JSON.stringify(updatedUser));
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error("[Firebase] creditReferralRewardRealtime error:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Real-time listener for referral history of a specific user
+ */
+export const subscribeToUserReferralsRealtime = (userUid, onUpdate, onError) => {
+  try {
+    const cleanUid = String(userUid || '').trim().toLowerCase();
+    if (!cleanUid) {
+      onUpdate([]);
+      return () => {};
+    }
+
+    const referralsCol = collection(db, "referrals");
+    const unsubscribe = onSnapshot(referralsCol, (snapshot) => {
+      const list = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (String(data.referrerUid || '').trim().toLowerCase() === cleanUid) {
+          list.push({ id: docSnap.id, ...data });
+        }
+      });
+      // Sort newest first
+      list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      onUpdate(list);
+    }, (error) => {
+      console.warn("[Firebase] subscribeToUserReferrals error:", error);
+      if (onError) onError(error);
+    });
+
+    return unsubscribe;
+  } catch (err) {
+    console.error("[Firebase] subscribeToUserReferrals init error:", err);
+    return () => {};
+  }
+};
