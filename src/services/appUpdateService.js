@@ -1,8 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 
 // App Version & Update Service
-export const CURRENT_APP_VERSION = '1.4.5';
-export const CURRENT_BUILD_NUMBER = 7;
+export const CURRENT_APP_VERSION = '1.4.6';
+export const CURRENT_BUILD_NUMBER = 8;
 
 /**
  * Checks if the user is running the installed native Android/iOS APK
