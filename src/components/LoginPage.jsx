@@ -13,7 +13,7 @@ import {
 import { dispatchRealOtp } from '../services/otpService';
 
 export default function LoginPage({ onLoginSuccess }) {
-  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'admin' | 'forgot'
+  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'forgot'
   const [welcomeBonus, setWelcomeBonus] = useState(5);
   const [referralRewardAmount, setReferralRewardAmount] = useState(5);
   const [referralCodeInput, setReferralCodeInput] = useState('');
@@ -57,10 +57,6 @@ export default function LoginPage({ onLoginSuccess }) {
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
   
-  // Admin Login state
-  const [adminUsername, setAdminUsername] = useState('admin');
-  const [adminPasscode, setAdminPasscode] = useState('');
-
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -384,59 +380,6 @@ export default function LoginPage({ onLoginSuccess }) {
     }
   };
 
-  // Dedicated Admin Portal Login Handler
-  const handleAdminLogin = async (e) => {
-    e.preventDefault();
-    setErrorMsg('');
-    const user = adminUsername.trim().toLowerCase();
-    const pass = adminPasscode.trim();
-
-    const isValidUser = 
-      user === 'admin' || 
-      user === '9084311275' || 
-      user === 'admin@zest.gg';
-
-    const isValidPass = 
-      pass === 'Zest@2008' || 
-      pass === 'admin123' || 
-      pass.toLowerCase() === 'zest2008' ||
-      pass === 'admin';
-
-    if (isValidUser && isValidPass) {
-      setLoading(true);
-      const adminUser = {
-        id: 'admin_master_1',
-        nickname: '👑 ZEST TOURNAMENT ADMIN',
-        uid: '9084311275',
-        email: 'admin@zest.gg',
-        phone: '+91 9084311275',
-        role: 'admin',
-        isHost: true,
-        wallet: 99999,
-        stats: {
-          matches: 100,
-          wins: 95,
-          kills: 1000,
-          earnings: 99999
-        }
-      };
-
-      sendToMakeWebhook({
-        eventType: 'ADMIN_LOGIN',
-        nickname: adminUser.nickname,
-        ffUid: adminUser.uid,
-        email: adminUser.email,
-        phone: adminUser.phone,
-        details: 'Master Admin authenticated via Admin Portal tab'
-      }).catch(err => console.warn('[Webhook] Admin login warning:', err));
-
-      setLoading(false);
-      onLoginSuccess(adminUser);
-    } else {
-      setErrorMsg('❌ Invalid Admin username or passcode. (Default: admin / Zest@2008 or admin123)');
-    }
-  };
-
   // Step 1 of Password Reset: Look up user and dispatch Email OTP
   const handleInitiatePasswordRecovery = async (e) => {
     e.preventDefault();
@@ -602,9 +545,7 @@ export default function LoginPage({ onLoginSuccess }) {
       {/* Brand Header */}
       <div style={{ textAlign: 'center', marginBottom: '20px' }}>
         <div style={{
-          background: authMode === 'admin' 
-            ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' 
-            : 'linear-gradient(135deg, var(--primary) 0%, #ff1744 100%)',
+          background: 'linear-gradient(135deg, var(--primary) 0%, #ff1744 100%)',
           width: '56px',
           height: '56px',
           borderRadius: '16px',
@@ -612,11 +553,11 @@ export default function LoginPage({ onLoginSuccess }) {
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '2rem',
-          boxShadow: authMode === 'admin' ? '0 0 20px rgba(255, 214, 0, 0.5)' : 'var(--glow-primary)',
+          boxShadow: 'var(--glow-primary)',
           marginBottom: '12px',
           transition: 'all 0.3s ease'
         }}>
-          {authMode === 'admin' ? '👑' : '🔥'}
+          🔥
         </div>
         <h1 style={{
           fontSize: '1.75rem',
@@ -703,27 +644,6 @@ export default function LoginPage({ onLoginSuccess }) {
             }}
           >
             REGISTER
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setAuthMode('admin'); setErrorMsg(''); }}
-            style={{
-              flex: 1,
-              padding: '8px 4px',
-              border: 'none',
-              borderRadius: '6px',
-              background: authMode === 'admin' ? 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)' : 'transparent',
-              color: authMode === 'admin' ? '#000' : '#fff',
-              fontFamily: 'var(--font-heading)',
-              fontSize: '0.75rem',
-              fontWeight: '900',
-              cursor: 'pointer',
-              boxShadow: authMode === 'admin' ? '0 0 15px rgba(255, 214, 0, 0.4)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            👑 ADMIN
           </button>
         </div>
 
@@ -1257,68 +1177,6 @@ export default function LoginPage({ onLoginSuccess }) {
               >
                 ← Change Email
               </button>
-            </div>
-          </form>
-        )}
-
-        {/* MODE 3: ADMIN LOGIN */}
-        {authMode === 'admin' && (
-          <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{
-              background: 'rgba(255, 214, 0, 0.08)',
-              border: '1px solid rgba(255, 214, 0, 0.25)',
-              padding: '10px',
-              borderRadius: '8px',
-              fontSize: '0.75rem',
-              color: 'var(--accent)',
-              lineHeight: '1.4'
-            }}>
-              🔑 <strong>Administrator Portal:</strong> Sign in here to unlock tournament creation (Host) & Google Sheet configurations.
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Admin Username</label>
-              <input
-                type="text"
-                value={adminUsername}
-                onChange={(e) => setAdminUsername(e.target.value)}
-                placeholder="admin"
-                className="form-input"
-                required
-              />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Admin Passcode</label>
-              <input
-                type="password"
-                value={adminPasscode}
-                onChange={(e) => setAdminPasscode(e.target.value)}
-                placeholder="Enter admin passcode (Default: admin123)"
-                className="form-input"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-secondary"
-              disabled={loading}
-              style={{
-                width: '100%',
-                height: '46px',
-                marginTop: '4px',
-                fontSize: '0.88rem',
-                background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)',
-                color: '#000',
-                fontWeight: '900'
-              }}
-            >
-              {loading ? 'Authenticating...' : '👑 Access Admin Host Portal'}
-            </button>
-
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-              Default credentials: User: <code style={{ color: 'var(--secondary)' }}>admin</code> | Pass: <code style={{ color: 'var(--secondary)' }}>admin123</code>
             </div>
           </form>
         )}
