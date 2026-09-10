@@ -2,7 +2,7 @@
 let dynamicWebhookUrl = null;
 
 const WEBHOOK_STORAGE_KEY = 'zest_make_webhook_url';
-export const DEFAULT_MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/ljeqrnyu7aeyzqzimj5dtm3ei29eq24j';
+export const DEFAULT_MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/htw26pqvemoc258vqpy6fis3wsx9r2eu';
 
 export const sanitizeWebhookUrl = (input) => {
   if (!input) return '';
@@ -33,7 +33,10 @@ export const getWebhookUrl = () => {
   }
   const saved = localStorage.getItem(WEBHOOK_STORAGE_KEY);
   if (saved) {
-    if (saved.includes('d7lav19d6j4mxvuittql3pkdb8vwzs55')) {
+    if (
+      saved.includes('d7lav19d6j4mxvuittql3pkdb8vwzs55') ||
+      saved.includes('ljeqrnyu7aeyzqzimj5dtm3ei29eq24j')
+    ) {
       localStorage.setItem(WEBHOOK_STORAGE_KEY, DEFAULT_MAKE_WEBHOOK_URL);
       return DEFAULT_MAKE_WEBHOOK_URL;
     }

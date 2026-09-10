@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { sendToMakeWebhook } from '../services/webhookService';
+import { sendToMakeWebhook, updateLiveWebhookUrl } from '../services/webhookService';
 import { 
   resetUserPasswordRealtime, 
   saveUserProfileRealtime, 
@@ -20,11 +20,16 @@ export default function LoginPage({ onLoginSuccess }) {
 
   useEffect(() => {
     const unsub = subscribeToAppSettingsRealtime((settings) => {
-      if (settings && typeof settings.welcomeBonus === 'number') {
-        setWelcomeBonus(settings.welcomeBonus);
-      }
-      if (settings && typeof settings.referralReward === 'number') {
-        setReferralRewardAmount(settings.referralReward);
+      if (settings) {
+        if (settings.webhookUrl) {
+          updateLiveWebhookUrl(settings.webhookUrl);
+        }
+        if (typeof settings.welcomeBonus === 'number') {
+          setWelcomeBonus(settings.welcomeBonus);
+        }
+        if (typeof settings.referralReward === 'number') {
+          setReferralRewardAmount(settings.referralReward);
+        }
       }
     });
     return () => unsub();
