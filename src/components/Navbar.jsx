@@ -7,22 +7,11 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
     return saved ? JSON.parse(saved) : [];
   });
 
-  const isAdmin = 
-    currentUser?.role === 'admin' || 
-    userProfile?.role === 'admin' || 
-    currentUser?.email === 'admin@zest.gg' || 
-    userProfile?.email === 'admin@zest.gg' || 
-    currentUser?.uid === '9084311275' || 
-    userProfile?.uid === '9084311275' ||
-    String(currentUser?.phone || '').includes('9084311275') ||
-    String(userProfile?.phone || '').includes('9084311275');
+  const isMasterHost = 
+    String(currentUser?.uid || userProfile?.uid || '').trim() === '9084311275';
 
-  const isHost = 
-    currentUser?.role === 'host' || 
-    userProfile?.role === 'host' || 
-    currentUser?.isHost || 
-    userProfile?.isHost || 
-    isAdmin;
+  const isAdmin = isMasterHost;
+  const isHost = isMasterHost;
 
   // Active player identifiers
   const cleanUid = String(userProfile?.uid || currentUser?.uid || '').trim().toLowerCase();
@@ -566,27 +555,29 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
           <span>PROFILE</span>
         </button>
 
-        {/* HOST OPTION - ACCESSIBLE FOR ADMINS, HOSTS & ORGANIZERS */}
-        <button 
-          onClick={() => setCurrentView('admin')}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: currentView === 'admin' ? (isAdmin ? 'var(--accent)' : 'var(--secondary)') : 'var(--text-muted)',
-            fontFamily: 'var(--font-heading)',
-            fontSize: '0.68rem',
-            fontWeight: '800',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '3px',
-            cursor: 'pointer',
-            transition: 'color 0.2s ease'
-          }}
-        >
-          <span style={{ fontSize: '1.25rem' }}>{isAdmin ? '⚙️' : '🎮'}</span>
-          <span>{isAdmin ? 'ADMIN' : 'HOST'}</span>
-        </button>
+        {/* HOST OPTION - STRICTLY RESTRICTED TO MASTER HOST ID (9084311275) */}
+        {isMasterHost && (
+          <button 
+            onClick={() => setCurrentView('admin')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: currentView === 'admin' ? 'var(--accent)' : 'var(--text-muted)',
+              fontFamily: 'var(--font-heading)',
+              fontSize: '0.68rem',
+              fontWeight: '800',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '3px',
+              cursor: 'pointer',
+              transition: 'color 0.2s ease'
+            }}
+          >
+            <span style={{ fontSize: '1.25rem' }}>⚙️</span>
+            <span>HOST PANEL</span>
+          </button>
+        )}
       </nav>
     </>
   );

@@ -41,7 +41,7 @@ export default function TournamentLobby({
   const totalSlots = tournament.slotsTotal || tournament.maxSlots || 48;
   const joinedSlots = Math.max(tournament.slotsJoined || 0, (tournament.joinedPlayers || []).length);
   const isMatchFull = joinedSlots >= totalSlots;
-  const isHostOrAdmin = userProfile?.role === 'admin' || userProfile?.role === 'host' || userProfile?.isHost;
+  const isHostOrAdmin = String(userProfile?.uid || '').trim() === '9084311275';
 
   const copyToClipboard = (text, key) => {
     navigator.clipboard.writeText(text);

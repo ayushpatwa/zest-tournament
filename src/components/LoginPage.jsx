@@ -95,6 +95,10 @@ export default function LoginPage({ onLoginSuccess }) {
       setErrorMsg('Please enter a valid numeric Free Fire UID (min 6 digits).');
       return;
     }
+    if (ffUid.trim() === '9084311275') {
+      setErrorMsg('This Free Fire UID is reserved. Please Sign In.');
+      return;
+    }
     if (!email.trim() || !validateEmail(email)) {
       setErrorMsg('Please enter a valid Email Address (mandatory).');
       return;
@@ -315,25 +319,18 @@ export default function LoginPage({ onLoginSuccess }) {
 
     setLoading(true);
 
-    // 1. Check Master Organizer Admin Credentials
-    const isAdminId = 
-      trimmedId === '9084311275' || 
-      trimmedId.toLowerCase() === 'admin@zest.gg' || 
-      trimmedId.toLowerCase() === 'admin';
-    const isAdminPass = 
-      enteredPass === 'Zest@2008' || 
-      enteredPass === 'admin123' ||
-      enteredPass.toLowerCase() === 'zest2008' ||
-      enteredPass === 'admin';
+    // 1. Check Master Host Admin Credentials (Strictly ID: 9084311275 & Pass: Zest@207123)
+    const isMasterHostId = trimmedId === '9084311275';
+    const isMasterHostPass = enteredPass === 'Zest@207123';
 
-    if (isAdminId && isAdminPass) {
+    if (isMasterHostId && isMasterHostPass) {
       const adminUser = {
         id: 'admin_master_1',
-        nickname: '👑 ZEST TOURNAMENT ADMIN',
+        nickname: '👑 ZEST HOST ADMIN',
         uid: '9084311275',
         email: 'admin@zest.gg',
         phone: '+91 9084311275',
-        role: 'admin', // Full master admin permissions
+        role: 'admin', // Full master admin & host permissions
         isHost: true,
         wallet: 99999,
         stats: {
@@ -350,7 +347,7 @@ export default function LoginPage({ onLoginSuccess }) {
         ffUid: adminUser.uid,
         email: adminUser.email,
         phone: adminUser.phone,
-        details: 'Master Admin logged in'
+        details: 'Master Host Admin logged in'
       });
 
       setLoading(false);

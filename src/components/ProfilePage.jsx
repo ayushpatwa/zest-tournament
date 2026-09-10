@@ -11,6 +11,9 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout, cur
   const [successMsg, setSuccessMsg] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const isMasterHost = 
+    String(userProfile?.uid || currentUser?.uid || '').trim() === '9084311275';
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -22,6 +25,10 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout, cur
     }
     if (!uid.trim() || isNaN(uid.trim()) || uid.trim().length < 6) {
       setErrorMsg('Please enter a valid numeric Free Fire UID (min 6 digits).');
+      return;
+    }
+    if (uid.trim() === '9084311275' && !isMasterHost) {
+      setErrorMsg('This Free Fire UID is reserved.');
       return;
     }
     if (!phone.trim()) {
@@ -369,66 +376,68 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout, cur
         </button>
       </div>
 
-      {/* Host & Organizer Arena Card */}
-      <div 
-        onClick={() => setCurrentView('admin')}
-        className="glass-panel" 
-        style={{ 
-          background: 'linear-gradient(135deg, rgba(255, 214, 0, 0.08) 0%, rgba(255, 87, 34, 0.08) 100%)',
-          border: '1px solid rgba(255, 214, 0, 0.3)',
-          borderRadius: '16px',
-          padding: '16px',
-          cursor: 'pointer',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '12px',
-          boxShadow: '0 4px 18px rgba(255, 214, 0, 0.1)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '44px',
-            height: '44px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.4rem',
-            color: '#000',
-            flexShrink: 0,
-            boxShadow: '0 0 15px rgba(255, 214, 0, 0.35)'
-          }}>
-            👑
-          </div>
-          <div>
-            <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#ffd600', fontFamily: 'var(--font-heading)' }}>
-              ORGANIZER & HOST ARENA
-            </h4>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-              Create tournaments, drop room IDs & passwords & manage players
-            </p>
-          </div>
-        </div>
-
-        <button 
-          style={{
-            background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)',
-            border: 'none',
-            color: '#000',
-            borderRadius: '8px',
-            padding: '6px 14px',
-            fontSize: '0.75rem',
-            fontWeight: '900',
+      {/* Host & Organizer Arena Card - STRICTLY VISIBLE ONLY TO MASTER HOST (9084311275) */}
+      {isMasterHost && (
+        <div 
+          onClick={() => setCurrentView('admin')}
+          className="glass-panel" 
+          style={{ 
+            background: 'linear-gradient(135deg, rgba(255, 214, 0, 0.08) 0%, rgba(255, 87, 34, 0.08) 100%)',
+            border: '1px solid rgba(255, 214, 0, 0.3)',
+            borderRadius: '16px',
+            padding: '16px',
             cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            boxShadow: '0 0 10px rgba(255, 214, 0, 0.3)'
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+            boxShadow: '0 4px 18px rgba(255, 214, 0, 0.1)'
           }}
         >
-          OPEN →
-        </button>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.4rem',
+              color: '#000',
+              flexShrink: 0,
+              boxShadow: '0 0 15px rgba(255, 214, 0, 0.35)'
+            }}>
+              👑
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#ffd600', fontFamily: 'var(--font-heading)' }}>
+                ORGANIZER & HOST ARENA
+              </h4>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                Create tournaments, drop room IDs & passwords & manage players
+              </p>
+            </div>
+          </div>
+
+          <button 
+            style={{
+              background: 'linear-gradient(135deg, #ffd600 0%, #ff5722 100%)',
+              border: 'none',
+              color: '#000',
+              borderRadius: '8px',
+              padding: '6px 14px',
+              fontSize: '0.75rem',
+              fontWeight: '900',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 0 10px rgba(255, 214, 0, 0.3)'
+            }}
+          >
+            OPEN →
+          </button>
+        </div>
+      )}
 
       {/* Player Career Stats */}
       <div>
