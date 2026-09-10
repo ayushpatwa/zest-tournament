@@ -91,9 +91,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [testingWebhook, setTestingWebhook] = useState(false);
 
   // App Update Publisher states
-  const [updateVersion, setUpdateVersion] = useState('1.4.6');
-  const [updateTitle, setUpdateTitle] = useState('🔥 Push Notifications & App Enhancements (v1.4.6)!');
-  const [updateNotes, setUpdateNotes] = useState('• Real-time Push Notifications for Room Credentials & Announcements\n• Background Alerts even when app is closed\n• Cleaned and streamlined Login interface\n• General performance and stability fixes');
+  const [updateVersion, setUpdateVersion] = useState('1.4.7');
+  const [updateTitle, setUpdateTitle] = useState('🔥 Secure Host Arena & Google Sheet Sync (v1.4.7)!');
+  const [updateNotes, setUpdateNotes] = useState('• Exclusive Master Host Access & Security Lockdown\n• Google Sheet Webhook Auto-Migration\n• Background Push Notifications for Room Credentials\n• Performance & Reliability Enhancements');
   const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatePublishStatus, setUpdatePublishStatus] = useState('');
