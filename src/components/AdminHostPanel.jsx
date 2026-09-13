@@ -101,9 +101,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [isTestingResend, setIsTestingResend] = useState(false);
 
   // App Update Publisher states
-  const [updateVersion, setUpdateVersion] = useState('1.4.7');
-  const [updateTitle, setUpdateTitle] = useState('🔥 Secure Host Arena & Google Sheet Sync (v1.4.7)!');
-  const [updateNotes, setUpdateNotes] = useState('• Exclusive Master Host Access & Security Lockdown\n• Google Sheet Webhook Auto-Migration\n• Background Push Notifications for Room Credentials\n• Performance & Reliability Enhancements');
+  const [updateVersion, setUpdateVersion] = useState('1.4.8');
+  const [updateTitle, setUpdateTitle] = useState('⚡ Android Notification Panel & Performance (v1.4.8)!');
+  const [updateNotes, setUpdateNotes] = useState('• Android Pull-down Notification Panel & Heads-Up Alerts\n• Instant Room ID & Password Device Alerts\n• Resend.com Ultra-Fast OTP Gateway\n• Streamlined Performance & Reliability');
   const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatePublishStatus, setUpdatePublishStatus] = useState('');
