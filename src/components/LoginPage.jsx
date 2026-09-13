@@ -12,7 +12,6 @@ import {
 } from '../services/firebase';
 import { dispatchRealOtp } from '../services/otpService';
 import { updateLiveResendConfig } from '../services/resendService';
-import { showSystemNotification } from '../services/notificationService';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'forgot'
@@ -215,14 +214,6 @@ export default function LoginPage({ onLoginSuccess }) {
       setOtpSuccessMsg(`⚠️ Notice: ${otpRes.resend.error}`);
     }
 
-    // Also trigger instant Android notification panel alert
-    showSystemNotification({
-      id: `otp_${Date.now()}`,
-      title: '🔐 ZEST REGISTRATION OTP',
-      body: `Your verification code is: ${code}`,
-      extra: { type: 'otp' }
-    });
-
     setLoading(false);
   };
 
@@ -258,14 +249,6 @@ export default function LoginPage({ onLoginSuccess }) {
       setResendTimer(25);
       const destination = activeChannel === 'email' ? targetEmail : targetPhone;
       setOtpSuccessMsg(`✅ Fresh 6-digit OTP sent to (${destination})! Check Inbox & Spam/Junk folder.`);
-
-      // Also trigger instant Android notification panel alert
-      showSystemNotification({
-        id: `otp_${Date.now()}`,
-        title: '🔐 ZEST REGISTRATION OTP',
-        body: `Your fresh verification code is: ${newCode}`,
-        extra: { type: 'otp' }
-      });
     } catch (err) {
       console.error('[OTP Resend Error]:', err);
       setErrorMsg('Failed to resend OTP. Please check your connection and try again.');
@@ -1191,47 +1174,6 @@ export default function LoginPage({ onLoginSuccess }) {
                 lineHeight: '1.4'
               }}>
                 {otpSuccessMsg}
-              </div>
-            )}
-
-            {/* Live Security OTP Banner with 1-Click Auto Fill */}
-            {generatedOtp && (
-              <div style={{
-                background: 'rgba(255, 214, 0, 0.08)',
-                border: '1px solid rgba(255, 214, 0, 0.35)',
-                borderRadius: '10px',
-                padding: '10px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px'
-              }}>
-                <div>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--accent)', fontWeight: '700', display: 'block' }}>
-                    🔐 Verification Code
-                  </span>
-                  <span style={{ fontFamily: 'monospace', fontSize: '1.25rem', fontWeight: '900', color: '#fff', letterSpacing: '3px' }}>
-                    {generatedOtp}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setEnteredOtp(generatedOtp)}
-                  style={{
-                    background: 'rgba(255, 214, 0, 0.2)',
-                    border: '1px solid var(--accent)',
-                    color: 'var(--accent)',
-                    borderRadius: '6px',
-                    padding: '6px 12px',
-                    fontSize: '0.74rem',
-                    fontWeight: '800',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  ⚡ Auto-Fill Code
-                </button>
               </div>
             )}
 
