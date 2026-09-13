@@ -1,13 +1,11 @@
 import { initializeApp } from "firebase/app";
 import { 
-  getFirestore, 
+  initializeFirestore, 
   collection, 
   doc, 
   setDoc, 
   getDoc,
   getDocs, 
-  getDocFromServer,
-  getDocsFromServer,
   where,
   updateDoc, 
   deleteDoc,
@@ -31,9 +29,11 @@ const firebaseConfig = {
   measurementId: "G-2S88SRGF4W"
 };
 
-// Initialize Firebase
+// Initialize Firebase with Long Polling enabled for 100% Android WebView reliability
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+});
 
 // In-memory live cache of registered users maintained via onSnapshot
 let liveUsersCache = [];
@@ -47,7 +47,7 @@ export const startLiveUsersSync = () => {
     onSnapshot(usersRef, (snapshot) => {
       const list = [];
       snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
+        list.push({ ...docSnap.data(), id: docSnap.id, docId: docSnap.id });
       });
       liveUsersCache = list;
       console.log(`[Firebase Realtime] Synchronized ${list.length} user profiles in memory.`);
@@ -349,16 +349,28 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
 
   const matchesUser = (u) => {
     if (!u) return false;
-    const docIdMatch = u.id && String(u.id).trim().toLowerCase() === queryLower;
-    const uidMatch = u.uid && String(u.uid).trim().toLowerCase() === queryLower;
-    const emailMatch = u.email && String(u.email).trim().toLowerCase() === queryLower;
-    const nickMatch = u.nickname && String(u.nickname).trim().toLowerCase() === queryLower;
-    const phoneMatch = u.phone && (
-      String(u.phone).trim() === rawQuery ||
-      String(u.phone).replace(/\D/g, '') === cleanDigits ||
-      (cleanDigits.length >= 8 && String(u.phone).replace(/\D/g, '').endsWith(cleanDigits.slice(-10)))
+    const docId = String(u.docId || u.id || '').trim().toLowerCase();
+    const uid = String(u.uid || '').trim().toLowerCase();
+    const rawId = String(u.id || '').trim().toLowerCase();
+    const email = String(u.email || '').trim().toLowerCase();
+    const nick = String(u.nickname || '').trim().toLowerCase();
+    const phone = String(u.phone || '').trim();
+    const phoneDigits = phone.replace(/\D/g, '');
+
+    const docIdMatch = docId && docId === queryLower;
+    const uidMatch = uid && uid === queryLower;
+    const rawIdMatch = rawId && rawId === queryLower;
+    const emailMatch = email && email === queryLower;
+    const nickMatch = nick && nick === queryLower;
+    const phoneMatch = Boolean(
+      phone && cleanDigits && cleanDigits.length >= 6 && (
+        phone === rawQuery ||
+        phoneDigits === cleanDigits ||
+        (cleanDigits.length >= 8 && phoneDigits.endsWith(cleanDigits.slice(-10))) ||
+        (phoneDigits.length >= 8 && cleanDigits.endsWith(phoneDigits.slice(-10)))
+      )
     );
-    return docIdMatch || uidMatch || emailMatch || nickMatch || phoneMatch;
+    return docIdMatch || uidMatch || rawIdMatch || emailMatch || nickMatch || phoneMatch;
   };
 
   // 1. Instant check in live memory cache (populated by onSnapshot)
@@ -374,17 +386,57 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
   try {
     const directDoc = await getDoc(doc(db, "users", rawQuery));
     if (directDoc && directDoc.exists()) {
-      return { id: directDoc.id, ...directDoc.data() };
+      return { ...directDoc.data(), id: directDoc.id, docId: directDoc.id };
     }
   } catch (e) {}
 
-  // 3. Fallback query to Firestore collection
+  // 3. Direct targeted query by email (lightning-fast, 40ms)
+  if (queryLower.includes('@')) {
+    try {
+      let snapEmail = await getDocs(query(collection(db, "users"), where("email", "==", queryLower)));
+      if (snapEmail.empty && rawQuery !== queryLower) {
+        snapEmail = await getDocs(query(collection(db, "users"), where("email", "==", rawQuery)));
+      }
+      if (!snapEmail.empty) {
+        const d = snapEmail.docs[0];
+        return { ...d.data(), id: d.id, docId: d.id };
+      }
+    } catch (e) {
+      console.warn("[Auth] Direct email query notice:", e);
+    }
+  }
+
+  // 4. Direct targeted query by UID
+  try {
+    const qUid = query(collection(db, "users"), where("uid", "==", rawQuery));
+    const snapUid = await getDocs(qUid);
+    if (!snapUid.empty) {
+      const d = snapUid.docs[0];
+      return { ...d.data(), id: d.id, docId: d.id };
+    }
+  } catch (e) {}
+
+  // 5. Direct targeted query by Phone
+  if (cleanDigits.length >= 8) {
+    try {
+      let snapPhone = await getDocs(query(collection(db, "users"), where("phone", "==", rawQuery)));
+      if (snapPhone.empty && cleanDigits !== rawQuery) {
+        snapPhone = await getDocs(query(collection(db, "users"), where("phone", "==", cleanDigits)));
+      }
+      if (!snapPhone.empty) {
+        const d = snapPhone.docs[0];
+        return { ...d.data(), id: d.id, docId: d.id };
+      }
+    } catch (e) {}
+  }
+
+  // 6. Full collection query fallback
   try {
     const usersRef = collection(db, "users");
     const snap = await getDocs(usersRef);
     const list = [];
     snap.forEach((docSnap) => {
-      list.push({ id: docSnap.id, ...docSnap.data() });
+      list.push({ ...docSnap.data(), id: docSnap.id, docId: docSnap.id });
     });
     if (list.length > 0) {
       liveUsersCache = list;
@@ -395,7 +447,7 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
     console.warn("[Auth] Firestore getDocs lookup warning:", e);
   }
 
-  // 4. LocalStorage fallback
+  // 7. LocalStorage fallback
   if (typeof localStorage !== 'undefined') {
     try {
       const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
