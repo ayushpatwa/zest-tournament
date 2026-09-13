@@ -598,7 +598,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         to: testResendEmail.trim(),
         nickname: 'Admin Tester',
         otpCode: testCode,
-        subject: `[TEST] Zest Tournament Verification Code: ${testCode}`
+        subject: `[TEST] Zest Tournament Verification Code: ${testCode}`,
+        apiKey: resendApiKeyInput.trim(),
+        fromEmail: resendFromEmailInput.trim()
       });
 
       if (res?.success) {

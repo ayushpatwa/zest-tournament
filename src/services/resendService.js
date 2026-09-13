@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Resend.com Email Delivery Service
  * Direct, ultra-fast Email OTP delivery bypassing Make.com queue errors.
  */
@@ -130,19 +130,26 @@ export const buildOtpEmailHtml = ({ nickname = 'Player', otpCode, appName = 'Zes
 /**
  * Sends OTP Email directly via Resend.com REST API
  */
-export const sendResendOtpEmail = async ({ to, nickname = 'Player', otpCode, subject }) => {
-  const apiKey = getResendApiKey();
+export const sendResendOtpEmail = async ({ 
+  to, 
+  nickname = 'Player', 
+  otpCode, 
+  subject,
+  apiKey: apiKeyOverride,
+  fromEmail: fromEmailOverride
+}) => {
+  const apiKey = (apiKeyOverride || getResendApiKey() || '').trim();
   if (!apiKey) {
     console.warn('[Resend Service] No Resend API Key configured yet.');
-    return { success: false, reason: 'NO_API_KEY' };
+    return { success: false, reason: 'NO_API_KEY', error: 'Please enter your Resend.com API Key (re_...).' };
   }
 
   const cleanTo = (to || '').trim();
   if (!cleanTo || !cleanTo.includes('@')) {
-    return { success: false, reason: 'INVALID_RECIPIENT' };
+    return { success: false, reason: 'INVALID_RECIPIENT', error: 'Invalid recipient email address.' };
   }
 
-  const fromEmail = getResendFromEmail();
+  const fromEmail = (fromEmailOverride || getResendFromEmail() || DEFAULT_RESEND_FROM).trim();
   const mailSubject = subject || `Your Zest Tournament Verification Code: ${otpCode}`;
   const htmlContent = buildOtpEmailHtml({ nickname, otpCode });
   const textContent = `Your Zest Tournament verification code is ${otpCode}. It is valid for 5 minutes. Do not share this code with anyone.`;
@@ -184,30 +191,22 @@ export const sendResendOtpEmail = async ({ to, nickname = 'Player', otpCode, sub
     }
   }
 
-  // 2. Web Browser: Direct fetch with proxy fallback
-  try {
-    const rawRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await rawRes.json().catch(() => ({}));
-    if (rawRes.ok) {
-      console.log('[Resend Service] Web direct dispatch successful:', data);
-      return { success: true, id: data.id, data };
+  // 2. Web Browser: Try Vite proxy, Vercel Serverless proxy, or direct fetch
+  const webEndpoints = [];
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      webEndpoints.push('/api/resend/emails');
     }
+    webEndpoints.push('/api/send-otp');
+    webEndpoints.push('https://api.resend.com/emails');
+  } else {
+    webEndpoints.push('https://api.resend.com/emails');
+  }
 
-    console.warn('[Resend Service] Web direct error:', data);
-    return { success: false, error: data.message || `HTTP ${rawRes.status}` };
-  } catch (webErr) {
-    console.warn('[Resend Service] Direct browser fetch failed (likely CORS), attempting fallback proxy...', webErr);
+  let lastError = null;
+  for (const endpoint of webEndpoints) {
     try {
-      const proxyUrl = 'https://corsproxy.io/?url=' + encodeURIComponent('https://api.resend.com/emails');
-      const proxyRes = await fetch(proxyUrl, {
+      const rawRes = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -215,13 +214,25 @@ export const sendResendOtpEmail = async ({ to, nickname = 'Player', otpCode, sub
         },
         body: JSON.stringify(payload)
       });
-      const proxyData = await proxyRes.json().catch(() => ({}));
-      if (proxyRes.ok) {
-        return { success: true, id: proxyData.id, data: proxyData };
+
+      const data = await rawRes.json().catch(() => ({}));
+      if (rawRes.ok) {
+        console.log(`[Resend Service] Web dispatch via ${endpoint} successful:`, data);
+        return { success: true, id: data.id, data };
+      } else {
+        lastError = data.message || `HTTP ${rawRes.status}`;
+        console.warn(`[Resend Service] Web dispatch via ${endpoint} returned error:`, lastError);
       }
-      return { success: false, error: proxyData.message || `Proxy HTTP ${proxyRes.status}` };
-    } catch (proxyErr) {
-      return { success: false, error: webErr.message };
+    } catch (endpointErr) {
+      lastError = endpointErr.message;
+      console.warn(`[Resend Service] Failed to dispatch via ${endpoint}:`, endpointErr.message);
     }
   }
+
+  return { 
+    success: false, 
+    error: lastError === 'Failed to fetch' 
+      ? 'Browser CORS blocked direct request. In the Android APK app, this works 100% natively without CORS! On web, please deploy on Vercel or test in APK.' 
+      : (lastError || 'Failed to dispatch email') 
+  };
 };
