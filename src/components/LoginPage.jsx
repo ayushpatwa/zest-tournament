@@ -67,15 +67,11 @@ export default function LoginPage({ onLoginSuccess }) {
 
   // Timer countdown effect for OTP resend
   useEffect(() => {
-    let interval = null;
-    if (resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer(prev => prev - 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    if (resendTimer <= 0) return;
+    const interval = setInterval(() => {
+      setResendTimer(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
   }, [resendTimer]);
 
   const validateEmail = (val) => {
@@ -203,34 +199,49 @@ export default function LoginPage({ onLoginSuccess }) {
       channel: verifyChannel
     });
 
-    setResendTimer(30);
+    setResendTimer(25);
     setAuthMode('otp_verify');
     setLoading(false);
   };
 
-  // Step 2: Resend OTP
-  const handleResendOtp = async () => {
+  // Step 2: Resend OTP (supports optional channel switch)
+  const handleResendOtp = async (channelOverride) => {
     if (resendTimer > 0) return;
     setErrorMsg('');
     setOtpSuccessMsg('');
     setLoading(true);
 
+    const activeChannel = channelOverride || verifyChannel;
+    if (channelOverride && channelOverride !== verifyChannel) {
+      setVerifyChannel(channelOverride);
+    }
+
     const newCode = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(newCode);
     setEnteredOtp('');
 
-    await dispatchRealOtp({
-      email: pendingUser?.email || email,
-      phone: pendingUser?.phone || phone,
-      nickname: pendingUser?.nickname || nickname,
-      ffUid: pendingUser?.uid || ffUid,
-      otpCode: newCode,
-      channel: verifyChannel
-    });
+    const targetEmail = pendingUser?.email || email;
+    const targetPhone = pendingUser?.phone || phone;
 
-    setResendTimer(30);
-    setOtpSuccessMsg(`✅ New 6-digit OTP code sent to your ${verifyChannel === 'email' ? 'Email' : 'Phone'}!`);
-    setLoading(false);
+    try {
+      await dispatchRealOtp({
+        email: targetEmail,
+        phone: targetPhone,
+        nickname: pendingUser?.nickname || nickname,
+        ffUid: pendingUser?.uid || ffUid,
+        otpCode: newCode,
+        channel: activeChannel
+      });
+
+      setResendTimer(25);
+      const destination = activeChannel === 'email' ? targetEmail : targetPhone;
+      setOtpSuccessMsg(`✅ Fresh 6-digit OTP sent to your ${activeChannel === 'email' ? 'Email' : 'Phone SMS'} (${destination})!`);
+    } catch (err) {
+      console.error('[OTP Resend Error]:', err);
+      setErrorMsg('Failed to resend OTP. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Step 3: Verify OTP and complete registration in Cloud Firestore
@@ -432,7 +443,7 @@ export default function LoginPage({ onLoginSuccess }) {
         channel: 'email'
       }).catch(err => console.warn('[OTP] Background dispatch warning:', err));
 
-      setResendTimer(30);
+      setResendTimer(25);
       setAuthMode('forgot_otp_verify');
     } catch (err) {
       console.error('[OTP Recovery Error]:', err);
@@ -454,19 +465,20 @@ export default function LoginPage({ onLoginSuccess }) {
       setRecoverOtp(newCode);
       setEnteredRecoverOtp('');
 
-      dispatchRealOtp({
+      await dispatchRealOtp({
         email: recoverUser.email,
         phone: recoverUser.phone || '',
         nickname: recoverUser.nickname || 'Player',
         ffUid: recoverUser.uid || recoverIdentifier,
         otpCode: newCode,
         channel: 'email'
-      }).catch(err => console.warn('[OTP Resend] Background dispatch warning:', err));
+      });
 
-      setResendTimer(30);
-      setResetSuccessMsg(`✅ New 6-digit OTP code sent to ${recoverUser.email}!`);
+      setResendTimer(25);
+      setResetSuccessMsg(`✅ Fresh 6-digit OTP sent to ${recoverUser.email}! Check inbox & spam folder.`);
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to resend OTP.');
+      console.error('[OTP Resend Error]:', err);
+      setErrorMsg(err.message || 'Failed to resend OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -900,36 +912,82 @@ export default function LoginPage({ onLoginSuccess }) {
               {loading ? 'Verifying & Updating...' : '✅ Verify OTP & Update Password'}
             </button>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            {/* DEDICATED RESEND OTP SECTION */}
+            <div style={{
+              marginTop: '6px',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              background: 'rgba(20, 26, 38, 0.75)',
+              border: '1px solid rgba(0, 229, 255, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Didn't receive email code?</span>
+                {resendTimer > 0 ? (
+                  <span style={{ color: '#00e5ff', fontWeight: '800', fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                    ⏳ Resend in {resendTimer}s
+                  </span>
+                ) : (
+                  <span style={{ color: '#00e676', fontWeight: '800', fontSize: '0.78rem' }}>
+                    ⚡ Ready to resend
+                  </span>
+                )}
+              </div>
+
+              {/* Countdown Progress Bar */}
+              {resendTimer > 0 && (
+                <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${((25 - resendTimer) / 25) * 100}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #ff9100, #00e5ff)',
+                    transition: 'width 1s linear'
+                  }} />
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handleResendRecoverOtp}
                 disabled={resendTimer > 0 || loading}
-                className="btn btn-outline"
+                className="btn"
                 style={{
-                  flex: 1,
-                  height: '38px',
-                  fontSize: '0.74rem',
-                  color: resendTimer > 0 ? 'var(--text-muted)' : 'var(--secondary)',
-                  borderColor: resendTimer > 0 ? 'rgba(255,255,255,0.1)' : 'var(--secondary)'
+                  width: '100%',
+                  height: '42px',
+                  fontSize: '0.82rem',
+                  fontWeight: '800',
+                  letterSpacing: '0.5px',
+                  borderRadius: '8px',
+                  transition: 'all 0.2s ease',
+                  background: resendTimer === 0 
+                    ? 'linear-gradient(135deg, rgba(0, 229, 255, 0.25) 0%, rgba(0, 230, 118, 0.25) 100%)' 
+                    : 'rgba(255, 255, 255, 0.05)',
+                  color: resendTimer === 0 ? '#00e5ff' : 'var(--text-muted)',
+                  border: resendTimer === 0 ? '1px solid #00e5ff' : '1px solid rgba(255, 255, 255, 0.1)',
+                  cursor: resendTimer === 0 ? 'pointer' : 'not-allowed',
+                  boxShadow: resendTimer === 0 ? '0 0 15px rgba(0, 229, 255, 0.3)' : 'none'
                 }}
               >
-                {resendTimer > 0 ? `⏳ Resend OTP (${resendTimer}s)` : '🔄 Resend Email OTP'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setAuthMode('forgot'); setErrorMsg(''); setResetSuccessMsg(''); }}
-                className="btn btn-outline"
-                style={{
-                  flex: 1,
-                  height: '38px',
-                  fontSize: '0.74rem'
-                }}
-              >
-                ← Back
+                {loading ? 'Sending fresh OTP...' : resendTimer > 0 ? `⏳ Wait ${resendTimer}s to Resend` : '🔄 Resend Email OTP Code'}
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={() => { setAuthMode('forgot'); setErrorMsg(''); setResetSuccessMsg(''); }}
+              className="btn btn-outline"
+              style={{
+                width: '100%',
+                height: '36px',
+                fontSize: '0.76rem',
+                color: 'var(--text-secondary)',
+                borderColor: 'rgba(255, 255, 255, 0.15)'
+              }}
+            >
+              ← Back to Find Account
+            </button>
           </form>
         )}
 
@@ -1147,39 +1205,125 @@ export default function LoginPage({ onLoginSuccess }) {
                 color: enteredOtp.length === 6 ? '#000' : 'var(--text-muted)'
               }}
             >
-              {loading ? 'Verifying...' : '✅ Verify Email OTP & Complete Registration'}
+              {loading ? 'Verifying...' : `✅ Verify ${verifyChannel === 'email' ? 'Email' : 'SMS'} OTP & Complete Registration`}
             </button>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            {/* DEDICATED RESEND OTP SECTION */}
+            <div style={{
+              marginTop: '6px',
+              padding: '14px',
+              borderRadius: '12px',
+              background: 'rgba(20, 26, 38, 0.75)',
+              border: '1px solid rgba(0, 229, 255, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Didn't receive verification code?</span>
+                {resendTimer > 0 ? (
+                  <span style={{ color: '#00e5ff', fontWeight: '800', fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                    ⏳ Resend in {resendTimer}s
+                  </span>
+                ) : (
+                  <span style={{ color: '#00e676', fontWeight: '800', fontSize: '0.78rem' }}>
+                    ⚡ Ready to resend
+                  </span>
+                )}
+              </div>
+
+              {/* Progress Bar */}
+              {resendTimer > 0 && (
+                <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${((25 - resendTimer) / 25) * 100}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #ff9100, #00e5ff)',
+                    transition: 'width 1s linear'
+                  }} />
+                </div>
+              )}
+
+              {/* Primary Resend Button */}
               <button
                 type="button"
-                onClick={handleResendOtp}
+                onClick={() => handleResendOtp()}
                 disabled={resendTimer > 0 || loading}
-                className="btn btn-outline"
+                className="btn"
                 style={{
-                  flex: 1,
-                  height: '38px',
-                  fontSize: '0.74rem',
-                  color: resendTimer > 0 ? 'var(--text-muted)' : 'var(--secondary)',
-                  borderColor: resendTimer > 0 ? 'rgba(255,255,255,0.1)' : 'var(--secondary)'
+                  width: '100%',
+                  height: '42px',
+                  fontSize: '0.82rem',
+                  fontWeight: '800',
+                  letterSpacing: '0.5px',
+                  borderRadius: '8px',
+                  transition: 'all 0.2s ease',
+                  background: resendTimer === 0 
+                    ? 'linear-gradient(135deg, rgba(0, 229, 255, 0.25) 0%, rgba(0, 230, 118, 0.25) 100%)' 
+                    : 'rgba(255, 255, 255, 0.05)',
+                  color: resendTimer === 0 ? '#00e5ff' : 'var(--text-muted)',
+                  border: resendTimer === 0 ? '1px solid #00e5ff' : '1px solid rgba(255, 255, 255, 0.1)',
+                  cursor: resendTimer === 0 ? 'pointer' : 'not-allowed',
+                  boxShadow: resendTimer === 0 ? '0 0 15px rgba(0, 229, 255, 0.3)' : 'none'
                 }}
               >
-                {resendTimer > 0 ? `⏳ Resend OTP (${resendTimer}s)` : '🔄 Resend Email OTP'}
+                {loading ? 'Sending fresh OTP...' : resendTimer > 0 ? `⏳ Wait ${resendTimer}s to Resend` : `🔄 Resend OTP to ${verifyChannel === 'email' ? 'Email' : 'Phone'}`}
               </button>
 
-              <button
-                type="button"
-                onClick={() => { setAuthMode('signup'); setErrorMsg(''); setOtpSuccessMsg(''); }}
-                className="btn btn-outline"
-                style={{
-                  flex: 1,
-                  height: '38px',
-                  fontSize: '0.74rem'
-                }}
-              >
-                ← Change Email
-              </button>
+              {/* Optional Alternate Channel Switch */}
+              {verifyChannel === 'email' && (pendingUser?.phone || phone) && (
+                <button
+                  type="button"
+                  onClick={() => handleResendOtp('phone')}
+                  disabled={resendTimer > 0 || loading}
+                  className="btn btn-outline"
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    fontSize: '0.74rem',
+                    color: resendTimer === 0 ? '#ffb300' : 'var(--text-muted)',
+                    borderColor: resendTimer === 0 ? 'rgba(255, 179, 0, 0.4)' : 'rgba(255, 255, 255, 0.08)',
+                    background: 'transparent'
+                  }}
+                >
+                  📱 Email delayed? Resend via Phone SMS instead
+                </button>
+              )}
+
+              {verifyChannel === 'phone' && (pendingUser?.email || email) && (
+                <button
+                  type="button"
+                  onClick={() => handleResendOtp('email')}
+                  disabled={resendTimer > 0 || loading}
+                  className="btn btn-outline"
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    fontSize: '0.74rem',
+                    color: resendTimer === 0 ? '#00e5ff' : 'var(--text-muted)',
+                    borderColor: resendTimer === 0 ? 'rgba(0, 229, 255, 0.4)' : 'rgba(255, 255, 255, 0.08)',
+                    background: 'transparent'
+                  }}
+                >
+                  📩 SMS delayed? Resend via Email instead
+                </button>
+              )}
             </div>
+
+            <button
+              type="button"
+              onClick={() => { setAuthMode('signup'); setErrorMsg(''); setOtpSuccessMsg(''); }}
+              className="btn btn-outline"
+              style={{
+                width: '100%',
+                height: '36px',
+                fontSize: '0.76rem',
+                color: 'var(--text-secondary)',
+                borderColor: 'rgba(255, 255, 255, 0.15)'
+              }}
+            >
+              ← Edit Registration Details
+            </button>
           </form>
         )}
 
