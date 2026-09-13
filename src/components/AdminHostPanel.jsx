@@ -289,18 +289,19 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
       type: notifType
     });
     if (res.success) {
-      // 2. Dispatch System Notification banner to devices
+      // 2. Dispatch System Notification banner to local device
       await dispatchPushNotification({
+        id: res.id,
         title: notifTitle.trim(),
         message: notifMessage.trim(),
         type: notifType
       });
 
-      setNotifStatus('✅ Notification broadcasted! Sent to in-app bell 🔔 and Android notification panel.');
+      setNotifStatus('✅ Broadcast sent to Cloud! All other devices will receive the notification alert immediately in real-time.');
       setNotifTitle('');
       setNotifMessage('');
     } else {
-      setNotifStatus(`⚠️ Failed: ${res.error}`);
+      setNotifStatus(`⚠️ Failed to broadcast: ${res.error}`);
     }
     setNotifLoading(false);
     setTimeout(() => setNotifStatus(''), 6000);
@@ -2029,7 +2030,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
               boxShadow: '0 4px 15px rgba(255, 0, 127, 0.4)'
             }}
           >
-            {notifLoading ? '📢 Broadcasting Announcement to Cloud...' : '📢 Push Broadcast Notification to All Players (Bell 🔔)'}
+            {notifLoading ? '📢 Broadcasting Announcement to All Devices...' : '📢 BROADCAST TO ALL PLAYERS (Real-Time Cloud & Shade Alert)'}
           </button>
 
           <button
@@ -2040,12 +2041,12 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                 title: notifTitle.trim() || '🔥 ZEST TOURNAMENT NOTIFICATION',
                 body: notifMessage.trim() || 'Heads-up alert! This is how Room ID drops and announcements appear in your phone notification panel.'
               });
-              alert('✓ Notification triggered! Pull down the notification panel from the top of your phone screen.');
+              alert('✓ Notification triggered on YOUR phone! Pull down the notification panel from the top of your screen.\n\nNote: To send this notification to ALL other players, use the big pink "BROADCAST TO ALL PLAYERS" button.');
             }}
             className="btn btn-secondary"
             style={{ width: '100%', height: '38px', fontSize: '0.8rem', fontWeight: '800' }}
           >
-            ⚡ Test Android Notification Panel (Pull-down Shade)
+            ⚡ Test My Phone's Notification Shade (Local Device Only)
           </button>
 
           {/* Active Broadcast Announcements List */}

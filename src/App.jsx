@@ -86,32 +86,75 @@ export default function App() {
       setTournaments(liveTournaments || []);
     });
 
-    // Subscribe to broadcast notifications (Bell 🔔) & pop into Android Notification Panel
-    let isInitialNotifLoad = true;
+    // Subscribe to broadcast notifications (Bell 🔔) & pop into Android Notification Panel across all devices
     const unsubscribeNotifs = subscribeToNotificationsRealtime((notifs) => {
-      setCloudNotifications(notifs);
+      setCloudNotifications(notifs || []);
 
-      // Avoid spamming old historical notifications on initial app boot
-      if (isInitialNotifLoad) {
-        isInitialNotifLoad = false;
-        return;
+      if (!Array.isArray(notifs) || notifs.length === 0) return;
+
+      const SEEN_NOTIF_KEY = 'zest_seen_notification_ids';
+      let seenIds = [];
+      try {
+        const stored = localStorage.getItem(SEEN_NOTIF_KEY);
+        seenIds = stored ? JSON.parse(stored) : [];
+      } catch (_) {
+        seenIds = [];
       }
 
-      // If a new notification arrived in real-time, immediately pop it into the Android notification panel
-      if (Array.isArray(notifs) && notifs.length > 0) {
-        const latest = notifs[0];
-        if (latest && latest.title) {
+      // Check current user identifier for targeted room drops
+      let currentUid = '';
+      try {
+        const storedUser = localStorage.getItem('zest_user');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          currentUid = String(parsed.uid || parsed.id || parsed.phone || '').trim().toLowerCase();
+        }
+      } catch (_) {}
+
+      const now = Date.now();
+      const MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+      // Inspect recent notifications (top 5)
+      notifs.slice(0, 5).forEach((item) => {
+        if (!item || !item.id || !item.title) return;
+        if (seenIds.includes(item.id)) return;
+
+        // Check age: only pop recent notifications created in last 2 hours
+        let itemTime = item.timestamp;
+        if (!itemTime && item.createdAt && typeof item.createdAt.toMillis === 'function') {
+          itemTime = item.createdAt.toMillis();
+        }
+        if (!itemTime) {
+          itemTime = parseInt(String(item.id).replace(/\D/g, '')) || 0;
+        }
+        if (itemTime > 0 && (now - itemTime) > MAX_AGE_MS) {
+          seenIds.push(item.id);
+          return;
+        }
+
+        // Check targeting
+        const targets = Array.isArray(item.targetUids) ? item.targetUids.map(u => String(u).trim().toLowerCase()) : [];
+        const isBroadcast = targets.length === 0;
+        const isTargetedToMe = currentUid && targets.includes(currentUid);
+
+        if (isBroadcast || isTargetedToMe) {
+          console.log('[App] New real-time notification detected for device:', item.title);
           showSystemNotification({
-            id: latest.id,
-            title: latest.title,
-            body: latest.message,
+            id: item.id,
+            title: item.title,
+            body: item.message,
             extra: {
-              tournamentId: latest.targetTournamentId,
-              type: latest.type
+              tournamentId: item.targetTournamentId,
+              type: item.type
             }
           });
+          seenIds.push(item.id);
         }
-      }
+      });
+
+      try {
+        localStorage.setItem(SEEN_NOTIF_KEY, JSON.stringify(seenIds.slice(-50)));
+      } catch (_) {}
     });
 
     // Subscribe to dynamic cloud app settings (Webhook, App Version Updates, Deposit QR)

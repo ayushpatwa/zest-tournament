@@ -40,6 +40,22 @@ export const showSystemNotification = async ({ id, title, body, extra = {} }) =>
 
   if (Capacitor.isNativePlatform()) {
     try {
+      // Ensure notification channel exists
+      try {
+        await LocalNotifications.createChannel({
+          id: 'zest_alerts',
+          name: 'Zest Match Alerts & Room Drops',
+          description: 'Instant alerts for Room ID drops, match reminders, and tournament announcements',
+          importance: 5, // High importance: pops heads-up banner on screen & drops into status bar
+          visibility: 1, // Public on lockscreen
+          sound: 'default',
+          vibration: true,
+          lights: true,
+          lightColor: '#00e5ff'
+        });
+      } catch (_) {}
+
+      // Schedule immediately without delay
       await LocalNotifications.schedule({
         notifications: [
           {
@@ -48,8 +64,7 @@ export const showSystemNotification = async ({ id, title, body, extra = {} }) =>
             id: numericId,
             channelId: 'zest_alerts',
             sound: 'default',
-            extra: extra,
-            schedule: { at: new Date(Date.now() + 50) }
+            extra: extra
           }
         ]
       });

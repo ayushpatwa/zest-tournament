@@ -805,14 +805,27 @@ export const resetUserPasswordRealtime = async (identifier, verificationPhone, n
 export const subscribeToNotificationsRealtime = (onUpdate) => {
   try {
     const notifsCollection = collection(db, "notifications");
-    const q = query(notifsCollection, orderBy("createdAt", "desc"), limit(30));
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    // Listen directly to collection for 100% reliable cross-device realtime sync
+    const unsubscribe = onSnapshot(notifsCollection, (snapshot) => {
       const list = [];
       snapshot.forEach((docSnap) => {
         list.push({ id: docSnap.id, ...docSnap.data() });
       });
-      onUpdate(list);
+      
+      // Sort client-side by timestamp descending (newest first)
+      list.sort((a, b) => {
+        const tA = (a.createdAt && typeof a.createdAt.toMillis === 'function')
+          ? a.createdAt.toMillis()
+          : (typeof a.timestamp === 'number' ? a.timestamp : (parseInt(String(a.id || '').replace(/\D/g, '')) || 0));
+        const tB = (b.createdAt && typeof b.createdAt.toMillis === 'function')
+          ? b.createdAt.toMillis()
+          : (typeof b.timestamp === 'number' ? b.timestamp : (parseInt(String(b.id || '').replace(/\D/g, '')) || 0));
+        return tB - tA;
+      });
+
+      console.log(`[Firebase Realtime] Received ${list.length} notifications live.`);
+      onUpdate(list.slice(0, 40));
     }, (err) => {
       console.warn("[Firebase] Notifications subscription warning:", err);
     });
@@ -828,7 +841,8 @@ export const subscribeToNotificationsRealtime = (onUpdate) => {
  */
 export const sendNotificationRealtime = async (notificationData) => {
   try {
-    const notifId = `notif_${Date.now()}`;
+    const now = Date.now();
+    const notifId = `notif_${now}`;
     const notifRef = doc(db, "notifications", notifId);
     await setDoc(notifRef, {
       id: notifId,
@@ -838,11 +852,12 @@ export const sendNotificationRealtime = async (notificationData) => {
       targetTournamentId: notificationData.targetTournamentId || null,
       targetUids: Array.isArray(notificationData.targetUids) ? notificationData.targetUids : [],
       tournamentTitle: notificationData.tournamentTitle || '',
+      timestamp: now,
       createdAt: serverTimestamp(),
       createdTimeStr: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + ', ' + new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
     });
     console.log(`[Firebase Realtime] Broadcast notification sent:`, notifId);
-    return { success: true };
+    return { success: true, id: notifId };
   } catch (error) {
     console.error("[Firebase] Error sending notification:", error);
     return { success: false, error: error.message };
