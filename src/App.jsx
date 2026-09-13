@@ -13,6 +13,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import AppUpdateModal from './components/AppUpdateModal';
 import { isNewVersionAvailable, CURRENT_APP_VERSION } from './services/appUpdateService';
 import { sendToMakeWebhook, updateLiveWebhookUrl } from './services/webhookService';
+import { updateLiveResendConfig } from './services/resendService';
 import { initPushNotifications } from './services/notificationService';
 import { 
   subscribeToTournamentsRealtime, 
@@ -95,6 +96,12 @@ export default function App() {
       if (settings) {
         if (settings.webhookUrl) {
           updateLiveWebhookUrl(settings.webhookUrl);
+        }
+        if (settings.resendApiKey || settings.resendFromEmail) {
+          updateLiveResendConfig({
+            apiKey: settings.resendApiKey,
+            fromEmail: settings.resendFromEmail
+          });
         }
         if (settings.depositQr) {
           setDepositQrConfig(settings.depositQr);

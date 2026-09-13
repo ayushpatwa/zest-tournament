@@ -1,5 +1,10 @@
 {
   "appId": "com.zest.tournament",
   "appName": "Zest Tournament",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
 }

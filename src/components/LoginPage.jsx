@@ -11,6 +11,7 @@ import {
   creditReferralRewardRealtime
 } from '../services/firebase';
 import { dispatchRealOtp } from '../services/otpService';
+import { updateLiveResendConfig } from '../services/resendService';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'forgot'
@@ -23,6 +24,12 @@ export default function LoginPage({ onLoginSuccess }) {
       if (settings) {
         if (settings.webhookUrl) {
           updateLiveWebhookUrl(settings.webhookUrl);
+        }
+        if (settings.resendApiKey || settings.resendFromEmail) {
+          updateLiveResendConfig({
+            apiKey: settings.resendApiKey,
+            fromEmail: settings.resendFromEmail
+          });
         }
         if (typeof settings.welcomeBonus === 'number') {
           setWelcomeBonus(settings.welcomeBonus);

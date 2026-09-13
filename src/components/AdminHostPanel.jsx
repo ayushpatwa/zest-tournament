@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
+import { getResendApiKey, getResendFromEmail, saveResendConfig, sendResendOtpEmail } from '../services/resendService';
 import { dispatchPushNotification } from '../services/notificationService';
 import { 
   saveAppSettingsRealtime, 
@@ -90,6 +91,15 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [webhookStatus, setWebhookStatus] = useState('');
   const [testingWebhook, setTestingWebhook] = useState(false);
 
+  // Resend.com Email Delivery Gateway states
+  const [resendApiKeyInput, setResendApiKeyInput] = useState(getResendApiKey());
+  const [resendFromEmailInput, setResendFromEmailInput] = useState(getResendFromEmail());
+  const [resendSaveStatus, setResendSaveStatus] = useState('');
+  const [isSavingResend, setIsSavingResend] = useState(false);
+  const [testResendEmail, setTestResendEmail] = useState('');
+  const [testResendStatus, setTestResendStatus] = useState('');
+  const [isTestingResend, setIsTestingResend] = useState(false);
+
   // App Update Publisher states
   const [updateVersion, setUpdateVersion] = useState('1.4.7');
   const [updateTitle, setUpdateTitle] = useState('🔥 Secure Host Arena & Google Sheet Sync (v1.4.7)!');
@@ -117,6 +127,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
       if (settings) {
         if (typeof settings.referralReward === 'number') setReferralRewardSetting(settings.referralReward);
         if (typeof settings.welcomeBonus === 'number') setWelcomeBonusSetting(settings.welcomeBonus);
+        if (settings.resendApiKey) setResendApiKeyInput(settings.resendApiKey);
+        if (settings.resendFromEmail) setResendFromEmailInput(settings.resendFromEmail);
       }
     });
     return () => unsub();
@@ -550,6 +562,57 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     setTimeout(() => setPayoutSuccessMsg(''), 4000);
   };
 
+  const handleSaveResendConfig = async (e) => {
+    e.preventDefault();
+    setResendSaveStatus('');
+    setIsSavingResend(true);
+    try {
+      saveResendConfig({
+        apiKey: resendApiKeyInput.trim(),
+        fromEmail: resendFromEmailInput.trim()
+      });
+      await saveAppSettingsRealtime({
+        resendApiKey: resendApiKeyInput.trim(),
+        resendFromEmail: resendFromEmailInput.trim()
+      });
+      setResendSaveStatus('✅ Resend.com settings saved and synced to cloud in real-time!');
+    } catch (err) {
+      setResendSaveStatus(`❌ Failed to save: ${err.message}`);
+    } finally {
+      setIsSavingResend(false);
+      setTimeout(() => setResendSaveStatus(''), 4000);
+    }
+  };
+
+  const handleTestResendEmail = async () => {
+    if (!testResendEmail || !testResendEmail.includes('@')) {
+      setTestResendStatus('⚠️ Please enter a valid test email address.');
+      return;
+    }
+    setTestResendStatus('⏳ Dispatching test OTP via Resend.com...');
+    setIsTestingResend(true);
+
+    try {
+      const testCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const res = await sendResendOtpEmail({
+        to: testResendEmail.trim(),
+        nickname: 'Admin Tester',
+        otpCode: testCode,
+        subject: `[TEST] Zest Tournament Verification Code: ${testCode}`
+      });
+
+      if (res?.success) {
+        setTestResendStatus(`🎉 Success! Test OTP (${testCode}) delivered to ${testResendEmail}. Resend ID: ${res.id}`);
+      } else {
+        setTestResendStatus(`❌ Error sending test email: ${res?.error || res?.reason || 'Unknown error'}`);
+      }
+    } catch (err) {
+      setTestResendStatus(`❌ Exception: ${err.message}`);
+    } finally {
+      setIsTestingResend(false);
+    }
+  };
+
   const handleSaveWebhook = async (e) => {
     e.preventDefault();
     setWebhookUrl(webhookInput);
@@ -778,7 +841,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   border: '1px solid var(--border-color)'
                 }}
               >
-                📊 Google Sheet
+                📊 Sheet & Resend.com OTP
               </button>
 
               <button
@@ -2368,57 +2431,180 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         </div>
       )}
 
-      {/* MODE 5: MAKE.COM & GOOGLE SHEETS */}
+      {/* MODE 5: INTEGRATIONS: RESEND.COM & MAKE.COM */}
       {activeTab === 'webhook' && (
-        <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <h3 style={{ fontSize: '1.05rem', color: 'var(--secondary)', marginBottom: '4px' }}>
-              📊 Make.com Webhook Integration
-            </h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-              Every user registration, tournament entry, and wallet deposit automatically sends data to this webhook to append rows directly into your <strong>Google Sheet</strong>.
-            </p>
-          </div>
-
-          <form onSubmit={handleSaveWebhook} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="form-group">
-              <label>Make.com Custom Webhook URL</label>
-              <input 
-                type="text" 
-                value={webhookInput} 
-                onChange={(e) => setWebhookInput(e.target.value)} 
-                placeholder="https://hook.eu1.make.com/xxxxxxxxx" 
-                className="form-input"
-                style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
-                required
-              />
+        <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+          
+          {/* SECTION 1: RESEND.COM EMAIL OTP DELIVERY GATEWAY */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.06) 0%, rgba(124, 77, 255, 0.06) 100%)',
+            border: '1px solid rgba(0, 229, 255, 0.3)',
+            borderRadius: '12px',
+            padding: '18px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', color: '#00e5ff', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⚡</span> Resend.com Email Delivery Gateway (Primary OTP)
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                  Ultra-fast direct Email OTP delivery. Bypasses Make.com queue limits and delivers branded OTPs directly to player inboxes in under 2 seconds!
+                </p>
+              </div>
+              <span className="badge" style={{ background: 'rgba(0, 229, 255, 0.2)', color: '#00e5ff', fontSize: '0.7rem' }}>
+                🚀 ULTRA FAST
+              </span>
             </div>
 
-            {webhookStatus && (
-              <div style={{ color: 'var(--secondary)', fontSize: '0.85rem' }}>
-                {webhookStatus}
+            <form onSubmit={handleSaveResendConfig} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Resend.com API Key <span style={{ color: 'var(--primary)' }}>* (Format: re_xxxxxxxx)</span></label>
+                <input 
+                  type="text" 
+                  value={resendApiKeyInput} 
+                  onChange={(e) => setResendApiKeyInput(e.target.value)} 
+                  placeholder="re_123456789_abcdefg..." 
+                  className="form-input"
+                  style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                  required
+                />
               </div>
-            )}
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Sender "From" Email / Domain</label>
+                <input 
+                  type="text" 
+                  value={resendFromEmailInput} 
+                  onChange={(e) => setResendFromEmailInput(e.target.value)} 
+                  placeholder="Zest Tournament <onboarding@resend.dev> or Zest Tournament <otp@yourdomain.com>" 
+                  className="form-input"
+                  style={{ fontSize: '0.85rem' }}
+                  required
+                />
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
+                  💡 Default testing sender: <code style={{ color: '#00e5ff' }}>Zest Tournament &lt;onboarding@resend.dev&gt;</code>. Add your verified domain in <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff' }}>resend.com/domains</a> to send to any player.
+                </small>
+              </div>
+
+              {resendSaveStatus && (
+                <div style={{ color: resendSaveStatus.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontSize: '0.85rem' }}>
+                  {resendSaveStatus}
+                </div>
+              )}
+
               <button 
                 type="submit" 
+                disabled={isSavingResend}
                 className="btn btn-primary"
-                style={{ flex: 1, padding: '12px' }}
+                style={{ height: '42px', fontWeight: '800' }}
               >
-                💾 Save Webhook URL
+                {isSavingResend ? 'Saving & Syncing...' : '💾 Save & Sync Resend.com Settings'}
               </button>
-              <button 
-                type="button" 
-                onClick={handleTestWebhook}
-                disabled={testingWebhook}
-                className="btn btn-secondary"
-                style={{ flex: 1, padding: '12px' }}
-              >
-                {testingWebhook ? 'Sending Ping...' : '⚡ Send Test Row'}
-              </button>
+            </form>
+
+            {/* Test Send Box */}
+            <div style={{
+              background: 'rgba(0,0,0,0.25)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '8px',
+              padding: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              <label style={{ fontSize: '0.78rem', color: '#fff', fontWeight: '700' }}>
+                🧪 Send Live Test OTP Email via Resend.com:
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  type="email" 
+                  value={testResendEmail} 
+                  onChange={(e) => setTestResendEmail(e.target.value)} 
+                  placeholder="Enter your email to receive test OTP" 
+                  className="form-input"
+                  style={{ flex: 1, height: '38px', fontSize: '0.8rem' }}
+                />
+                <button 
+                  type="button" 
+                  onClick={handleTestResendEmail}
+                  disabled={isTestingResend}
+                  className="btn btn-secondary"
+                  style={{ padding: '0 16px', height: '38px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                >
+                  {isTestingResend ? 'Sending...' : '⚡ Send Test OTP'}
+                </button>
+              </div>
+              {testResendStatus && (
+                <div style={{ fontSize: '0.78rem', color: testResendStatus.startsWith('🎉') ? 'var(--success)' : testResendStatus.startsWith('⏳') ? '#00e5ff' : 'var(--danger)' }}>
+                  {testResendStatus}
+                </div>
+              )}
             </div>
-          </form>
+          </div>
+
+          {/* SECTION 2: MAKE.COM & GOOGLE SHEETS */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '12px',
+            padding: '18px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px'
+          }}>
+            <div>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--secondary)', marginBottom: '4px' }}>
+                📊 Make.com Webhook (Google Sheets Logging)
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                Appends registration records, tournament entries, and wallet deposits directly into your <strong>Google Sheet</strong>.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveWebhook} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Make.com Custom Webhook URL</label>
+                <input 
+                  type="text" 
+                  value={webhookInput} 
+                  onChange={(e) => setWebhookInput(e.target.value)} 
+                  placeholder="https://hook.eu1.make.com/xxxxxxxxx" 
+                  className="form-input"
+                  style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                  required
+                />
+              </div>
+
+              {webhookStatus && (
+                <div style={{ color: 'var(--secondary)', fontSize: '0.85rem' }}>
+                  {webhookStatus}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  style={{ flex: 1, padding: '12px' }}
+                >
+                  💾 Save Webhook URL
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleTestWebhook}
+                  disabled={testingWebhook}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '12px' }}
+                >
+                  {testingWebhook ? 'Sending Ping...' : '⚡ Send Test Row'}
+                </button>
+              </div>
+            </form>
+          </div>
+
         </div>
       )}
 

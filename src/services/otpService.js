@@ -2,6 +2,7 @@
  * OTP Service for Automating Email and SMS Verification Delivery
  */
 import { sendToMakeWebhook } from './webhookService';
+import { sendResendOtpEmail, getResendApiKey } from './resendService';
 
 // Storage keys for optional direct Email / SMS gateway credentials
 const EMAILJS_CONFIG_KEY = 'zest_emailjs_config';
@@ -36,18 +37,44 @@ export const saveSmsGatewayConfig = (config) => {
 export const dispatchRealOtp = async ({ email, phone, nickname, ffUid, otpCode, channel = 'email' }) => {
   console.log(`[OTP Service] Dispatching real OTP ${otpCode} to ${channel.toUpperCase()}:`, channel === 'email' ? email : phone);
 
-  // 1. Send to Make.com Webhook with dedicated OTP parameters
-  // (Make.com automatically routes to Gmail / SMS modules in real-time)
-  const webhookResult = await sendToMakeWebhook({
-    eventType: 'OTP_VERIFICATION',
-    nickname: nickname || 'Player',
-    ffUid: ffUid || 'N/A',
-    email: email || '',
-    phone: phone || '',
-    otpCode: otpCode,
-    channel: channel,
-    details: `Automated ${channel.toUpperCase()} OTP Delivery: ${otpCode}`
-  });
+  let resendResult = null;
+
+  // 1. PRIMARY EMAIL DELIVERY: Resend.com REST API
+  // Bypasses Make.com queue limits and directly delivers branded OTP email
+  if (channel === 'email') {
+    try {
+      resendResult = await sendResendOtpEmail({
+        to: email,
+        nickname: nickname || 'Player',
+        otpCode: otpCode
+      });
+      if (resendResult?.success) {
+        console.log('[OTP Service] ✅ Resend.com delivered OTP successfully! ID:', resendResult.id);
+      } else {
+        console.warn('[OTP Service] Resend.com notice:', resendResult?.reason || resendResult?.error);
+      }
+    } catch (resendErr) {
+      console.warn('[OTP Service] Resend.com dispatch error:', resendErr);
+    }
+  }
+
+  // 2. MAKE.COM WEBHOOK: Send in background for Google Sheet logging & secondary trigger
+  // Wrapped safely so Make.com 400 "Queue is full" errors never block the player
+  let webhookResult = null;
+  try {
+    webhookResult = await sendToMakeWebhook({
+      eventType: 'OTP_VERIFICATION',
+      nickname: nickname || 'Player',
+      ffUid: ffUid || 'N/A',
+      email: email || '',
+      phone: phone || '',
+      otpCode: otpCode,
+      channel: channel,
+      details: `Automated ${channel.toUpperCase()} OTP Delivery: ${otpCode}`
+    });
+  } catch (makeErr) {
+    console.warn('[OTP Service] Make.com background webhook notice:', makeErr);
+  }
 
   // 2. Direct Email Delivery via EmailJS REST API (if user configured EmailJS)
   const emailConfig = getEmailConfig();
@@ -99,5 +126,5 @@ export const dispatchRealOtp = async ({ email, phone, nickname, ffUid, otpCode, 
     }
   }
 
-  return { success: true, webhook: webhookResult };
+  return { success: true, resend: resendResult, webhook: webhookResult };
 };
