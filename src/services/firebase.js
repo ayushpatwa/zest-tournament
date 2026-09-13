@@ -968,53 +968,215 @@ export const deleteNotificationRealtime = async (notificationId) => {
 };
 
 /**
- * Permanently deletes a registered player account from Firestore and local cache
+ * Permanently deletes a registered player account from Firestore and all associated collections across the entire database:
+ * 1. 'users' collection (all matching documents by docId, uid, id, email, phone, ffUid)
+ * 2. 'device_tokens' collection (removes device FCM tokens associated with the player)
+ * 3. 'tournaments' collection (removes player from joinedPlayers rosters and adjusts slotsJoined)
+ * 4. 'referrals' collection (cleans up any referral history tied to player)
+ * 5. Local storage cache (removes from zest_registered_users and active session)
  */
-export const deleteUserRealtime = async (userIdOrUid) => {
+export const deleteUserRealtime = async (userIdOrUserObj) => {
   try {
-    const queryStr = String(userIdOrUid).trim().toLowerCase();
-    const rawQuery = String(userIdOrUid).trim();
+    const targetKeys = new Set();
+    let rawQuery = '';
+    let targetNickname = '';
+
+    if (userIdOrUserObj && typeof userIdOrUserObj === 'object') {
+      if (userIdOrUserObj.uid) targetKeys.add(String(userIdOrUserObj.uid).trim().toLowerCase());
+      if (userIdOrUserObj.id) targetKeys.add(String(userIdOrUserObj.id).trim().toLowerCase());
+      if (userIdOrUserObj.email) targetKeys.add(String(userIdOrUserObj.email).trim().toLowerCase());
+      if (userIdOrUserObj.phone) {
+        const p = String(userIdOrUserObj.phone).trim().toLowerCase();
+        targetKeys.add(p);
+        targetKeys.add(p.replace(/\D/g, ''));
+      }
+      if (userIdOrUserObj.ffUid) targetKeys.add(String(userIdOrUserObj.ffUid).trim().toLowerCase());
+      if (userIdOrUserObj.nickname) {
+        targetNickname = userIdOrUserObj.nickname;
+        targetKeys.add(String(userIdOrUserObj.nickname).trim().toLowerCase());
+      }
+      rawQuery = String(userIdOrUserObj.uid || userIdOrUserObj.id || userIdOrUserObj.phone || userIdOrUserObj.email || '').trim();
+    } else if (userIdOrUserObj) {
+      rawQuery = String(userIdOrUserObj).trim();
+      const cleanRaw = rawQuery.toLowerCase();
+      targetKeys.add(cleanRaw);
+      const digitsOnly = cleanRaw.replace(/\D/g, '');
+      if (digitsOnly) targetKeys.add(digitsOnly);
+    }
+
+    targetKeys.delete('');
+
+    console.log(`[Firebase] Starting comprehensive player deletion for:`, Array.from(targetKeys));
+
+    const isUserMatch = (data, docId) => {
+      if (!data && !docId) return false;
+      const candidates = [
+        docId,
+        data?.uid,
+        data?.id,
+        data?.email,
+        data?.phone,
+        data?.phone ? String(data.phone).replace(/\D/g, '') : null,
+        data?.ffUid,
+        data?.nickname
+      ];
+      return candidates.some(c => c && targetKeys.has(String(c).trim().toLowerCase()));
+    };
+
+    // 1. Scan 'users' collection and gather all matching doc IDs and enrich targetKeys
     const usersCollection = collection(db, "users");
     const snapshot = await getDocs(usersCollection);
-    
-    let targetNickname = '';
-    const docsToDelete = [];
+    const docsToDelete = new Set();
 
     snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
-      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
-      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
-      
-      if (docIdMatch || uidMatch || emailMatch) {
-        docsToDelete.push(docSnap.id);
-        targetNickname = data.nickname || data.uid || docSnap.id;
+      const data = docSnap.data() || {};
+      if (isUserMatch(data, docSnap.id)) {
+        docsToDelete.add(docSnap.id);
+        if (data.nickname && !targetNickname) targetNickname = data.nickname;
+        if (data.uid) targetKeys.add(String(data.uid).trim().toLowerCase());
+        if (data.id) targetKeys.add(String(data.id).trim().toLowerCase());
+        if (data.email) targetKeys.add(String(data.email).trim().toLowerCase());
+        if (data.phone) {
+          const ph = String(data.phone).trim().toLowerCase();
+          targetKeys.add(ph);
+          targetKeys.add(ph.replace(/\D/g, ''));
+        }
+        if (data.ffUid) targetKeys.add(String(data.ffUid).trim().toLowerCase());
       }
     });
 
-    // Mark as deleted first then delete doc to ensure live listeners trigger auto-logout
+    if (rawQuery) {
+      docsToDelete.add(rawQuery);
+    }
+    docsToDelete.delete('');
+
+    // 2. Mark as deleted first (triggers realtime listener logout), then permanently deleteDoc
     for (const dId of docsToDelete) {
       try {
-        await updateDoc(doc(db, "users", dId), { isDeleted: true, status: 'deleted' });
-        await deleteDoc(doc(db, "users", dId));
-        console.log(`[Firebase] Successfully deleted user doc ${dId}`);
+        await updateDoc(doc(db, "users", dId), { 
+          isDeleted: true, 
+          status: 'deleted',
+          deletedAt: serverTimestamp()
+        });
       } catch (_) {}
-    }
 
-    if (docsToDelete.length === 0) {
       try {
-        await deleteDoc(doc(db, "users", rawQuery));
-      } catch (_) {}
+        await deleteDoc(doc(db, "users", dId));
+        console.log(`[Firebase] Successfully deleted user doc from 'users': ${dId}`);
+      } catch (err) {
+        console.warn(`[Firebase] deleteDoc warning on doc ${dId}:`, err);
+      }
     }
 
-    // Clean up from local storage
-    const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
-    const filtered = existingUsers.filter(u => 
-      u.uid?.trim().toLowerCase() !== queryStr && 
-      u.id?.trim().toLowerCase() !== queryStr &&
-      u.email?.trim().toLowerCase() !== queryStr
-    );
-    localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
+    // 3. Completely purge player's push notification tokens from 'device_tokens' collection
+    try {
+      const tokensCollection = collection(db, "device_tokens");
+      const tokensSnapshot = await getDocs(tokensCollection);
+      for (const tokenDoc of tokensSnapshot.docs) {
+        const tData = tokenDoc.data() || {};
+        const tUid = String(tData.uid || '').trim().toLowerCase();
+        const tNick = String(tData.nickname || '').trim().toLowerCase();
+        if (targetKeys.has(tUid) || targetKeys.has(tNick) || docsToDelete.has(tokenDoc.id)) {
+          await deleteDoc(doc(db, "device_tokens", tokenDoc.id));
+          console.log(`[Firebase] Purged device token doc: ${tokenDoc.id}`);
+        }
+      }
+    } catch (tokenErr) {
+      console.warn("[Firebase] Error purging device tokens:", tokenErr);
+    }
+
+    // 4. Remove player from joined rosters in all tournaments in 'tournaments' collection
+    try {
+      const tourneysSnapshot = await getDocs(collection(db, "tournaments"));
+      for (const tourneyDoc of tourneysSnapshot.docs) {
+        const tData = tourneyDoc.data() || {};
+        const joined = Array.isArray(tData.joinedPlayers) ? tData.joinedPlayers : [];
+        let playerFound = false;
+
+        const updatedJoined = joined.filter(p => {
+          const pUid = String(p.uid || '').trim().toLowerCase();
+          const pId = String(p.id || '').trim().toLowerCase();
+          const pEmail = String(p.email || '').trim().toLowerCase();
+          const pPhone = String(p.phone || '').trim().toLowerCase();
+          const pCleanPhone = pPhone.replace(/\D/g, '');
+          const pFfUid = String(p.ffUid || '').trim().toLowerCase();
+          const pNick = String(p.nickname || '').trim().toLowerCase();
+
+          const isMatch = 
+            targetKeys.has(pUid) || 
+            targetKeys.has(pId) || 
+            targetKeys.has(pEmail) || 
+            targetKeys.has(pPhone) || 
+            (pCleanPhone && targetKeys.has(pCleanPhone)) ||
+            targetKeys.has(pFfUid) ||
+            targetKeys.has(pNick);
+
+          if (isMatch) {
+            playerFound = true;
+            return false;
+          }
+          return true;
+        });
+
+        if (playerFound) {
+          await updateDoc(doc(db, "tournaments", tourneyDoc.id), {
+            joinedPlayers: updatedJoined,
+            slotsJoined: updatedJoined.length,
+            updatedAt: serverTimestamp()
+          });
+          console.log(`[Firebase] Removed deleted player from tournament: ${tourneyDoc.id}`);
+        }
+      }
+    } catch (tourneyErr) {
+      console.warn("[Firebase] Error removing player from tournaments:", tourneyErr);
+    }
+
+    // 5. Clean up from 'referrals' collection
+    try {
+      const referralsSnapshot = await getDocs(collection(db, "referrals"));
+      for (const refDoc of referralsSnapshot.docs) {
+        const rData = refDoc.data() || {};
+        const refUids = [
+          String(rData.referrerUid || '').trim().toLowerCase(),
+          String(rData.refereeUid || '').trim().toLowerCase(),
+          String(rData.referrerNickname || '').trim().toLowerCase(),
+          String(rData.refereeNickname || '').trim().toLowerCase()
+        ];
+        if (refUids.some(u => u && targetKeys.has(u))) {
+          await deleteDoc(doc(db, "referrals", refDoc.id));
+          console.log(`[Firebase] Purged referral log: ${refDoc.id}`);
+        }
+      }
+    } catch (refErr) {
+      console.warn("[Firebase] Error purging referrals:", refErr);
+    }
+
+    // 6. Clean up from local storage cache
+    try {
+      const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+      const filtered = existingUsers.filter(u => {
+        const uUid = String(u.uid || '').trim().toLowerCase();
+        const uId = String(u.id || '').trim().toLowerCase();
+        const uEmail = String(u.email || '').trim().toLowerCase();
+        const uPhone = String(u.phone || '').trim().toLowerCase();
+        return !targetKeys.has(uUid) && !targetKeys.has(uId) && !targetKeys.has(uEmail) && !targetKeys.has(uPhone);
+      });
+      localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
+
+      const curr = JSON.parse(localStorage.getItem('zest_current_user') || 'null');
+      if (curr) {
+        const cUid = String(curr.uid || '').trim().toLowerCase();
+        const cId = String(curr.id || '').trim().toLowerCase();
+        const cEmail = String(curr.email || '').trim().toLowerCase();
+        const cPhone = String(curr.phone || '').trim().toLowerCase();
+        if (targetKeys.has(cUid) || targetKeys.has(cId) || targetKeys.has(cEmail) || targetKeys.has(cPhone)) {
+          localStorage.removeItem('zest_current_user');
+          localStorage.removeItem('zest_wallet_transactions');
+        }
+      }
+    } catch (localErr) {
+      console.warn("[Firebase] Local cache cleanup warning:", localErr);
+    }
 
     return { success: true, nickname: targetNickname || rawQuery };
   } catch (error) {

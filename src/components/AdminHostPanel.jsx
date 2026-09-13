@@ -1950,11 +1950,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                         type="button"
                         className="btn"
                         onClick={async () => {
-                          const confirmDelete = window.confirm(`⚠️ Are you sure you want to permanently delete player "${u.nickname || u.uid}" (UID: ${u.uid || u.id})?\n\nThis will remove their account, wallet balance, and stats from Firebase.`);
+                          const confirmDelete = window.confirm(`⚠️ Are you sure you want to permanently delete player "${u.nickname || u.uid}" (UID: ${u.uid || u.id})?\n\nThis will completely wipe their account, wallet balance, device push tokens, and tournament slots from the database.`);
                           if (confirmDelete) {
-                            const res = await deleteUserRealtime(u.uid || u.id);
+                            const res = await deleteUserRealtime(u);
                             if (res.success) {
-                              alert(`✅ Player account "${u.nickname || u.uid}" was deleted successfully!`);
+                              alert(`✅ Player account "${res.nickname || u.nickname || u.uid}" was completely removed from the database!`);
                             } else {
                               alert(`⚠️ Failed to delete player: ${res.error}`);
                             }
