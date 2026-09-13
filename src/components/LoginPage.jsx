@@ -123,9 +123,9 @@ export default function LoginPage({ onLoginSuccess }) {
     setLoading(true);
 
     // Check across Firebase Cloud and Local Storage
-    const existsCheck = await checkUserExistsRealtime(ffUid.trim(), email.trim().toLowerCase());
+    const existsCheck = await checkUserExistsRealtime(ffUid.trim(), email.trim().toLowerCase(), phone.trim());
     if (existsCheck.exists) {
-      setErrorMsg('An account with this Free Fire UID or Email already exists. Please Sign In.');
+      setErrorMsg(`An account with this ${existsCheck.field || 'Free Fire UID, Email or Phone'} already exists. Please Sign In.`);
       setLoading(false);
       return;
     }
@@ -277,7 +277,13 @@ export default function LoginPage({ onLoginSuccess }) {
     setLoading(true);
 
     // 1. Save to Cloud Firestore so account is available on ALL devices instantly
-    await saveUserProfileRealtime(pendingUser);
+    const saveRes = await saveUserProfileRealtime(pendingUser);
+    if (!saveRes?.success) {
+      console.error("[Registration] Cloud save failed:", saveRes?.error);
+      setErrorMsg(`Cloud sync notice: ${saveRes?.error || 'Could not save account'}. Please check internet and try again.`);
+      setLoading(false);
+      return;
+    }
 
     // 2. Cache in local storage for faster offline launch
     const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
@@ -334,11 +340,11 @@ export default function LoginPage({ onLoginSuccess }) {
     e.preventDefault();
     setErrorMsg('');
 
-    const trimmedId = loginIdentifier.trim();
+    const trimmedId = loginIdentifier.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
     const enteredPass = password.trim();
 
     if (!trimmedId) {
-      setErrorMsg('Please enter your Free Fire UID or registered Email.');
+      setErrorMsg('Please enter your Free Fire UID, registered Email or Phone.');
       return;
     }
     if (!enteredPass) {
@@ -694,13 +700,16 @@ export default function LoginPage({ onLoginSuccess }) {
         {authMode === 'signin' && (
           <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Free Fire UID or Email</label>
+              <label>Free Fire UID, Email or Phone</label>
               <input
                 type="text"
                 value={loginIdentifier}
                 onChange={(e) => setLoginIdentifier(e.target.value)}
-                placeholder="Enter UID or Email"
+                placeholder="Enter UID, Email or Phone"
                 className="form-input"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
                 required
               />
             </div>

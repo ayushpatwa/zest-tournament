@@ -6,6 +6,9 @@ import {
   setDoc, 
   getDoc,
   getDocs, 
+  getDocFromServer,
+  getDocsFromServer,
+  where,
   updateDoc, 
   deleteDoc,
   onSnapshot, 
@@ -275,14 +278,26 @@ export const sendLobbyMessageRealtime = async (tournamentId, msgData) => {
  */
 export const saveUserProfileRealtime = async (userData) => {
   try {
-    if (!userData.uid && !userData.id) return;
+    if (!userData || (!userData.uid && !userData.id)) {
+      return { success: false, error: 'Missing user identification (UID or ID).' };
+    }
     const userId = String(userData.uid || userData.id).trim();
+
+    // Strip any undefined keys to prevent Firestore payload crashes
+    const sanitizedData = {};
+    Object.keys(userData).forEach((key) => {
+      if (userData[key] !== undefined) {
+        sanitizedData[key] = userData[key];
+      }
+    });
+
     await setDoc(doc(db, "users", userId), {
-      ...userData,
+      ...sanitizedData,
       uid: String(userData.uid || userId).trim(),
       wallet: typeof userData.wallet === 'number' ? userData.wallet : (parseFloat(userData.wallet) || 0),
       lastActive: serverTimestamp()
     }, { merge: true });
+
     console.log(`[Firebase] User profile synced for ${userId}`);
     return { success: true };
   } catch (error) {
@@ -292,75 +307,178 @@ export const saveUserProfileRealtime = async (userData) => {
 };
 
 /**
+ * Universal finder for a user in Cloud Firestore across all devices.
+ * Uses getDocFromServer and getDocsFromServer to bypass stale offline IndexedDB caches.
+ * Supports: Free Fire UID, Firestore Document ID, Email, Phone Number, and Nickname.
+ */
+export const findUserInFirestoreAcrossDevices = async (identifier) => {
+  if (!identifier) return null;
+
+  const rawQuery = String(identifier || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  if (!rawQuery) return null;
+
+  const queryLower = rawQuery.toLowerCase();
+  const cleanDigits = rawQuery.replace(/\D/g, '');
+
+  const candidateMap = new Map();
+
+  // Tier 1: Direct Document ID lookup from Firestore server
+  try {
+    const directDoc = await getDocFromServer(doc(db, "users", rawQuery)).catch(() => getDoc(doc(db, "users", rawQuery)));
+    if (directDoc && directDoc.exists()) {
+      candidateMap.set(directDoc.id, { id: directDoc.id, ...directDoc.data() });
+    }
+  } catch (e) {
+    // Ignore direct doc lookup error
+  }
+
+  // If not found yet and rawQuery has different case, check queryLower
+  if (candidateMap.size === 0 && queryLower !== rawQuery) {
+    try {
+      const lowerDoc = await getDocFromServer(doc(db, "users", queryLower)).catch(() => getDoc(doc(db, "users", queryLower)));
+      if (lowerDoc && lowerDoc.exists()) {
+        candidateMap.set(lowerDoc.id, { id: lowerDoc.id, ...lowerDoc.data() });
+      }
+    } catch (e) {}
+  }
+
+  // Tier 2: Targeted Firestore indexed queries directly from server
+  if (candidateMap.size === 0) {
+    const usersRef = collection(db, "users");
+    const queries = [
+      query(usersRef, where("uid", "==", rawQuery)),
+      query(usersRef, where("email", "==", queryLower))
+    ];
+
+    if (rawQuery !== queryLower) {
+      queries.push(query(usersRef, where("email", "==", rawQuery)));
+    }
+
+    if (cleanDigits.length >= 8) {
+      queries.push(query(usersRef, where("phone", "==", rawQuery)));
+      queries.push(query(usersRef, where("phone", "==", cleanDigits)));
+      queries.push(query(usersRef, where("phone", "==", `+91${cleanDigits.slice(-10)}`)));
+      queries.push(query(usersRef, where("phone", "==", cleanDigits.slice(-10))));
+    }
+
+    queries.push(query(usersRef, where("nickname", "==", rawQuery)));
+
+    const results = await Promise.allSettled(
+      queries.map(q => getDocsFromServer(q).catch(() => getDocs(q)))
+    );
+
+    for (const res of results) {
+      if (res.status === 'fulfilled' && res.value && !res.value.empty) {
+        res.value.forEach(docSnap => {
+          candidateMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+        });
+      }
+    }
+  }
+
+  // Tier 3: Fallback full collection scan if still not found
+  if (candidateMap.size === 0) {
+    try {
+      const usersRef = collection(db, "users");
+      const snap = await getDocsFromServer(usersRef).catch(() => getDocs(usersRef));
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        const docIdMatch = docSnap.id.trim().toLowerCase() === queryLower;
+        const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryLower;
+        const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryLower;
+        const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryLower;
+        const phoneMatch = data.phone && (
+          String(data.phone).trim() === rawQuery ||
+          (cleanDigits.length >= 8 && String(data.phone).replace(/\D/g, '').endsWith(cleanDigits.slice(-10)))
+        );
+
+        if (docIdMatch || uidMatch || emailMatch || nickMatch || phoneMatch) {
+          candidateMap.set(docSnap.id, { id: docSnap.id, ...data });
+        }
+      });
+    } catch (e) {
+      console.warn("[Auth] Users collection fallback scan warning:", e);
+    }
+  }
+
+  if (candidateMap.size > 0) {
+    return Array.from(candidateMap.values())[0];
+  }
+
+  return null;
+};
+
+/**
  * Authenticates user from Cloud Firestore across any device in real-time
  */
 export const authenticateUserRealtime = async (identifier, password) => {
   try {
-    const queryStr = String(identifier || '').trim().toLowerCase();
-    const rawQuery = String(identifier || '').trim();
+    const rawQuery = String(identifier || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+    const queryStr = rawQuery.toLowerCase();
+    const cleanDigits = rawQuery.replace(/\D/g, '');
     const cleanPass = String(password || '').trim();
 
     if (!queryStr || !cleanPass) {
-      return { success: false, error: 'Please enter your UID/Email and Password.' };
+      return { success: false, error: 'Please enter your UID, Email or Phone, and Password.' };
     }
 
-    const usersCollection = collection(db, "users");
-    const snapshot = await getDocs(usersCollection);
-    
-    let matchedUser = null;
-    let userFound = false;
+    // 1. Direct Cloud Firestore server lookup
+    const cloudUser = await findUserInFirestoreAcrossDevices(rawQuery);
 
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
-      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
-      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
-      const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
+    if (cloudUser) {
+      if (cloudUser.isDeleted) {
+        return { success: false, error: 'This account has been deactivated or deleted. Please register a new account.' };
+      }
 
-      if (docIdMatch || uidMatch || emailMatch || nickMatch) {
-        userFound = true;
-        // Verify password
-        if (data.password && String(data.password).trim() === cleanPass) {
-          matchedUser = {
-            id: docSnap.id,
-            ...data,
-            uid: data.uid || docSnap.id,
-            wallet: typeof data.wallet === 'number' ? data.wallet : (parseFloat(data.wallet) || 0)
-          };
+      if (cloudUser.password && String(cloudUser.password).trim() === cleanPass) {
+        const matchedUser = {
+          id: cloudUser.id,
+          ...cloudUser,
+          uid: cloudUser.uid || cloudUser.id,
+          wallet: typeof cloudUser.wallet === 'number' ? cloudUser.wallet : (parseFloat(cloudUser.wallet) || 0)
+        };
+
+        console.log(`[Firebase Cloud Auth] Successfully authenticated user ${matchedUser.uid || matchedUser.id} across devices.`);
+
+        // Sync to local device cache for instant offline launch
+        if (typeof localStorage !== 'undefined') {
+          try {
+            const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+            const filtered = existingUsers.filter(u => u.uid !== matchedUser.uid && u.email !== matchedUser.email);
+            filtered.push(matchedUser);
+            localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
+          } catch (storageErr) {}
         }
+
+        return { success: true, user: matchedUser };
       }
-    });
 
-    if (matchedUser) {
-      console.log(`[Firebase Cloud Auth] Successfully authenticated user ${matchedUser.uid || matchedUser.id} across devices.`);
-      
-      // Sync to local device cache
-      const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
-      const filtered = existingUsers.filter(u => u.uid !== matchedUser.uid && u.email !== matchedUser.email);
-      filtered.push(matchedUser);
-      localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
-
-      return { success: true, user: matchedUser };
-    }
-
-    if (userFound) {
       return { success: false, error: 'Incorrect Password. Please check and try again.' };
     }
 
-    // LocalStorage fallback for offline testing
-    const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
-    const localUser = localUsers.find(
-      u => (String(u.uid).trim().toLowerCase() === queryStr || String(u.email).trim().toLowerCase() === queryStr || String(u.nickname).trim().toLowerCase() === queryStr)
-    );
+    // 2. LocalStorage fallback for offline continuity
+    if (typeof localStorage !== 'undefined') {
+      const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+      const localUser = localUsers.find(u => {
+        const uidMatch = u.uid && String(u.uid).trim().toLowerCase() === queryStr;
+        const emailMatch = u.email && String(u.email).trim().toLowerCase() === queryStr;
+        const nickMatch = u.nickname && String(u.nickname).trim().toLowerCase() === queryStr;
+        const phoneMatch = u.phone && (
+          String(u.phone).trim() === rawQuery ||
+          (cleanDigits.length >= 8 && String(u.phone).replace(/\D/g, '').endsWith(cleanDigits.slice(-10)))
+        );
+        return uidMatch || emailMatch || nickMatch || phoneMatch;
+      });
 
-    if (localUser) {
-      if (String(localUser.password).trim() === cleanPass) {
-        return { success: true, user: localUser };
+      if (localUser) {
+        if (String(localUser.password).trim() === cleanPass) {
+          return { success: true, user: localUser };
+        }
+        return { success: false, error: 'Incorrect Password. Please check and try again.' };
       }
-      return { success: false, error: 'Incorrect Password. Please check and try again.' };
     }
 
-    return { success: false, error: 'No player account found with this Free Fire UID or Email. Please Register first.' };
+    return { success: false, error: 'No player account found with this Free Fire UID, Email or Phone. Please Register first.' };
   } catch (error) {
     console.error("[Firebase Cloud Auth] Error authenticating user:", error);
     return { success: false, error: error.message };
@@ -370,38 +488,37 @@ export const authenticateUserRealtime = async (identifier, password) => {
 /**
  * Checks if user already exists in Cloud Firestore or local cache
  */
-export const checkUserExistsRealtime = async (ffUid, email) => {
+export const checkUserExistsRealtime = async (ffUid, email, phone) => {
   try {
-    const cleanUid = String(ffUid || '').trim().toLowerCase();
+    const cleanUid = String(ffUid || '').trim();
     const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanPhone = String(phone || '').trim();
 
-    const usersCollection = collection(db, "users");
-    const snapshot = await getDocs(usersCollection);
-    
-    let exists = false;
-    let existingData = null;
+    if (cleanUid) {
+      const u1 = await findUserInFirestoreAcrossDevices(cleanUid);
+      if (u1 && !u1.isDeleted) return { exists: true, user: u1, field: 'Free Fire UID' };
+    }
+    if (cleanEmail) {
+      const u2 = await findUserInFirestoreAcrossDevices(cleanEmail);
+      if (u2 && !u2.isDeleted) return { exists: true, user: u2, field: 'Email Address' };
+    }
+    if (cleanPhone) {
+      const u3 = await findUserInFirestoreAcrossDevices(cleanPhone);
+      if (u3 && !u3.isDeleted) return { exists: true, user: u3, field: 'Phone Number' };
+    }
 
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const docIdMatch = cleanUid && docSnap.id.trim().toLowerCase() === cleanUid;
-      const uidMatch = cleanUid && data.uid && String(data.uid).trim().toLowerCase() === cleanUid;
-      const emailMatch = cleanEmail && data.email && String(data.email).trim().toLowerCase() === cleanEmail;
+    // Local storage check
+    if (typeof localStorage !== 'undefined') {
+      const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+      const localFound = localUsers.find(u => 
+        (cleanUid && String(u.uid).trim().toLowerCase() === cleanUid.toLowerCase()) ||
+        (cleanEmail && String(u.email).trim().toLowerCase() === cleanEmail) ||
+        (cleanPhone && String(u.phone).trim().replace(/\D/g, '').endsWith(cleanPhone.replace(/\D/g, '').slice(-10)))
+      );
+      if (localFound) return { exists: true, user: localFound };
+    }
 
-      if (docIdMatch || uidMatch || emailMatch) {
-        exists = true;
-        existingData = data;
-      }
-    });
-
-    if (exists) return { exists: true, user: existingData };
-
-    const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
-    const localFound = localUsers.some(u => 
-      (cleanUid && String(u.uid).trim().toLowerCase() === cleanUid) ||
-      (cleanEmail && String(u.email).trim().toLowerCase() === cleanEmail)
-    );
-
-    return { exists: localFound, user: existingData };
+    return { exists: false };
   } catch (error) {
     console.error("[Firebase] Error checking user existence:", error);
     return { exists: false };
@@ -645,61 +762,41 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
  */
 export const findUserForPasswordReset = async (identifier) => {
   try {
-    const queryStr = String(identifier || '').trim().toLowerCase();
-    if (!queryStr) return { success: false, error: 'Please enter your Free Fire UID or Email.' };
+    const rawQuery = String(identifier || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+    const queryStr = rawQuery.toLowerCase();
+    if (!queryStr) return { success: false, error: 'Please enter your Free Fire UID, Email or Phone.' };
 
-    let matchedUser = null;
-
-    // Check Firebase Firestore with 3s timeout
-    try {
-      const usersCollection = collection(db, "users");
-      const snapshotPromise = getDocs(usersCollection);
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
-      
-      const snapshot = await Promise.race([snapshotPromise, timeoutPromise]);
-      
-      const cleanDigits = queryStr.replace(/\D/g, '');
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
-        const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
-        const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
-        const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
-        const phoneMatch = data.phone && (
-          String(data.phone).trim().toLowerCase() === queryStr ||
-          (cleanDigits.length >= 8 && String(data.phone).replace(/\D/g, '').includes(cleanDigits))
-        );
-        
-        if (docIdMatch || uidMatch || emailMatch || nickMatch || phoneMatch) {
-          matchedUser = { 
-            id: docSnap.id, 
-            ...data, 
-            uid: data.uid || docSnap.id,
-            email: data.email || (queryStr.includes('@') ? queryStr : '')
-          };
-        }
-      });
-    } catch (fbErr) {
-      console.warn("[Firebase] Firestore findUser lookup timeout or warning:", fbErr);
-    }
-
-    if (matchedUser) {
-      return { success: true, user: matchedUser };
-    }
-
-    // Local storage fallback
-    const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
-    const foundLocal = localUsers.find(u => 
-      String(u.uid || '').trim().toLowerCase() === queryStr || 
-      String(u.email || '').trim().toLowerCase() === queryStr ||
-      String(u.nickname || '').trim().toLowerCase() === queryStr
-    );
-
-    if (foundLocal) {
+    // 1. Direct Cloud Firestore server lookup across all devices
+    const cloudUser = await findUserInFirestoreAcrossDevices(rawQuery);
+    if (cloudUser) {
       return { 
         success: true, 
-        user: { ...foundLocal, email: foundLocal.email || (queryStr.includes('@') ? queryStr : '') } 
+        user: { 
+          id: cloudUser.id, 
+          ...cloudUser, 
+          uid: cloudUser.uid || cloudUser.id,
+          email: cloudUser.email || (queryStr.includes('@') ? queryStr : '')
+        } 
       };
+    }
+
+    // 2. Local storage fallback
+    if (typeof localStorage !== 'undefined') {
+      const cleanDigits = rawQuery.replace(/\D/g, '');
+      const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+      const foundLocal = localUsers.find(u => 
+        String(u.uid || '').trim().toLowerCase() === queryStr || 
+        String(u.email || '').trim().toLowerCase() === queryStr ||
+        String(u.nickname || '').trim().toLowerCase() === queryStr ||
+        (cleanDigits.length >= 8 && String(u.phone || '').replace(/\D/g, '').endsWith(cleanDigits.slice(-10)))
+      );
+
+      if (foundLocal) {
+        return { 
+          success: true, 
+          user: { ...foundLocal, email: foundLocal.email || (queryStr.includes('@') ? queryStr : '') } 
+        };
+      }
     }
 
     // If identifier is an email, allow password reset for that email
@@ -715,10 +812,10 @@ export const findUserForPasswordReset = async (identifier) => {
       };
     }
 
-    return { success: false, error: `No registered player account found with "${queryStr}". Please Register first.` };
-  } catch (err) {
-    console.error("[Firebase] findUserForPasswordReset error:", err);
-    return { success: false, error: err.message || 'Failed to search account.' };
+    return { success: false, error: `No registered player account found matching "${rawQuery}". Please Register first.` };
+  } catch (error) {
+    console.error("[Firebase] Error in findUserForPasswordReset:", error);
+    return { success: false, error: error.message };
   }
 };
 
