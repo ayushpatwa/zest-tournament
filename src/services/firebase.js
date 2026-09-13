@@ -658,14 +658,19 @@ export const findUserForPasswordReset = async (identifier) => {
       
       const snapshot = await Promise.race([snapshotPromise, timeoutPromise]);
       
+      const cleanDigits = queryStr.replace(/\D/g, '');
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
         const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
         const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
         const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
         const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
+        const phoneMatch = data.phone && (
+          String(data.phone).trim().toLowerCase() === queryStr ||
+          (cleanDigits.length >= 8 && String(data.phone).replace(/\D/g, '').includes(cleanDigits))
+        );
         
-        if (docIdMatch || uidMatch || emailMatch || nickMatch) {
+        if (docIdMatch || uidMatch || emailMatch || nickMatch || phoneMatch) {
           matchedUser = { 
             id: docSnap.id, 
             ...data, 

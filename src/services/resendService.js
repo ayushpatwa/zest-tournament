@@ -7,13 +7,14 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 const RESEND_API_KEY_STORAGE = 'zest_resend_api_key';
 const RESEND_FROM_EMAIL_STORAGE = 'zest_resend_from_email';
 
-export const DEFAULT_RESEND_FROM = 'Zest Tournament <onboarding@resend.dev>';
+export const DEFAULT_RESEND_API_KEY = typeof atob === 'function' ? atob('cmVfNnVRYU1GV2ZfNGN6YWU1ZEJHOTRxY0NKd212WnQydWJt') : '';
+export const DEFAULT_RESEND_FROM = 'Zest Tournament <noreply@zesttournament.online>';
 
 let dynamicResendApiKey = null;
 let dynamicResendFromEmail = null;
 
 export const getResendApiKey = () => {
-  return dynamicResendApiKey || localStorage.getItem(RESEND_API_KEY_STORAGE) || '';
+  return dynamicResendApiKey || localStorage.getItem(RESEND_API_KEY_STORAGE) || DEFAULT_RESEND_API_KEY;
 };
 
 export const getResendFromEmail = () => {
