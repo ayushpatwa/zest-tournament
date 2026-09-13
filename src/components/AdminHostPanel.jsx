@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 import { getResendApiKey, getResendFromEmail, saveResendConfig, sendResendOtpEmail } from '../services/resendService';
-import { dispatchPushNotification } from '../services/notificationService';
+import { dispatchPushNotification, showSystemNotification } from '../services/notificationService';
 import { 
   saveAppSettingsRealtime, 
   subscribeToAppSettingsRealtime,
@@ -2030,6 +2030,22 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
             }}
           >
             {notifLoading ? '📢 Broadcasting Announcement to Cloud...' : '📢 Push Broadcast Notification to All Players (Bell 🔔)'}
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await showSystemNotification({
+                id: Date.now(),
+                title: notifTitle.trim() || '🔥 ZEST TOURNAMENT NOTIFICATION',
+                body: notifMessage.trim() || 'Heads-up alert! This is how Room ID drops and announcements appear in your phone notification panel.'
+              });
+              alert('✓ Notification triggered! Pull down the notification panel from the top of your phone screen.');
+            }}
+            className="btn btn-secondary"
+            style={{ width: '100%', height: '38px', fontSize: '0.8rem', fontWeight: '800' }}
+          >
+            ⚡ Test Android Notification Panel (Pull-down Shade)
           </button>
 
           {/* Active Broadcast Announcements List */}

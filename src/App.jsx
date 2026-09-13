@@ -14,7 +14,7 @@ import AppUpdateModal from './components/AppUpdateModal';
 import { isNewVersionAvailable, CURRENT_APP_VERSION } from './services/appUpdateService';
 import { sendToMakeWebhook, updateLiveWebhookUrl } from './services/webhookService';
 import { updateLiveResendConfig } from './services/resendService';
-import { initPushNotifications } from './services/notificationService';
+import { initPushNotifications, showSystemNotification, saveCurrentUserToken } from './services/notificationService';
 import { 
   subscribeToTournamentsRealtime, 
   subscribeToAppSettingsRealtime,
@@ -86,9 +86,32 @@ export default function App() {
       setTournaments(liveTournaments || []);
     });
 
-    // Subscribe to broadcast notifications (Bell 🔔)
+    // Subscribe to broadcast notifications (Bell 🔔) & pop into Android Notification Panel
+    let isInitialNotifLoad = true;
     const unsubscribeNotifs = subscribeToNotificationsRealtime((notifs) => {
       setCloudNotifications(notifs);
+
+      // Avoid spamming old historical notifications on initial app boot
+      if (isInitialNotifLoad) {
+        isInitialNotifLoad = false;
+        return;
+      }
+
+      // If a new notification arrived in real-time, immediately pop it into the Android notification panel
+      if (Array.isArray(notifs) && notifs.length > 0) {
+        const latest = notifs[0];
+        if (latest && latest.title) {
+          showSystemNotification({
+            id: latest.id,
+            title: latest.title,
+            body: latest.message,
+            extra: {
+              tournamentId: latest.targetTournamentId,
+              type: latest.type
+            }
+          });
+        }
+      }
     });
 
     // Subscribe to dynamic cloud app settings (Webhook, App Version Updates, Deposit QR)
@@ -123,18 +146,19 @@ export default function App() {
     };
   }, []);
 
-  // Push Notifications: Initialize FCM Token, Android Channels & Closed-App Listeners
+  // Push Notifications: Initialize Channels, Permissions & Notification Listeners
   useEffect(() => {
+    initPushNotifications(currentUser, (notificationData) => {
+      console.log('[App] Push notification clicked, navigating:', notificationData);
+      if (notificationData?.tournamentId) {
+        setSelectedTournamentId(notificationData.tournamentId);
+        setCurrentView('lobby');
+      } else if (notificationData?.view) {
+        setCurrentView(notificationData.view);
+      }
+    });
     if (currentUser) {
-      initPushNotifications(currentUser, (notificationData) => {
-        console.log('[App] Push notification clicked, navigating:', notificationData);
-        if (notificationData?.tournamentId) {
-          setSelectedTournamentId(notificationData.tournamentId);
-          setCurrentView('lobby');
-        } else if (notificationData?.view) {
-          setCurrentView(notificationData.view);
-        }
-      });
+      saveCurrentUserToken(currentUser);
     }
   }, [currentUser?.uid, currentUser?.id]);
 
