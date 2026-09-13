@@ -12,6 +12,7 @@ import {
 } from '../services/firebase';
 import { dispatchRealOtp } from '../services/otpService';
 import { updateLiveResendConfig } from '../services/resendService';
+import { showSystemNotification } from '../services/notificationService';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'forgot'
@@ -59,9 +60,6 @@ export default function LoginPage({ onLoginSuccess }) {
   
   // Player Sign In state
   const [loginIdentifier, setLoginIdentifier] = useState('');
-  const [loginOtpUser, setLoginOtpUser] = useState(null);
-  const [loginOtpCode, setLoginOtpCode] = useState('');
-  const [enteredLoginOtp, setEnteredLoginOtp] = useState('');
   
   // Account Recovery state
   const [recoverIdentifier, setRecoverIdentifier] = useState('');
@@ -216,6 +214,15 @@ export default function LoginPage({ onLoginSuccess }) {
     } else if (otpRes?.resend?.error) {
       setOtpSuccessMsg(`⚠️ Notice: ${otpRes.resend.error}`);
     }
+
+    // Also trigger instant Android notification panel alert
+    showSystemNotification({
+      id: `otp_${Date.now()}`,
+      title: '🔐 ZEST REGISTRATION OTP',
+      body: `Your verification code is: ${code}`,
+      extra: { type: 'otp' }
+    });
+
     setLoading(false);
   };
 
@@ -251,6 +258,14 @@ export default function LoginPage({ onLoginSuccess }) {
       setResendTimer(25);
       const destination = activeChannel === 'email' ? targetEmail : targetPhone;
       setOtpSuccessMsg(`✅ Fresh 6-digit OTP sent to (${destination})! Check Inbox & Spam/Junk folder.`);
+
+      // Also trigger instant Android notification panel alert
+      showSystemNotification({
+        id: `otp_${Date.now()}`,
+        title: '🔐 ZEST REGISTRATION OTP',
+        body: `Your fresh verification code is: ${newCode}`,
+        extra: { type: 'otp' }
+      });
     } catch (err) {
       console.error('[OTP Resend Error]:', err);
       setErrorMsg('Failed to resend OTP. Please check your connection and try again.');
@@ -329,135 +344,6 @@ export default function LoginPage({ onLoginSuccess }) {
       setLoading(false);
       onLoginSuccess(pendingUser);
     }, 1000);
-  };
-
-  // Instant OTP Login: Step 1 (Send OTP to registered email)
-  const handleInitiateOtpLogin = async (e) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setOtpSuccessMsg('');
-
-    const cleanInput = loginIdentifier.trim();
-    if (!cleanInput) {
-      setErrorMsg('Please enter your Free Fire UID, Email, or Phone Number.');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const lookup = await findUserForPasswordReset(cleanInput);
-      if (!lookup.success || !lookup.user) {
-        setErrorMsg(`No registered player account found for "${cleanInput}". Please click REGISTER to create a new account.`);
-        setLoading(false);
-        return;
-      }
-
-      const foundUser = lookup.user;
-      const targetEmail = foundUser.email || (cleanInput.includes('@') ? cleanInput : '');
-
-      if (!targetEmail) {
-        setErrorMsg('This account does not have a registered email address to receive an OTP.');
-        setLoading(false);
-        return;
-      }
-
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setLoginOtpCode(code);
-      setEnteredLoginOtp('');
-      setLoginOtpUser({ ...foundUser, email: targetEmail });
-
-      const otpRes = await dispatchRealOtp({
-        email: targetEmail,
-        phone: foundUser.phone || '',
-        nickname: foundUser.nickname || 'Player',
-        ffUid: foundUser.uid || cleanInput,
-        otpCode: code,
-        channel: 'email'
-      });
-
-      setResendTimer(25);
-      setAuthMode('signin_otp_verify');
-      if (otpRes?.resend?.success) {
-        setOtpSuccessMsg(`✅ 6-digit Login OTP sent to ${targetEmail}! Please check Inbox & Spam folder.`);
-      }
-    } catch (err) {
-      console.error('[OTP Login Error]:', err);
-      setErrorMsg(err.message || 'Failed to dispatch Login OTP.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Instant OTP Login: Resend
-  const handleResendLoginOtp = async () => {
-    if (resendTimer > 0 || !loginOtpUser?.email) return;
-    setErrorMsg('');
-    setOtpSuccessMsg('');
-    setLoading(true);
-
-    try {
-      const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setLoginOtpCode(newCode);
-      setEnteredLoginOtp('');
-
-      await dispatchRealOtp({
-        email: loginOtpUser.email,
-        phone: loginOtpUser.phone || '',
-        nickname: loginOtpUser.nickname || 'Player',
-        ffUid: loginOtpUser.uid || loginIdentifier,
-        otpCode: newCode,
-        channel: 'email'
-      });
-
-      setResendTimer(25);
-      setOtpSuccessMsg(`✅ Fresh Login OTP sent to ${loginOtpUser.email}! Check Inbox & Spam folder.`);
-    } catch (err) {
-      console.error('[Resend Login OTP Error]:', err);
-      setErrorMsg('Failed to resend Login OTP.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Instant OTP Login: Step 2 (Verify and login)
-  const handleVerifyLoginOtp = async (e) => {
-    e.preventDefault();
-    setErrorMsg('');
-
-    const cleanEntered = enteredLoginOtp.trim();
-    if (!cleanEntered || cleanEntered.length !== 6) {
-      setErrorMsg('Please enter the full 6-digit OTP code.');
-      return;
-    }
-
-    if (cleanEntered !== loginOtpCode) {
-      setErrorMsg('❌ Incorrect OTP code. Please enter the valid code sent to your email.');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      await sendToMakeWebhook({
-        eventType: 'USER_LOGIN',
-        nickname: loginOtpUser.nickname,
-        ffUid: loginOtpUser.uid,
-        email: loginOtpUser.email,
-        phone: loginOtpUser.phone,
-        details: 'Player signed in via Email OTP'
-      });
-
-      setOtpSuccessMsg('🎉 OTP verified! Logging you in...');
-      setTimeout(() => {
-        setLoading(false);
-        onLoginSuccess(loginOtpUser);
-      }, 800);
-    } catch (err) {
-      console.error('[Login OTP Verification Error]:', err);
-      setLoading(false);
-      onLoginSuccess(loginOtpUser);
-    }
   };
 
   // Global Sign In (Players & Admin)
@@ -877,237 +763,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 fontWeight: '900'
               }}
             >
-              {loading ? 'Signing In...' : '🚀 Sign In with Password'}
-            </button>
-
-            <div style={{ display: 'flex', alignItems: 'center', margin: '4px 0', gap: '8px' }}>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>OR</span>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => { setAuthMode('signin_otp'); setErrorMsg(''); setOtpSuccessMsg(''); }}
-              className="btn"
-              style={{
-                width: '100%',
-                height: '42px',
-                fontSize: '0.84rem',
-                fontWeight: '800',
-                background: 'rgba(0, 229, 255, 0.08)',
-                color: '#00e5ff',
-                border: '1px solid rgba(0, 229, 255, 0.35)',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            >
-              ⚡ Instant Login with OTP (No Password)
-            </button>
-          </form>
-        )}
-
-        {/* MODE 1.5: SIGN IN VIA EMAIL OTP (STEP 1: ENTER UID / EMAIL / PHONE) */}
-        {authMode === 'signin_otp' && (
-          <form onSubmit={handleInitiateOtpLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{
-              background: 'rgba(0, 229, 255, 0.08)',
-              border: '1px solid rgba(0, 229, 255, 0.25)',
-              padding: '12px',
-              borderRadius: '10px',
-              fontSize: '0.78rem',
-              color: 'var(--text-primary)',
-              lineHeight: '1.4'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '1rem' }}>⚡</span>
-                <strong style={{ color: 'var(--secondary)', fontFamily: 'var(--font-heading)', fontSize: '0.82rem' }}>
-                  INSTANT OTP LOGIN
-                </strong>
-              </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.74rem' }}>
-                Enter your Free Fire UID, Email, or Phone. We will send a 6-digit verification code directly to your registered email!
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Free Fire UID, Email, or Phone Number <span style={{ color: 'var(--primary)' }}>*</span></label>
-              <input
-                type="text"
-                value={loginIdentifier}
-                onChange={(e) => setLoginIdentifier(e.target.value)}
-                placeholder="e.g. 482910384 or player@gmail.com"
-                className="form-input"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-              style={{
-                width: '100%',
-                height: '46px',
-                marginTop: '4px',
-                fontSize: '0.9rem',
-                fontWeight: '900',
-                background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)'
-              }}
-            >
-              {loading ? 'Sending Login OTP...' : '⚡ Send Login OTP →'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setAuthMode('signin'); setErrorMsg(''); }}
-              className="btn btn-outline"
-              style={{ width: '100%', height: '40px', fontSize: '0.8rem', marginTop: '2px' }}
-            >
-              🔑 Login with Password instead
-            </button>
-          </form>
-        )}
-
-        {/* MODE 1.6: SIGN IN VIA EMAIL OTP (STEP 2: ENTER OTP & LOGIN) */}
-        {authMode === 'signin_otp_verify' && (
-          <form onSubmit={handleVerifyLoginOtp} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{
-              background: 'rgba(0, 229, 255, 0.08)',
-              border: '1px solid rgba(0, 229, 255, 0.25)',
-              padding: '14px',
-              borderRadius: '12px',
-              fontSize: '0.8rem',
-              color: 'var(--text-primary)',
-              lineHeight: '1.45'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <span style={{ fontSize: '1.2rem' }}>📩</span>
-                <strong style={{ color: 'var(--secondary)', fontFamily: 'var(--font-heading)', fontSize: '0.85rem' }}>
-                  LOGIN OTP SENT
-                </strong>
-              </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.76rem' }}>
-                We sent a 6-digit verification code to:
-                <div style={{ color: '#fff', fontWeight: '700', fontSize: '0.86rem', marginTop: '3px', wordBreak: 'break-all' }}>
-                  {loginOtpUser?.email}
-                </div>
-              </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-                💡 Please check your Email Inbox (or Spam / Junk folder) and enter the 6-digit code below.
-              </div>
-            </div>
-
-            {otpSuccessMsg && (
-              <div style={{
-                background: 'rgba(0, 230, 118, 0.15)',
-                border: '1px solid var(--success)',
-                color: 'var(--success)',
-                fontSize: '0.8rem',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                lineHeight: '1.4'
-              }}>
-                {otpSuccessMsg}
-              </div>
-            )}
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Enter 6-Digit Email OTP Code <span style={{ color: 'var(--primary)' }}>*</span></label>
-              <input
-                type="text"
-                value={enteredLoginOtp}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                  setEnteredLoginOtp(val);
-                }}
-                placeholder="• • • • • •"
-                maxLength={6}
-                autoFocus
-                style={{
-                  textAlign: 'center',
-                  fontFamily: 'monospace',
-                  fontSize: '1.5rem',
-                  fontWeight: '900',
-                  letterSpacing: '8px',
-                  color: '#00e5ff'
-                }}
-                className="form-input"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading || enteredLoginOtp.length < 6}
-              style={{
-                width: '100%',
-                height: '46px',
-                marginTop: '4px',
-                fontSize: '0.9rem',
-                fontWeight: '900',
-                background: enteredLoginOtp.length === 6 
-                  ? 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)' 
-                  : 'rgba(255,255,255,0.1)',
-                color: enteredLoginOtp.length === 6 ? '#000' : 'var(--text-muted)'
-              }}
-            >
-              {loading ? 'Verifying...' : '✅ Verify OTP & Login'}
-            </button>
-
-            {/* Resend button */}
-            <div style={{
-              marginTop: '4px',
-              padding: '12px 14px',
-              borderRadius: '12px',
-              background: 'rgba(20, 26, 38, 0.75)',
-              border: '1px solid rgba(0, 229, 255, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Didn't receive code?</span>
-                {resendTimer > 0 ? (
-                  <span style={{ color: '#00e5ff', fontWeight: '800', fontFamily: 'monospace', fontSize: '0.82rem' }}>
-                    ⏳ Resend in {resendTimer}s
-                  </span>
-                ) : (
-                  <span style={{ color: '#00e676', fontWeight: '800', fontSize: '0.78rem' }}>
-                    ⚡ Ready
-                  </span>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleResendLoginOtp}
-                disabled={resendTimer > 0 || loading}
-                className="btn"
-                style={{
-                  width: '100%',
-                  height: '38px',
-                  fontSize: '0.8rem',
-                  fontWeight: '800',
-                  borderRadius: '8px',
-                  background: resendTimer === 0 ? 'rgba(0, 229, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  color: resendTimer === 0 ? '#00e5ff' : 'var(--text-muted)',
-                  border: resendTimer === 0 ? '1px solid #00e5ff' : '1px solid rgba(255, 255, 255, 0.1)',
-                  cursor: resendTimer === 0 ? 'pointer' : 'not-allowed'
-                }}
-              >
-                {resendTimer > 0 ? `⏳ Wait ${resendTimer}s` : '🔄 Resend Login OTP'}
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => { setAuthMode('signin'); setErrorMsg(''); setOtpSuccessMsg(''); }}
-              className="btn btn-outline"
-              style={{ width: '100%', height: '36px', fontSize: '0.76rem' }}
-            >
-              ← Back to Sign In
+              {loading ? 'Signing In...' : '🚀 Sign In'}
             </button>
           </form>
         )}
@@ -1535,6 +1191,47 @@ export default function LoginPage({ onLoginSuccess }) {
                 lineHeight: '1.4'
               }}>
                 {otpSuccessMsg}
+              </div>
+            )}
+
+            {/* Live Security OTP Banner with 1-Click Auto Fill */}
+            {generatedOtp && (
+              <div style={{
+                background: 'rgba(255, 214, 0, 0.08)',
+                border: '1px solid rgba(255, 214, 0, 0.35)',
+                borderRadius: '10px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--accent)', fontWeight: '700', display: 'block' }}>
+                    🔐 Verification Code
+                  </span>
+                  <span style={{ fontFamily: 'monospace', fontSize: '1.25rem', fontWeight: '900', color: '#fff', letterSpacing: '3px' }}>
+                    {generatedOtp}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setEnteredOtp(generatedOtp)}
+                  style={{
+                    background: 'rgba(255, 214, 0, 0.2)',
+                    border: '1px solid var(--accent)',
+                    color: 'var(--accent)',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    fontSize: '0.74rem',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  ⚡ Auto-Fill Code
+                </button>
               </div>
             )}
 
