@@ -29,10 +29,10 @@ const firebaseConfig = {
   measurementId: "G-2S88SRGF4W"
 };
 
-// Initialize Firebase with Long Polling enabled for 100% Android WebView reliability
+// Initialize Firebase with Auto-Detect Long Polling for optimal mobile WebView reliability
 const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
+  experimentalAutoDetectLongPolling: true,
 });
 
 // In-memory live cache of registered users maintained via onSnapshot
@@ -380,7 +380,22 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
       console.log(`[Auth] User matched from live memory cache:`, foundInCache.uid || foundInCache.id);
       return foundInCache;
     }
+  } else {
+    // If live sync is warming up upon fresh app launch, wait up to 1200ms for initial onSnapshot
+    for (let i = 0; i < 6; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      if (liveUsersCache.length > 0) {
+        const found = liveUsersCache.find(matchesUser);
+        if (found) {
+          console.log(`[Auth] User matched after live sync warmup:`, found.uid || found.id);
+          return found;
+        }
+        break;
+      }
+    }
   }
+
+  let networkErrorCaught = null;
 
   // 2. Direct document getDoc lookup (if user typed Free Fire UID or Doc ID)
   try {
@@ -388,7 +403,10 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
     if (directDoc && directDoc.exists()) {
       return { ...directDoc.data(), id: directDoc.id, docId: directDoc.id };
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn("[Auth] Direct getDoc lookup notice:", e?.message);
+    networkErrorCaught = e;
+  }
 
   // 3. Direct targeted query by email (lightning-fast, 40ms)
   if (queryLower.includes('@')) {
@@ -402,7 +420,8 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
         return { ...d.data(), id: d.id, docId: d.id };
       }
     } catch (e) {
-      console.warn("[Auth] Direct email query notice:", e);
+      console.warn("[Auth] Direct email query notice:", e?.message);
+      networkErrorCaught = e;
     }
   }
 
@@ -414,7 +433,10 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
       const d = snapUid.docs[0];
       return { ...d.data(), id: d.id, docId: d.id };
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn("[Auth] Direct UID query notice:", e?.message);
+    networkErrorCaught = e;
+  }
 
   // 5. Direct targeted query by Phone
   if (cleanDigits.length >= 8) {
@@ -427,7 +449,10 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
         const d = snapPhone.docs[0];
         return { ...d.data(), id: d.id, docId: d.id };
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("[Auth] Direct phone query notice:", e?.message);
+      networkErrorCaught = e;
+    }
   }
 
   // 6. Full collection query fallback
@@ -444,7 +469,8 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
       if (found) return found;
     }
   } catch (e) {
-    console.warn("[Auth] Firestore getDocs lookup warning:", e);
+    console.warn("[Auth] Firestore getDocs lookup warning:", e?.message);
+    networkErrorCaught = e;
   }
 
   // 7. LocalStorage fallback
@@ -454,6 +480,11 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
       const localFound = localUsers.find(matchesUser);
       if (localFound) return localFound;
     } catch (e) {}
+  }
+
+  // If server was unreachable and memory cache empty, pass network error indicator
+  if (networkErrorCaught && liveUsersCache.length === 0) {
+    return { isNetworkError: true, error: networkErrorCaught.message };
   }
 
   return null;
@@ -475,6 +506,13 @@ export const authenticateUserRealtime = async (identifier, password) => {
 
     // 1. Direct Cloud Firestore server lookup
     const cloudUser = await findUserInFirestoreAcrossDevices(rawQuery);
+
+    if (cloudUser?.isNetworkError) {
+      return { 
+        success: false, 
+        error: 'Unable to reach Zest game servers. Please check your internet connection and try again.' 
+      };
+    }
 
     if (cloudUser) {
       if (cloudUser.isDeleted) {
