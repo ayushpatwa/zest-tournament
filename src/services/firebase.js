@@ -35,6 +35,33 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
+// In-memory live cache of registered users maintained via onSnapshot
+let liveUsersCache = [];
+let usersSyncInitialized = false;
+
+export const startLiveUsersSync = () => {
+  if (usersSyncInitialized) return;
+  usersSyncInitialized = true;
+  try {
+    const usersRef = collection(db, "users");
+    onSnapshot(usersRef, (snapshot) => {
+      const list = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      liveUsersCache = list;
+      console.log(`[Firebase Realtime] Synchronized ${list.length} user profiles in memory.`);
+    }, (err) => {
+      console.warn("[Firebase] Live users sync notice:", err);
+    });
+  } catch (e) {
+    console.warn("[Firebase] Failed to initialize live users sync:", e);
+  }
+};
+
+// Start live sync automatically on load
+startLiveUsersSync();
+
 // Starter tournaments seed (Empty by default - matches are created manually by Hosts/Admin)
 export const SEED_TOURNAMENTS = [];
 
@@ -320,89 +347,61 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
   const queryLower = rawQuery.toLowerCase();
   const cleanDigits = rawQuery.replace(/\D/g, '');
 
-  const candidateMap = new Map();
+  const matchesUser = (u) => {
+    if (!u) return false;
+    const docIdMatch = u.id && String(u.id).trim().toLowerCase() === queryLower;
+    const uidMatch = u.uid && String(u.uid).trim().toLowerCase() === queryLower;
+    const emailMatch = u.email && String(u.email).trim().toLowerCase() === queryLower;
+    const nickMatch = u.nickname && String(u.nickname).trim().toLowerCase() === queryLower;
+    const phoneMatch = u.phone && (
+      String(u.phone).trim() === rawQuery ||
+      String(u.phone).replace(/\D/g, '') === cleanDigits ||
+      (cleanDigits.length >= 8 && String(u.phone).replace(/\D/g, '').endsWith(cleanDigits.slice(-10)))
+    );
+    return docIdMatch || uidMatch || emailMatch || nickMatch || phoneMatch;
+  };
 
-  // Tier 1: Direct Document ID lookup from Firestore server
+  // 1. Instant check in live memory cache (populated by onSnapshot)
+  if (liveUsersCache.length > 0) {
+    const foundInCache = liveUsersCache.find(matchesUser);
+    if (foundInCache) {
+      console.log(`[Auth] User matched from live memory cache:`, foundInCache.uid || foundInCache.id);
+      return foundInCache;
+    }
+  }
+
+  // 2. Direct document getDoc lookup (if user typed Free Fire UID or Doc ID)
   try {
-    const directDoc = await getDocFromServer(doc(db, "users", rawQuery)).catch(() => getDoc(doc(db, "users", rawQuery)));
+    const directDoc = await getDoc(doc(db, "users", rawQuery));
     if (directDoc && directDoc.exists()) {
-      candidateMap.set(directDoc.id, { id: directDoc.id, ...directDoc.data() });
+      return { id: directDoc.id, ...directDoc.data() };
+    }
+  } catch (e) {}
+
+  // 3. Fallback query to Firestore collection
+  try {
+    const usersRef = collection(db, "users");
+    const snap = await getDocs(usersRef);
+    const list = [];
+    snap.forEach((docSnap) => {
+      list.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    if (list.length > 0) {
+      liveUsersCache = list;
+      const found = list.find(matchesUser);
+      if (found) return found;
     }
   } catch (e) {
-    // Ignore direct doc lookup error
+    console.warn("[Auth] Firestore getDocs lookup warning:", e);
   }
 
-  // If not found yet and rawQuery has different case, check queryLower
-  if (candidateMap.size === 0 && queryLower !== rawQuery) {
+  // 4. LocalStorage fallback
+  if (typeof localStorage !== 'undefined') {
     try {
-      const lowerDoc = await getDocFromServer(doc(db, "users", queryLower)).catch(() => getDoc(doc(db, "users", queryLower)));
-      if (lowerDoc && lowerDoc.exists()) {
-        candidateMap.set(lowerDoc.id, { id: lowerDoc.id, ...lowerDoc.data() });
-      }
+      const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+      const localFound = localUsers.find(matchesUser);
+      if (localFound) return localFound;
     } catch (e) {}
-  }
-
-  // Tier 2: Targeted Firestore indexed queries directly from server
-  if (candidateMap.size === 0) {
-    const usersRef = collection(db, "users");
-    const queries = [
-      query(usersRef, where("uid", "==", rawQuery)),
-      query(usersRef, where("email", "==", queryLower))
-    ];
-
-    if (rawQuery !== queryLower) {
-      queries.push(query(usersRef, where("email", "==", rawQuery)));
-    }
-
-    if (cleanDigits.length >= 8) {
-      queries.push(query(usersRef, where("phone", "==", rawQuery)));
-      queries.push(query(usersRef, where("phone", "==", cleanDigits)));
-      queries.push(query(usersRef, where("phone", "==", `+91${cleanDigits.slice(-10)}`)));
-      queries.push(query(usersRef, where("phone", "==", cleanDigits.slice(-10))));
-    }
-
-    queries.push(query(usersRef, where("nickname", "==", rawQuery)));
-
-    const results = await Promise.allSettled(
-      queries.map(q => getDocsFromServer(q).catch(() => getDocs(q)))
-    );
-
-    for (const res of results) {
-      if (res.status === 'fulfilled' && res.value && !res.value.empty) {
-        res.value.forEach(docSnap => {
-          candidateMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
-        });
-      }
-    }
-  }
-
-  // Tier 3: Fallback full collection scan if still not found
-  if (candidateMap.size === 0) {
-    try {
-      const usersRef = collection(db, "users");
-      const snap = await getDocsFromServer(usersRef).catch(() => getDocs(usersRef));
-      snap.forEach(docSnap => {
-        const data = docSnap.data();
-        const docIdMatch = docSnap.id.trim().toLowerCase() === queryLower;
-        const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryLower;
-        const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryLower;
-        const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryLower;
-        const phoneMatch = data.phone && (
-          String(data.phone).trim() === rawQuery ||
-          (cleanDigits.length >= 8 && String(data.phone).replace(/\D/g, '').endsWith(cleanDigits.slice(-10)))
-        );
-
-        if (docIdMatch || uidMatch || emailMatch || nickMatch || phoneMatch) {
-          candidateMap.set(docSnap.id, { id: docSnap.id, ...data });
-        }
-      });
-    } catch (e) {
-      console.warn("[Auth] Users collection fallback scan warning:", e);
-    }
-  }
-
-  if (candidateMap.size > 0) {
-    return Array.from(candidateMap.values())[0];
   }
 
   return null;
