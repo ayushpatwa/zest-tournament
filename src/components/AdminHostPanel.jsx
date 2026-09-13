@@ -289,14 +289,14 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
       type: notifType
     });
     if (res.success) {
-      // 2. Dispatch Closed-App Push Notification via Webhook / Cloud
+      // 2. Dispatch System Notification banner to devices
       await dispatchPushNotification({
         title: notifTitle.trim(),
         message: notifMessage.trim(),
         type: notifType
       });
 
-      setNotifStatus('✅ Notification broadcasted! Sent to in-app bell 🔔 and dispatched push alert for closed apps.');
+      setNotifStatus('✅ Notification broadcasted! Sent to in-app bell 🔔 and Android notification panel.');
       setNotifTitle('');
       setNotifMessage('');
     } else {

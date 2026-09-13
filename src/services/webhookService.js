@@ -67,8 +67,17 @@ export const setWebhookUrl = (url) => {
  * @param {string} eventData.details - Description or amount
  */
 export const sendToMakeWebhook = async (eventData) => {
+  // Prevent notifications from being sent to Make.com / Google Sheets
+  if (
+    eventData?.eventType === 'PUSH_NOTIFICATION_BROADCAST' ||
+    String(eventData?.eventType || '').toUpperCase().includes('NOTIFICATION')
+  ) {
+    console.log('[Make.com Webhook] Notification event skipped from Google Sheets logging.');
+    return { success: true, skipped: true };
+  }
+
   const webhookUrl = getWebhookUrl();
-  let cleanPhone = String(eventData.phone || 'N/A').trim();
+  let cleanPhone = String(eventData?.phone || 'N/A').trim();
   // If phone starts with '+', remove it or format it so Google Sheets does not treat it as a formula (=+)
   if (cleanPhone.startsWith('+')) {
     cleanPhone = cleanPhone.replace(/^\+/, '').trim();

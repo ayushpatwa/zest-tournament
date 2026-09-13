@@ -2,7 +2,6 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { saveDeviceTokenRealtime } from './firebase';
-import { sendToMakeWebhook } from './webhookService';
 
 let pushInitialized = false;
 const processedNotificationIds = new Set();
@@ -219,11 +218,11 @@ export const saveCurrentUserToken = async (currentUser) => {
 };
 
 /**
- * Dispatch Push Notification to all users (or target UIDs) via Make.com Webhook and Cloud
+ * Dispatch System Notification to current device and sync
  */
 export const dispatchPushNotification = async (notificationData) => {
   try {
-    // 1. Immediately trigger local system notification on current device
+    // Trigger local system notification on current device
     await showSystemNotification({
       id: `broadcast_${Date.now()}`,
       title: notificationData.title || 'ZEST TOURNAMENT',
@@ -234,19 +233,8 @@ export const dispatchPushNotification = async (notificationData) => {
       }
     });
 
-    // 2. Dispatch through Make.com Webhook with full payload
-    await sendToMakeWebhook({
-      eventType: 'PUSH_NOTIFICATION_BROADCAST',
-      title: notificationData.title || 'ZEST TOURNAMENT',
-      message: notificationData.message || '',
-      type: notificationData.type || 'info',
-      targetTournamentId: notificationData.targetTournamentId || null,
-      targetUids: notificationData.targetUids || [],
-      details: `Closed-App Push Notification Broadcast: "${notificationData.title}"`
-    });
-
-    console.log('[PushNotifications] Push broadcast dispatched.');
+    console.log('[PushNotifications] System notification dispatched.');
   } catch (err) {
-    console.warn('[PushNotifications] Webhook push dispatch warning:', err);
+    console.warn('[PushNotifications] System notification dispatch warning:', err);
   }
 };
