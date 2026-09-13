@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 import { getResendApiKey, getResendFromEmail, saveResendConfig, sendResendOtpEmail } from '../services/resendService';
-import { dispatchPushNotification, showSystemNotification } from '../services/notificationService';
+import { dispatchPushNotification, showSystemNotification, getLiveFcmConfig, updateLiveFcmConfig } from '../services/notificationService';
 import { 
   saveAppSettingsRealtime, 
   subscribeToAppSettingsRealtime,
+  saveFcmConfigRealtime,
   saveTournamentRealtime,
   creditUserWalletRealtime, 
   deductUserWalletRealtime, 
@@ -100,6 +101,13 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [testResendStatus, setTestResendStatus] = useState('');
   const [isTestingResend, setIsTestingResend] = useState(false);
 
+  // Firebase Cloud Messaging (FCM) Closed-App Push states
+  const [fcmServiceAccountInput, setFcmServiceAccountInput] = useState(() => getLiveFcmConfig() || '');
+  const [fcmSaveStatus, setFcmSaveStatus] = useState('');
+  const [isSavingFcm, setIsSavingFcm] = useState(false);
+  const [isTestingClosedAppPush, setIsTestingClosedAppPush] = useState(false);
+  const [testPushStatus, setTestPushStatus] = useState('');
+
   // App Update Publisher states
   const [updateVersion, setUpdateVersion] = useState('1.4.8');
   const [updateTitle, setUpdateTitle] = useState('⚡ Android Notification Panel & Performance (v1.4.8)!');
@@ -129,6 +137,10 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         if (typeof settings.welcomeBonus === 'number') setWelcomeBonusSetting(settings.welcomeBonus);
         if (settings.resendApiKey) setResendApiKeyInput(settings.resendApiKey);
         if (settings.resendFromEmail) setResendFromEmailInput(settings.resendFromEmail);
+        if (settings.fcmServiceAccount) {
+          setFcmServiceAccountInput(settings.fcmServiceAccount);
+          updateLiveFcmConfig(settings.fcmServiceAccount);
+        }
       }
     });
     return () => unsub();
@@ -647,6 +659,65 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     }
   };
 
+  const handleSaveFcmConfig = async (e) => {
+    e.preventDefault();
+    setFcmSaveStatus('');
+    setIsSavingFcm(true);
+    try {
+      const input = fcmServiceAccountInput.trim();
+      let parsed = null;
+      if (input) {
+        try {
+          parsed = JSON.parse(input);
+          if (!parsed.client_email || !parsed.private_key) {
+            throw new Error('JSON must contain "client_email" and "private_key" fields.');
+          }
+        } catch (err) {
+          setFcmSaveStatus(`⚠️ Invalid JSON: ${err.message}`);
+          setIsSavingFcm(false);
+          return;
+        }
+      }
+      const serialized = input ? JSON.stringify(parsed, null, 2) : '';
+      const res = await saveFcmConfigRealtime(serialized);
+      if (res.success) {
+        updateLiveFcmConfig(serialized);
+        setFcmSaveStatus('✅ Firebase Service Account saved! Closed-app push notifications are now ACTIVE.');
+      } else {
+        setFcmSaveStatus(`⚠️ Failed to save: ${res.error}`);
+      }
+    } catch (err) {
+      setFcmSaveStatus(`⚠️ Error: ${err.message}`);
+    } finally {
+      setIsSavingFcm(false);
+      setTimeout(() => setFcmSaveStatus(''), 5000);
+    }
+  };
+
+  const handleTestClosedAppPush = async () => {
+    setIsTestingClosedAppPush(true);
+    setTestPushStatus('⏳ Dispatching closed-app test push to all registered devices...');
+    try {
+      const res = await dispatchPushNotification({
+        title: '🔥 CLOSED-APP PUSH TEST: ZEST ARENA',
+        message: 'This notification was delivered via Google FCM to your device even if the app was closed or screen locked!',
+        type: 'alert'
+      });
+      if (res.success && res.result?.sentCount > 0) {
+        setTestPushStatus(`🎉 Delivered to ${res.result.sentCount} closed Android devices via Google FCM!`);
+      } else if (res.result?.requiresServiceAccount || res.result?.error?.includes('Missing Firebase')) {
+        setTestPushStatus('⚠️ Setup Required: Paste your Firebase Service Account JSON below first.');
+      } else {
+        setTestPushStatus(`⚠️ Response: ${res.result?.error || res.error || 'Check console logs'}`);
+      }
+    } catch (e) {
+      setTestPushStatus(`⚠️ Error: ${e.message}`);
+    } finally {
+      setIsTestingClosedAppPush(false);
+      setTimeout(() => setTestPushStatus(''), 8000);
+    }
+  };
+
   const handlePublishAppUpdate = async (e) => {
     e.preventDefault();
     if (!updateDownloadUrl.trim()) {
@@ -841,10 +912,10 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   borderRadius: '8px',
                   background: activeTab === 'webhook' ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
                   color: activeTab === 'webhook' ? '#000' : '#fff',
-                  border: '1px solid var(--border-color)'
+                  fontWeight: '800'
                 }}
               >
-                📊 Sheet & Resend.com OTP
+                🔔 Push, OTP & Gateways
               </button>
 
               <button
@@ -2621,6 +2692,124 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   {testingWebhook ? 'Sending Ping...' : '⚡ Send Test Row'}
                 </button>
               </div>
+            </form>
+          </div>
+
+          {/* SECTION 3: FIREBASE CLOUD MESSAGING (FCM) CLOSED-APP PUSH */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid rgba(255, 42, 95, 0.3)',
+            borderRadius: '12px',
+            padding: '18px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            boxShadow: '0 4px 20px rgba(255, 42, 95, 0.08)'
+          }}>
+            <div className="flex-between">
+              <div>
+                <h3 style={{ fontSize: '1.05rem', color: '#ff2a5f', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🔥</span> Closed-App Push Notifications (Google FCM)
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4', margin: 0 }}>
+                  Wakes up and drops notifications into players' notification shade even when the <strong>app is completely closed, killed from recents, or screen is locked</strong>.
+                </p>
+              </div>
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: '900',
+                padding: '4px 10px',
+                borderRadius: '20px',
+                background: fcmServiceAccountInput ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 214, 0, 0.15)',
+                color: fcmServiceAccountInput ? 'var(--success)' : 'var(--accent)',
+                border: fcmServiceAccountInput ? '1px solid rgba(0, 230, 118, 0.3)' : '1px solid rgba(255, 214, 0, 0.3)',
+                whiteSpace: 'nowrap'
+              }}>
+                {fcmServiceAccountInput ? '🟢 FCM ACTIVE' : '⚠️ SETUP REQUIRED'}
+              </span>
+            </div>
+
+            {/* How-to guide banner */}
+            <div style={{
+              background: 'rgba(0, 229, 255, 0.05)',
+              border: '1px solid rgba(0, 229, 255, 0.2)',
+              borderRadius: '8px',
+              padding: '12px',
+              fontSize: '0.78rem',
+              color: '#d0f0fd',
+              lineHeight: '1.5'
+            }}>
+              <strong>📌 3-Step Setup for Closed-App Push Notifications:</strong>
+              <ol style={{ margin: '6px 0 0 16px', padding: 0 }}>
+                <li>Open <a href="https://console.firebase.google.com/project/zest-app-fc25b/settings/serviceaccounts/adminsdk" target="_blank" rel="noreferrer" style={{ color: 'var(--secondary)', textDecoration: 'underline' }}>Firebase Console &rarr; Service Accounts</a>.</li>
+                <li>Click <strong>"Generate new private key"</strong> &rarr; <strong>"Generate key"</strong> (downloads a <code>.json</code> file).</li>
+                <li>Open that JSON file, copy everything, and paste it into the box below, then click <strong>"Activate Closed-App Push"</strong>!</li>
+              </ol>
+            </div>
+
+            <form onSubmit={handleSaveFcmConfig} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Firebase Service Account Private Key (JSON)</span>
+                  {fcmServiceAccountInput && (
+                    <span style={{ color: 'var(--success)', fontSize: '0.75rem' }}>✓ Configured</span>
+                  )}
+                </label>
+                <textarea
+                  rows="4"
+                  value={fcmServiceAccountInput}
+                  onChange={(e) => setFcmServiceAccountInput(e.target.value)}
+                  placeholder='{"type": "service_account", "project_id": "zest-app-fc25b", "private_key_id": "...", "private_key": "-----BEGIN PRIVATE KEY-----\n...", "client_email": "firebase-adminsdk-xxx@zest-app-fc25b.iam.gserviceaccount.com"}'
+                  className="form-input"
+                  style={{ fontFamily: 'monospace', fontSize: '0.75rem', resize: 'vertical' }}
+                />
+              </div>
+
+              {fcmSaveStatus && (
+                <div style={{ color: fcmSaveStatus.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontSize: '0.85rem' }}>
+                  {fcmSaveStatus}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="submit"
+                  disabled={isSavingFcm}
+                  className="btn"
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: 'linear-gradient(135deg, #ff2a5f 0%, #ff5722 100%)',
+                    color: '#fff',
+                    fontWeight: '800'
+                  }}
+                >
+                  {isSavingFcm ? 'Saving to Cloud...' : '💾 Save & Activate Closed-App Push'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTestClosedAppPush}
+                  disabled={isTestingClosedAppPush}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '12px', fontWeight: '800' }}
+                >
+                  {isTestingClosedAppPush ? 'Sending to Phones...' : '⚡ Test Closed-App Push (All Devices)'}
+                </button>
+              </div>
+
+              {testPushStatus && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  background: testPushStatus.startsWith('🎉') ? 'rgba(0, 230, 118, 0.1)' : 'rgba(255, 214, 0, 0.1)',
+                  color: testPushStatus.startsWith('🎉') ? 'var(--success)' : 'var(--accent)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  {testPushStatus}
+                </div>
+              )}
             </form>
           </div>
 

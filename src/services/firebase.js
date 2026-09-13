@@ -901,6 +901,58 @@ export const saveDeviceTokenRealtime = async (userIdOrUid, token, metadata = {})
 };
 
 /**
+ * Retrieves target device push tokens from Firestore for closed-app notification dispatch
+ */
+export const getTargetDeviceTokensRealtime = async (targetUids = []) => {
+  try {
+    const tokensCollection = collection(db, "device_tokens");
+    const snapshot = await getDocs(tokensCollection);
+    const tokens = new Set();
+    const cleanTargets = Array.isArray(targetUids) ? targetUids.map(u => String(u).trim().toLowerCase()) : [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (!data || !data.token) return;
+
+      if (cleanTargets.length === 0) {
+        // Broadcast mode: include all device tokens
+        tokens.add(data.token);
+      } else {
+        // Targeted mode: match uid, email, or phone
+        const uUid = String(data.uid || '').trim().toLowerCase();
+        if (cleanTargets.includes(uUid)) {
+          tokens.add(data.token);
+        }
+      }
+    });
+
+    console.log(`[Firebase Realtime] Found ${tokens.size} target device tokens for push dispatch.`);
+    return Array.from(tokens);
+  } catch (err) {
+    console.warn('[Firebase Realtime] Error fetching device tokens:', err);
+    return [];
+  }
+};
+
+/**
+ * Saves Firebase Service Account JSON credentials for closed-app FCM push dispatch
+ */
+export const saveFcmConfigRealtime = async (serviceAccountJson) => {
+  try {
+    const settingsRef = doc(db, "settings", "app_config");
+    await setDoc(settingsRef, {
+      fcmServiceAccount: serviceAccountJson,
+      fcmUpdatedAt: serverTimestamp()
+    }, { merge: true });
+    console.log('[Firebase Realtime] FCM Service Account saved to app_config.');
+    return { success: true };
+  } catch (err) {
+    console.error('[Firebase Realtime] Error saving FCM Service Account:', err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
  * Deletes a broadcast notification from Firestore
  */
 export const deleteNotificationRealtime = async (notificationId) => {

@@ -1,10 +1,34 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { saveDeviceTokenRealtime } from './firebase';
+import { saveDeviceTokenRealtime, getTargetDeviceTokensRealtime } from './firebase';
 
 let pushInitialized = false;
+let activeFcmServiceAccount = null;
 const processedNotificationIds = new Set();
+const FCM_CONFIG_KEY = 'zest_fcm_service_account';
+
+export const updateLiveFcmConfig = (sa) => {
+  if (sa) {
+    activeFcmServiceAccount = typeof sa === 'string' ? sa : JSON.stringify(sa);
+    try {
+      localStorage.setItem(FCM_CONFIG_KEY, activeFcmServiceAccount);
+    } catch (_) {}
+    console.log('[PushNotifications] FCM Service Account updated in memory.');
+  }
+};
+
+export const getLiveFcmConfig = () => {
+  if (activeFcmServiceAccount) return activeFcmServiceAccount;
+  try {
+    const saved = localStorage.getItem(FCM_CONFIG_KEY);
+    if (saved) {
+      activeFcmServiceAccount = saved;
+      return saved;
+    }
+  } catch (_) {}
+  return null;
+};
 
 /**
  * Generates safe 32-bit positive integer hash for Android notification IDs
@@ -233,13 +257,15 @@ export const saveCurrentUserToken = async (currentUser) => {
 };
 
 /**
- * Dispatch System Notification to current device and sync
+ * Dispatch Push Notification:
+ * 1. Immediate local status bar / shade alert on sender's device.
+ * 2. Remote Google FCM HTTP v1 broadcast to all closed / locked player phones!
  */
 export const dispatchPushNotification = async (notificationData) => {
   try {
-    // Trigger local system notification on current device
+    // 1. Trigger local system notification on current device
     await showSystemNotification({
-      id: `broadcast_${Date.now()}`,
+      id: notificationData.id || `broadcast_${Date.now()}`,
       title: notificationData.title || 'ZEST TOURNAMENT',
       body: notificationData.message || '',
       extra: {
@@ -248,8 +274,63 @@ export const dispatchPushNotification = async (notificationData) => {
       }
     });
 
-    console.log('[PushNotifications] System notification dispatched.');
+    console.log('[PushNotifications] Local notification dispatched.');
+
+    // 2. Fetch target device tokens from Firestore
+    const tokens = await getTargetDeviceTokensRealtime(notificationData.targetUids);
+    if (!tokens || tokens.length === 0) {
+      console.log('[PushNotifications] No target device tokens found to send closed-app push.');
+      return { success: true, sentCount: 0, reason: 'no_tokens' };
+    }
+
+    console.log(`[PushNotifications] Found ${tokens.length} registered player devices. Dispatching closed-app FCM push...`);
+
+    // 3. Dispatch to /api/send-push endpoint
+    const saConfig = getLiveFcmConfig();
+    const payload = {
+      title: notificationData.title || 'ZEST TOURNAMENT',
+      message: notificationData.message || '',
+      tokens: tokens,
+      serviceAccount: saConfig,
+      extra: {
+        tournamentId: notificationData.targetTournamentId || '',
+        type: notificationData.type || 'announcement'
+      }
+    };
+
+    const isNative = Capacitor.isNativePlatform();
+    const endpointUrl = isNative 
+      ? 'https://zest-tournament.vercel.app/api/send-push'
+      : (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+        ? 'http://localhost:3000/api/send-push'
+        : '/api/send-push';
+
+    if (isNative) {
+      try {
+        const nativeRes = await CapacitorHttp.post({
+          url: endpointUrl,
+          headers: { 'Content-Type': 'application/json' },
+          data: payload
+        });
+        console.log('[PushNotifications] Native closed-app FCM push response:', nativeRes.data);
+        return { success: true, result: nativeRes.data };
+      } catch (nativeErr) {
+        console.warn('[PushNotifications] Native CapacitorHttp push error, attempting direct fetch:', nativeErr);
+      }
+    }
+
+    // Web or fallback fetch
+    const webRes = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const webData = await webRes.json().catch(() => ({}));
+    console.log('[PushNotifications] Closed-app FCM push response:', webData);
+    return { success: webRes.ok, result: webData };
+
   } catch (err) {
-    console.warn('[PushNotifications] System notification dispatch warning:', err);
+    console.warn('[PushNotifications] Closed-app push dispatch warning:', err);
+    return { success: false, error: err.message };
   }
 };

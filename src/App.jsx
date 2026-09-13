@@ -14,7 +14,7 @@ import AppUpdateModal from './components/AppUpdateModal';
 import { isNewVersionAvailable, CURRENT_APP_VERSION } from './services/appUpdateService';
 import { sendToMakeWebhook, updateLiveWebhookUrl } from './services/webhookService';
 import { updateLiveResendConfig } from './services/resendService';
-import { initPushNotifications, showSystemNotification, saveCurrentUserToken } from './services/notificationService';
+import { initPushNotifications, showSystemNotification, saveCurrentUserToken, updateLiveFcmConfig } from './services/notificationService';
 import { 
   subscribeToTournamentsRealtime, 
   subscribeToAppSettingsRealtime,
@@ -171,6 +171,9 @@ export default function App() {
         }
         if (settings.depositQr) {
           setDepositQrConfig(settings.depositQr);
+        }
+        if (settings.fcmServiceAccount) {
+          updateLiveFcmConfig(settings.fcmServiceAccount);
         }
         if (settings.appUpdate && isNewVersionAvailable(CURRENT_APP_VERSION, settings.appUpdate.latestVersion, false, settings.appUpdate.forceUpdate)) {
           console.log('[App Update] New version detected:', settings.appUpdate.latestVersion);
