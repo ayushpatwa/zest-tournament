@@ -299,11 +299,10 @@ export const dispatchPushNotification = async (notificationData) => {
     };
 
     const isNative = Capacitor.isNativePlatform();
-    const endpointUrl = isNative 
+    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const endpointUrl = (isNative || isLocalhost) 
       ? 'https://zest-tournament.vercel.app/api/send-push'
-      : (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-        ? 'http://localhost:3000/api/send-push'
-        : '/api/send-push';
+      : '/api/send-push';
 
     if (isNative) {
       try {
@@ -313,7 +312,8 @@ export const dispatchPushNotification = async (notificationData) => {
           data: payload
         });
         console.log('[PushNotifications] Native closed-app FCM push response:', nativeRes.data);
-        return { success: true, result: nativeRes.data };
+        const data = nativeRes.data || {};
+        return { success: data.success !== false, result: data, sentCount: data.sentCount || 0 };
       } catch (nativeErr) {
         console.warn('[PushNotifications] Native CapacitorHttp push error, attempting direct fetch:', nativeErr);
       }
@@ -327,7 +327,12 @@ export const dispatchPushNotification = async (notificationData) => {
     });
     const webData = await webRes.json().catch(() => ({}));
     console.log('[PushNotifications] Closed-app FCM push response:', webData);
-    return { success: webRes.ok, result: webData };
+    return { 
+      success: webRes.ok && webData.success !== false, 
+      result: webData,
+      sentCount: webData.sentCount || 0,
+      error: webData.error
+    };
 
   } catch (err) {
     console.warn('[PushNotifications] Closed-app push dispatch warning:', err);

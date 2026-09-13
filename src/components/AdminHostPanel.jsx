@@ -703,12 +703,19 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         message: 'This notification was delivered via Google FCM to your device even if the app was closed or screen locked!',
         type: 'alert'
       });
-      if (res.success && res.result?.sentCount > 0) {
-        setTestPushStatus(`🎉 Delivered to ${res.result.sentCount} closed Android devices via Google FCM!`);
+      const sent = res.result?.sentCount ?? res.sentCount ?? 0;
+      if (res.success && sent > 0) {
+        setTestPushStatus(`🎉 Delivered to ${sent} closed Android devices via Google FCM!`);
       } else if (res.result?.requiresServiceAccount || res.result?.error?.includes('Missing Firebase')) {
         setTestPushStatus('⚠️ Setup Required: Paste your Firebase Service Account JSON below first.');
+      } else if (res.reason === 'no_tokens') {
+        setTestPushStatus('⚠️ No registered player devices found in database. Open the app on Android once to register.');
+      } else if (res.result?.errors?.[0]?.error) {
+        setTestPushStatus(`⚠️ FCM Error: ${res.result.errors[0].error}`);
+      } else if (res.result?.error || res.error) {
+        setTestPushStatus(`⚠️ ${res.result?.error || res.error}`);
       } else {
-        setTestPushStatus(`⚠️ Response: ${res.result?.error || res.error || 'Check console logs'}`);
+        setTestPushStatus(`⚠️ Delivery incomplete (0 devices reached).`);
       }
     } catch (e) {
       setTestPushStatus(`⚠️ Error: ${e.message}`);

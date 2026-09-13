@@ -1,4 +1,4 @@
-﻿import crypto from 'crypto';
+import crypto from 'crypto';
 
 /**
  * Signs an RS256 JWT assertion for Google OAuth 2.0
@@ -137,10 +137,9 @@ export default async function handler(req, res) {
                 notification: {
                   channel_id: 'zest_alerts',
                   sound: 'default',
-                  priority: 'high',
-                  visibility: 'public',
                   default_sound: true,
-                  default_vibrate_timings: true
+                  default_vibrate_timings: true,
+                  notification_priority: 'PRIORITY_MAX'
                 }
               },
               data: {
@@ -178,10 +177,11 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      success: true,
+      success: successCount > 0,
       totalTokens: tokenList.length,
       sentCount: successCount,
       failedCount: failedCount,
+      error: (failedCount > 0 && successCount === 0) ? (errors[0]?.error || 'Failed to dispatch push') : undefined,
       errors: errors.slice(0, 5)
     });
 
