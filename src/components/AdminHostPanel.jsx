@@ -40,6 +40,13 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [editingTournament, setEditingTournament] = useState(null);
   const [managingPlayersTourney, setManagingPlayersTourney] = useState(null);
   const [removingPlayerId, setRemovingPlayerId] = useState(null);
+  
+  // Direct Roster Prize Modal states
+  const [rosterPrizePlayer, setRosterPrizePlayer] = useState(null); // { player, tourney }
+  const [rosterPrizeAmount, setRosterPrizeAmount] = useState('');
+  const [rosterPrizeReason, setRosterPrizeReason] = useState('');
+  const [rosterPrizeLoading, setRosterPrizeLoading] = useState(false);
+  const [rosterPrizeStatus, setRosterPrizeStatus] = useState('');
   const [title, setTitle] = useState('');
   const [mode, setMode] = useState('Solo');
   const [type, setType] = useState('Classic');
@@ -792,6 +799,84 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
 
     setPayoutLoading(false);
     setTimeout(() => setPayoutStatus(''), 5000);
+  };
+
+  // Direct Prize Payout from Match Roster
+  const handleOpenRosterPrize = (player, tourney) => {
+    setRosterPrizePlayer({ player, tourney });
+    // Check if tournament has a custom bounty (e.g. CS 1v1), prize pool, or default 50
+    const defaultAmt = tourney.bounty || tourney.prizePool || '50';
+    setRosterPrizeAmount(String(defaultAmt));
+    setRosterPrizeReason(`1st Place Winner - ${tourney.title}`);
+    setRosterPrizeStatus('');
+  };
+
+  const handleConfirmRosterPrize = async (e) => {
+    if (e) e.preventDefault();
+    if (!rosterPrizePlayer) return;
+
+    const { player, tourney } = rosterPrizePlayer;
+    const amt = parseFloat(rosterPrizeAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setRosterPrizeStatus('⚠️ Please enter a valid positive prize amount.');
+      return;
+    }
+
+    setRosterPrizeLoading(true);
+    setRosterPrizeStatus('');
+
+    try {
+      const targetIdentifier = player.uid || player.email || player.nickname;
+      const finalReason = rosterPrizeReason.trim() || `Prize Winnings - ${tourney.title}`;
+      
+      const res = await creditUserWalletRealtime(
+        targetIdentifier, 
+        amt, 
+        '🏆 Tournament Prize Winnings', 
+        finalReason
+      );
+
+      if (res.success) {
+        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} prize money to ${player.nickname || player.uid}'s wallet!`);
+
+        // Send Make.com webhook logging
+        await sendToMakeWebhook({
+          eventType: 'PRIZE_PAYOUT',
+          nickname: player.nickname || targetIdentifier,
+          ffUid: player.uid || targetIdentifier,
+          email: player.email || 'N/A',
+          phone: player.phone || 'N/A',
+          details: `Match Roster Direct Prize: ₹${amt} (${finalReason}) [Match: ${tourney.title}]`
+        });
+
+        // Send in-app notification to the winner
+        try {
+          await sendNotificationRealtime({
+            title: `🏆 Prize Money Credited: ₹${amt}!`,
+            message: `Congratulations ${player.nickname || 'Player'}! You have won ₹${amt} in "${tourney.title}". The prize has been added directly to your wallet balance!`,
+            type: 'prize',
+            category: 'WINNINGS',
+            badgeText: 'PRIZE',
+            targetUid: player.uid
+          });
+        } catch (notifErr) {
+          console.warn('Failed to dispatch prize notification:', notifErr);
+        }
+
+        // Auto close dialog after brief presentation
+        setTimeout(() => {
+          setRosterPrizePlayer(null);
+          setRosterPrizeStatus('');
+        }, 2200);
+      } else {
+        setRosterPrizeStatus(`⚠️ ${res.error || 'Failed to credit prize money'}`);
+      }
+    } catch (err) {
+      console.error('Error awarding prize from roster:', err);
+      setRosterPrizeStatus(`⚠️ Error: ${err.message}`);
+    } finally {
+      setRosterPrizeLoading(false);
+    }
   };
 
   return (
@@ -3111,12 +3196,34 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         {player.squadCode && (
                           <span className="badge" style={{ background: 'rgba(255,214,0,0.15)', color: 'var(--accent)', fontSize: '0.7rem' }}>
                             Squad: {player.squadCode}
                           </span>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenRosterPrize(player, latestTourney)}
+                          className="btn"
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '0.75rem',
+                            fontWeight: '900',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            background: 'linear-gradient(135deg, #ffd600 0%, #ffab00 100%)',
+                            color: '#000',
+                            border: 'none',
+                            boxShadow: '0 2px 10px rgba(255, 214, 0, 0.35)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            letterSpacing: '0.4px'
+                          }}
+                        >
+                          <span>🏆</span> GIVE PRIZE
+                        </button>
                         <button
                           type="button"
                           onClick={async () => {
@@ -3154,6 +3261,280 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
           </div>
         );
       })()}
+
+      {/* DIRECT ROSTER PRIZE MONEY POPUP MODAL */}
+      {rosterPrizePlayer && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.88)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '16px'
+        }}>
+          <div className="glass-panel animate-slide-in" style={{
+            width: '100%',
+            maxWidth: '500px',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            border: '1px solid #ffd600',
+            background: '#0a0f1d',
+            borderRadius: '16px',
+            boxShadow: '0 0 35px rgba(255, 214, 0, 0.25)'
+          }}>
+            {/* Header */}
+            <div className="flex-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#ffd600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🏆</span> Award Prize Money
+                </h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Match: <strong style={{ color: '#fff' }}>{rosterPrizePlayer.tourney.title}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setRosterPrizePlayer(null); setRosterPrizeStatus(''); }}
+                className="btn btn-outline"
+                style={{ padding: '4px 10px', fontSize: '0.8rem', borderRadius: '6px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Player Info Card */}
+            <div style={{
+              padding: '12px 16px',
+              background: 'rgba(255, 214, 0, 0.06)',
+              border: '1px solid rgba(255, 214, 0, 0.2)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #ffd600, #ff9100)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.25rem',
+                color: '#000',
+                fontWeight: '900',
+                flexShrink: 0
+              }}>
+                👑
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: '900', fontSize: '1rem', color: '#fff' }}>
+                  {rosterPrizePlayer.player.nickname}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
+                  <span>UID: <strong style={{ color: '#ffd600' }}>{rosterPrizePlayer.player.uid}</strong></span>
+                  {rosterPrizePlayer.player.email && rosterPrizePlayer.player.email !== 'N/A' && <span>✉️ {rosterPrizePlayer.player.email}</span>}
+                  {rosterPrizePlayer.player.phone && rosterPrizePlayer.player.phone !== 'N/A' && <span>📞 {rosterPrizePlayer.player.phone}</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Prize Amount Input & Quick Chips */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                Prize Money Amount (₹ Coins) <span style={{ color: '#ff1744' }}>*</span>
+              </label>
+              
+              {/* Preset Chips */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                {rosterPrizePlayer.tourney.bounty && (
+                  <button
+                    type="button"
+                    onClick={() => setRosterPrizeAmount(String(rosterPrizePlayer.tourney.bounty))}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.72rem',
+                      borderRadius: '6px',
+                      border: rosterPrizeAmount === String(rosterPrizePlayer.tourney.bounty) ? '1px solid #ffd600' : '1px solid rgba(255,255,255,0.1)',
+                      background: rosterPrizeAmount === String(rosterPrizePlayer.tourney.bounty) ? '#ffd600' : 'rgba(255,255,255,0.05)',
+                      color: rosterPrizeAmount === String(rosterPrizePlayer.tourney.bounty) ? '#000' : '#fff',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🎯 Bounty: ₹{rosterPrizePlayer.tourney.bounty}
+                  </button>
+                )}
+                {rosterPrizePlayer.tourney.prizePool && (
+                  <button
+                    type="button"
+                    onClick={() => setRosterPrizeAmount(String(rosterPrizePlayer.tourney.prizePool))}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.72rem',
+                      borderRadius: '6px',
+                      border: rosterPrizeAmount === String(rosterPrizePlayer.tourney.prizePool) ? '1px solid #ffd600' : '1px solid rgba(255,255,255,0.1)',
+                      background: rosterPrizeAmount === String(rosterPrizePlayer.tourney.prizePool) ? '#ffd600' : 'rgba(255,255,255,0.05)',
+                      color: rosterPrizeAmount === String(rosterPrizePlayer.tourney.prizePool) ? '#000' : '#fff',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🏆 Prize Pool: ₹{rosterPrizePlayer.tourney.prizePool}
+                  </button>
+                )}
+                {['20', '50', '100', '200', '500'].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setRosterPrizeAmount(amt)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.72rem',
+                      borderRadius: '6px',
+                      border: rosterPrizeAmount === amt ? '1px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
+                      background: rosterPrizeAmount === amt ? '#00e676' : 'rgba(255,255,255,0.05)',
+                      color: rosterPrizeAmount === amt ? '#000' : '#fff',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ₹{amt}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#ffd600', fontWeight: '900', fontSize: '1.1rem' }}>₹</span>
+                <input
+                  type="number"
+                  value={rosterPrizeAmount}
+                  onChange={(e) => setRosterPrizeAmount(e.target.value)}
+                  placeholder="Enter prize amount (e.g. 50)"
+                  min="1"
+                  className="input-field"
+                  style={{
+                    paddingLeft: '32px',
+                    fontSize: '1rem',
+                    fontWeight: '800',
+                    borderColor: 'rgba(255, 214, 0, 0.4)',
+                    background: 'rgba(0,0,0,0.4)'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Prize Reason & Preset Chips */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                Prize Reason / Remarks
+              </label>
+              
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                {[
+                  `🥇 1st Place Winner`,
+                  `🥈 2nd Place Runner-Up`,
+                  `🎯 Bounty Kill Winner`,
+                  `👑 Match MVP`
+                ].map(preset => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setRosterPrizeReason(`${preset} - ${rosterPrizePlayer.tourney.title}`)}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '0.7rem',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(255,255,255,0.05)',
+                      color: '#fff',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+
+              <input
+                type="text"
+                value={rosterPrizeReason}
+                onChange={(e) => setRosterPrizeReason(e.target.value)}
+                placeholder="e.g. 1st Place Winner"
+                className="input-field"
+                style={{ fontSize: '0.85rem' }}
+              />
+            </div>
+
+            {/* Feedback Status */}
+            {rosterPrizeStatus && (
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: '700',
+                background: rosterPrizeStatus.startsWith('✅') ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 23, 68, 0.15)',
+                border: rosterPrizeStatus.startsWith('✅') ? '1px solid #00e676' : '1px solid #ff1744',
+                color: rosterPrizeStatus.startsWith('✅') ? '#00e676' : '#ff1744'
+              }}>
+                {rosterPrizeStatus}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => { setRosterPrizePlayer(null); setRosterPrizeStatus(''); }}
+                className="btn btn-outline"
+                disabled={rosterPrizeLoading}
+                style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRosterPrize}
+                disabled={rosterPrizeLoading || !rosterPrizeAmount || parseFloat(rosterPrizeAmount) <= 0}
+                className="btn"
+                style={{
+                  flex: 2,
+                  padding: '10px 16px',
+                  fontSize: '0.88rem',
+                  fontWeight: '900',
+                  background: 'linear-gradient(135deg, #00e676 0%, #ffd600 100%)',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 15px rgba(0, 230, 118, 0.4)',
+                  cursor: rosterPrizeLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                {rosterPrizeLoading ? (
+                  '⚡ Crediting Wallet...'
+                ) : (
+                  <>
+                    <span>⚡</span> Send ₹{rosterPrizeAmount || 0} Prize to Wallet
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

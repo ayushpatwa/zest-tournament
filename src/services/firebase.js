@@ -691,25 +691,38 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
 
     const queryStr = String(uidOrEmail).trim().toLowerCase();
     const rawQuery = String(uidOrEmail).trim();
-    const usersCollection = collection(db, "users");
-    const snapshot = await getDocs(usersCollection);
     
     let targetDocId = null;
     let targetUserData = null;
 
-    // 1. Search through all cloud Firestore users
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
-      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
-      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
-      const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
-
-      if (docIdMatch || uidMatch || emailMatch || nickMatch) {
-        targetDocId = docSnap.id;
-        targetUserData = data;
+    // 1. Fast universal lookup via live memory cache / direct getDoc
+    try {
+      const fastMatched = await findUserInFirestoreAcrossDevices(rawQuery);
+      if (fastMatched && !fastMatched.isNetworkError) {
+        targetDocId = fastMatched.docId || fastMatched.id || rawQuery;
+        targetUserData = fastMatched;
       }
-    });
+    } catch (e) {
+      console.warn("[Credit] Fast lookup notice:", e);
+    }
+
+    // 2. Fallback search through cloud Firestore users if not yet found
+    if (!targetDocId) {
+      const usersCollection = collection(db, "users");
+      const snapshot = await getDocs(usersCollection);
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
+        const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
+        const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
+        const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
+
+        if (docIdMatch || uidMatch || emailMatch || nickMatch) {
+          targetDocId = docSnap.id;
+          targetUserData = data;
+        }
+      });
+    }
 
     const dateStr = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const finalReason = reason || title || 'Tournament Prize / Winning';
@@ -724,7 +737,7 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       createdAt: new Date().toISOString()
     };
 
-    // 2. If doc exists in Firestore, atomically increment wallet & earnings and push transaction
+    // 3. If doc exists in Firestore, atomically increment wallet & earnings and push transaction
     if (targetDocId) {
       const targetRef = doc(db, "users", targetDocId);
       await setDoc(targetRef, {
