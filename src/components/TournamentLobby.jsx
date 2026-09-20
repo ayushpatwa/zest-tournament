@@ -525,25 +525,49 @@ export default function TournamentLobby({
               <button
                 type="button"
                 onClick={async () => {
-                  const res = await addDemoPlayersToTournamentRealtime(tournament.id);
+                  const currentJoined = tournament.joinedPlayers?.length || 0;
+                  const availableSlots = Math.max(0, totalSlots - currentJoined);
+                  if (availableSlots <= 0) {
+                    alert(`⚠️ Match is already full (${currentJoined}/${totalSlots})!`);
+                    return;
+                  }
+                  const promptVal = window.prompt(
+                    `🤖 ADD BOTS TO MATCH\n\n` +
+                    `Tournament: ${tournament.title}\n` +
+                    `Current Joined: ${currentJoined}/${totalSlots}\n` +
+                    `Available Slots: ${availableSlots}\n\n` +
+                    `Enter number of bots to add (1 - ${availableSlots}):`,
+                    String(Math.min(10, availableSlots))
+                  );
+                  if (promptVal === null) return;
+                  const countNum = parseInt(promptVal, 10);
+                  if (isNaN(countNum) || countNum <= 0) {
+                    alert("⚠️ Please enter a valid positive number of bots.");
+                    return;
+                  }
+                  const finalCount = Math.min(countNum, availableSlots);
+                  const res = await addDemoPlayersToTournamentRealtime(tournament.id, finalCount);
                   if (res.success) {
-                    alert(`✓ Added demo players to this tournament lobby!`);
+                    alert(`🎉 Successfully added ${res.added} bots to "${tournament.title}"! (Total: ${res.total}/${totalSlots})`);
                   } else {
-                    alert(`⚠️ ${res.error || 'Failed to add demo players'}`);
+                    alert(`⚠️ ${res.error || 'Failed to add bots'}`);
                   }
                 }}
                 style={{
-                  padding: '4px 10px',
-                  fontSize: '0.72rem',
-                  background: 'rgba(0, 230, 118, 0.15)',
+                  padding: '5px 12px',
+                  fontSize: '0.74rem',
+                  background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.2) 0%, rgba(0, 229, 255, 0.2) 100%)',
                   color: '#00e676',
-                  border: '1px solid rgba(0, 230, 118, 0.4)',
+                  border: '1px solid rgba(0, 230, 118, 0.5)',
                   borderRadius: '6px',
                   fontWeight: '800',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
                 }}
               >
-                🌱 +Demo Players
+                <span>🤖</span> +Add Bots
               </button>
             )}
           </div>

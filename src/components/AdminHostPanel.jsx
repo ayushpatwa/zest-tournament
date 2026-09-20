@@ -1503,6 +1503,52 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                       </button>
                       <button
                         type="button"
+                        onClick={async () => {
+                          const currentJoined = t.joinedPlayers?.length || 0;
+                          const maxSlots = t.slotsTotal || t.maxSlots || 48;
+                          const availableSlots = Math.max(0, maxSlots - currentJoined);
+                          if (availableSlots <= 0) {
+                            alert(`⚠️ Match is already full (${currentJoined}/${maxSlots})!`);
+                            return;
+                          }
+                          const promptVal = window.prompt(
+                            `🤖 ADD BOTS TO MATCH\n\n` +
+                            `Tournament: ${t.title}\n` +
+                            `Current Joined: ${currentJoined}/${maxSlots}\n` +
+                            `Available Slots: ${availableSlots}\n\n` +
+                            `Enter number of bots to add (1 - ${availableSlots}):`,
+                            String(Math.min(10, availableSlots))
+                          );
+                          if (promptVal === null) return;
+                          const countNum = parseInt(promptVal, 10);
+                          if (isNaN(countNum) || countNum <= 0) {
+                            alert("⚠️ Please enter a valid positive number of bots.");
+                            return;
+                          }
+                          const finalCount = Math.min(countNum, availableSlots);
+                          const res = await addDemoPlayersToTournamentRealtime(t.id, finalCount);
+                          if (res.success) {
+                            alert(`🎉 Added ${res.added} bots to "${t.title}"! (Total: ${res.total}/${maxSlots})`);
+                          } else {
+                            alert(`⚠️ ${res.error || 'Failed to add bots'}`);
+                          }
+                        }}
+                        className="btn"
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: '800',
+                          background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.15) 0%, rgba(0, 229, 255, 0.15) 100%)',
+                          color: '#00e676',
+                          border: '1px solid rgba(0, 230, 118, 0.4)',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🤖 +Bots
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleStartEditTournament(t)}
                         className="btn btn-secondary"
                         style={{
@@ -1855,23 +1901,26 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                         onClick={async () => {
                           const res = await seedDemoPlayersRealtime();
                           if (res.success) {
-                            alert(`🌱 Successfully added 8 demo players to the database!`);
+                            alert(`🌱 Successfully added ${res.count} esports bot players to the database!`);
                           } else {
                             alert(`⚠️ Failed to add demo players: ${res.error}`);
                           }
                         }}
                         style={{
-                          padding: '3px 8px',
-                          fontSize: '0.7rem',
-                          background: 'rgba(0, 230, 118, 0.15)',
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.2) 0%, rgba(0, 229, 255, 0.2) 100%)',
                           color: '#00e676',
                           border: '1px solid rgba(0, 230, 118, 0.4)',
                           borderRadius: '6px',
                           fontWeight: '800',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
                         }}
                       >
-                        🌱 +8 Demo Players
+                        <span>🤖</span> +Seed 108 Esports Bots
                       </button>
                     </div>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -2295,25 +2344,41 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
               <button
                 type="button"
                 onClick={async () => {
-                  const res = await addDemoPlayersToAllMatchesRealtime();
+                  const promptVal = window.prompt(
+                    `🤖 ADD BOTS TO ALL ACTIVE MATCHES\n\n` +
+                    `Total Active Tournaments: ${tournaments.length}\n` +
+                    `Total Available Bots in Catalog: 108\n\n` +
+                    `Enter number of bots to add per match (e.g. 5, 10, or 20):`,
+                    "5"
+                  );
+                  if (promptVal === null) return;
+                  const countNum = parseInt(promptVal, 10);
+                  if (isNaN(countNum) || countNum <= 0) {
+                    alert("⚠️ Please enter a valid positive number.");
+                    return;
+                  }
+                  const res = await addDemoPlayersToAllMatchesRealtime(countNum);
                   if (res.success) {
-                    alert(`🌱 Successfully added demo players to all active matches!`);
+                    alert(`🎉 Successfully added ${res.count} bots across active matches!`);
                   } else {
                     alert(`⚠️ ${res.error || 'Failed to add demo players'}`);
                   }
                 }}
                 style={{
-                  padding: '6px 12px',
+                  padding: '6px 14px',
                   fontSize: '0.75rem',
-                  background: 'rgba(0, 230, 118, 0.15)',
+                  background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.2) 0%, rgba(0, 229, 255, 0.2) 100%)',
                   color: '#00e676',
-                  border: '1px solid rgba(0, 230, 118, 0.4)',
+                  border: '1px solid rgba(0, 230, 118, 0.5)',
                   borderRadius: '8px',
                   fontWeight: '800',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                🌱 +Demo Players to All Matches
+                <span>🤖</span> +Add Bots to All Matches
               </button>
             )}
           </div>
@@ -2405,26 +2470,51 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                     <button
                       type="button"
                       onClick={async () => {
-                        const res = await addDemoPlayersToTournamentRealtime(t.id);
+                        const currentJoined = t.joinedPlayers?.length || 0;
+                        const maxSlots = t.slotsTotal || t.maxSlots || 48;
+                        const availableSlots = Math.max(0, maxSlots - currentJoined);
+                        if (availableSlots <= 0) {
+                          alert(`⚠️ Match is already full (${currentJoined}/${maxSlots})!`);
+                          return;
+                        }
+                        const promptVal = window.prompt(
+                          `🤖 ADD BOTS TO MATCH\n\n` +
+                          `Tournament: ${t.title}\n` +
+                          `Current Joined: ${currentJoined}/${maxSlots}\n` +
+                          `Available Slots: ${availableSlots}\n\n` +
+                          `Enter number of bots to add (1 - ${availableSlots}):`,
+                          String(Math.min(10, availableSlots))
+                        );
+                        if (promptVal === null) return;
+                        const countNum = parseInt(promptVal, 10);
+                        if (isNaN(countNum) || countNum <= 0) {
+                          alert("⚠️ Please enter a valid positive number of bots.");
+                          return;
+                        }
+                        const finalCount = Math.min(countNum, availableSlots);
+                        const res = await addDemoPlayersToTournamentRealtime(t.id, finalCount);
                         if (res.success) {
-                          alert(`✓ Added demo players to "${t.title}"!`);
+                          alert(`🎉 Added ${res.added} bots to "${t.title}"! (Total: ${res.total}/${maxSlots})`);
                         } else {
-                          alert(`⚠️ ${res.error || 'Failed to add demo players'}`);
+                          alert(`⚠️ ${res.error || 'Failed to add bots'}`);
                         }
                       }}
                       className="btn"
                       style={{
                         padding: '8px 12px',
                         fontSize: '0.75rem',
-                        background: 'rgba(0, 230, 118, 0.15)',
+                        background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.2) 0%, rgba(0, 229, 255, 0.2) 100%)',
                         color: '#00e676',
                         border: '1px solid rgba(0, 230, 118, 0.4)',
                         borderRadius: '8px',
                         fontWeight: '700',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
                       }}
                     >
-                      👥 +Demo Players
+                      <span>🤖</span> +Add Bots
                     </button>
 
                     <button
@@ -3154,14 +3244,61 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                     Joined: <strong style={{ color: '#fff' }}>{playerList.length} / {maxSlots} Players</strong> {playerList.length >= maxSlots && <span style={{ color: '#ff1744', fontWeight: '900' }}>(HOUSEFULL)</span>}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setManagingPlayersTourney(null)}
-                  className="btn btn-outline"
-                  style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                >
-                  ✕ Close
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {playerList.length < maxSlots && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const availableSlots = Math.max(0, maxSlots - playerList.length);
+                        const promptVal = window.prompt(
+                          `🤖 ADD BOTS TO MATCH ROSTER\n\n` +
+                          `Match: ${latestTourney.title}\n` +
+                          `Current Joined: ${playerList.length}/${maxSlots}\n` +
+                          `Available Slots: ${availableSlots}\n\n` +
+                          `Enter number of bots to add (1 - ${availableSlots}):`,
+                          String(Math.min(10, availableSlots))
+                        );
+                        if (promptVal === null) return;
+                        const countNum = parseInt(promptVal, 10);
+                        if (isNaN(countNum) || countNum <= 0) {
+                          alert("⚠️ Please enter a valid positive number of bots.");
+                          return;
+                        }
+                        const finalCount = Math.min(countNum, availableSlots);
+                        const res = await addDemoPlayersToTournamentRealtime(latestTourney.id, finalCount);
+                        if (res.success) {
+                          alert(`🎉 Added ${res.added} bots to "${latestTourney.title}"! (Total: ${res.total}/${maxSlots})`);
+                        } else {
+                          alert(`⚠️ ${res.error || 'Failed to add bots'}`);
+                        }
+                      }}
+                      className="btn"
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '0.78rem',
+                        fontWeight: '800',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.2) 0%, rgba(0, 229, 255, 0.2) 100%)',
+                        color: '#00e676',
+                        border: '1px solid rgba(0, 230, 118, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <span>🤖</span> +Add Bots
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setManagingPlayersTourney(null)}
+                    className="btn btn-outline"
+                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                  >
+                    ✕ Close
+                  </button>
+                </div>
               </div>
 
               {/* Player list */}

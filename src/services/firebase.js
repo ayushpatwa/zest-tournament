@@ -1476,114 +1476,10 @@ export const toggleUserHostRoleRealtime = async (userIdOrUid, enableHost = true)
 };
 
 /**
- * Pre-defined esports demo players for testing & arena activity
+ * Pre-defined esports demo players for testing & arena activity (108 bots)
  */
-export const DEMO_PLAYERS = [
-  {
-    id: "user_demo_1",
-    uid: "582910394",
-    nickname: "SOUL_Viper",
-    email: "viper.soul@gmail.com",
-    phone: "9876543210",
-    password: "password123",
-    role: "player",
-    wallet: 1250,
-    stats: { matches: 46, wins: 22, kills: 382, earnings: 48500 },
-    isVerified: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "user_demo_2",
-    uid: "192837465",
-    nickname: "Garena_Sniper",
-    email: "garena.sniper@gmail.com",
-    phone: "9811223344",
-    password: "password123",
-    role: "player",
-    wallet: 840,
-    stats: { matches: 33, wins: 14, kills: 310, earnings: 34200 },
-    isVerified: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "user_demo_3",
-    uid: "910293847",
-    nickname: "TotalGaming_Fan",
-    email: "totalgaming.fan@gmail.com",
-    phone: "9822334455",
-    password: "password123",
-    role: "player",
-    wallet: 450,
-    stats: { matches: 28, wins: 11, kills: 275, earnings: 27800 },
-    isVerified: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "user_demo_4",
-    uid: "482910283",
-    nickname: "ShadowHunter_OP",
-    email: "shadowhunter.op@gmail.com",
-    phone: "9833445566",
-    password: "password123",
-    role: "player",
-    wallet: 620,
-    stats: { matches: 22, wins: 8, kills: 230, earnings: 21500 },
-    isVerified: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "user_demo_5",
-    uid: "849201938",
-    nickname: "Thunder_God_FF",
-    email: "thunder.god@gmail.com",
-    phone: "9844556677",
-    password: "password123",
-    role: "player",
-    wallet: 310,
-    stats: { matches: 19, wins: 7, kills: 198, earnings: 18900 },
-    isVerified: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "user_demo_6",
-    uid: "772910481",
-    nickname: "Raptor_Esports",
-    email: "raptor.esports@gmail.com",
-    phone: "9855667788",
-    password: "password123",
-    role: "player",
-    wallet: 500,
-    stats: { matches: 16, wins: 6, kills: 174, earnings: 16200 },
-    isVerified: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "user_demo_7",
-    uid: "284019284",
-    nickname: "Panda_Headshot",
-    email: "panda.hs@gmail.com",
-    phone: "9866778899",
-    password: "password123",
-    role: "player",
-    wallet: 750,
-    stats: { matches: 14, wins: 5, kills: 160, earnings: 14500 },
-    isVerified: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "user_demo_8",
-    uid: "639201847",
-    nickname: "Frost_Byte_99",
-    email: "frostbyte99@gmail.com",
-    phone: "9877889900",
-    password: "password123",
-    role: "player",
-    wallet: 200,
-    stats: { matches: 10, wins: 3, kills: 95, earnings: 8200 },
-    isVerified: true,
-    createdAt: new Date().toISOString()
-  }
-];
+import { DEMO_PLAYERS } from './demoBotsData.js';
+export { DEMO_PLAYERS };
 
 /**
  * Seeds demo players directly to Cloud Firestore & local cache
@@ -1605,7 +1501,7 @@ export const seedDemoPlayersRealtime = async () => {
       }
     }
     localStorage.setItem('zest_registered_users', JSON.stringify(merged));
-    console.log("[Firebase] Seeded demo players successfully!");
+    console.log(`[Firebase] Seeded ${DEMO_PLAYERS.length} demo bots successfully!`);
     return { success: true, count: DEMO_PLAYERS.length };
   } catch (err) {
     console.error("[Firebase] Error seeding demo players:", err);
@@ -1615,8 +1511,10 @@ export const seedDemoPlayersRealtime = async () => {
 
 /**
  * Adds demo players to a specific tournament in Firestore
+ * @param {string} tournamentId
+ * @param {number|null} count - Number of bots to add
  */
-export const addDemoPlayersToTournamentRealtime = async (tournamentId) => {
+export const addDemoPlayersToTournamentRealtime = async (tournamentId, count = null) => {
   try {
     const tourneyRef = doc(db, "tournaments", tournamentId);
     const tourneySnap = await getDoc(tourneyRef);
@@ -1625,20 +1523,34 @@ export const addDemoPlayersToTournamentRealtime = async (tournamentId) => {
     }
     const tData = tourneySnap.data();
     const existingJoined = Array.isArray(tData.joinedPlayers) ? tData.joinedPlayers : [];
-    const existingUids = new Set(existingJoined.map(p => String(p.uid || '').trim()));
+    const maxSlots = tData.slotsTotal || tData.maxSlots || 48;
+    const remainingSlots = Math.max(0, maxSlots - existingJoined.length);
 
-    const toAdd = DEMO_PLAYERS.filter(dp => !existingUids.has(dp.uid));
-    if (toAdd.length === 0) {
-      return { success: true, message: "Demo players already in match", added: 0 };
+    if (remainingSlots <= 0) {
+      return { success: false, error: "Match is already full (Housefull)!" };
     }
+
+    const existingUids = new Set(existingJoined.map(p => String(p.uid || '').trim()));
+    const availableBots = DEMO_PLAYERS.filter(dp => !existingUids.has(String(dp.uid).trim()));
+
+    if (availableBots.length === 0) {
+      return { success: false, error: "All available bots are already in this match!" };
+    }
+
+    let howMany = remainingSlots;
+    if (count !== null && count !== undefined && !isNaN(count)) {
+      howMany = Math.min(Math.max(1, parseInt(count, 10)), remainingSlots);
+    }
+    const toAdd = availableBots.slice(0, howMany);
 
     const newJoined = [
       ...existingJoined,
       ...toAdd.map(p => ({
         uid: p.uid,
         nickname: p.nickname,
-        email: p.email,
-        phone: p.phone,
+        email: p.email || 'N/A',
+        phone: p.phone || 'N/A',
+        isBot: true,
         joinedAt: new Date().toISOString()
       }))
     ];
@@ -1649,8 +1561,8 @@ export const addDemoPlayersToTournamentRealtime = async (tournamentId) => {
       updatedAt: serverTimestamp()
     });
 
-    console.log(`[Firebase] Added ${toAdd.length} demo players to tournament ${tournamentId}`);
-    return { success: true, added: toAdd.length, total: newJoined.length };
+    console.log(`[Firebase] Added ${toAdd.length} demo bots to tournament ${tournamentId}`);
+    return { success: true, added: toAdd.length, total: newJoined.length, maxSlots };
   } catch (err) {
     console.error("[Firebase] Error adding demo players to tournament:", err);
     return { success: false, error: err.message };
@@ -1659,8 +1571,9 @@ export const addDemoPlayersToTournamentRealtime = async (tournamentId) => {
 
 /**
  * Adds demo players to all active tournaments in Firestore
+ * @param {number|null} countPerMatch - Max bots to add per match
  */
-export const addDemoPlayersToAllMatchesRealtime = async () => {
+export const addDemoPlayersToAllMatchesRealtime = async (countPerMatch = null) => {
   try {
     const tourneysSnap = await getDocs(collection(db, "tournaments"));
     let totalAdded = 0;
@@ -1669,28 +1582,39 @@ export const addDemoPlayersToAllMatchesRealtime = async () => {
       const tData = docSnap.data();
       const tId = docSnap.id;
       const existingJoined = Array.isArray(tData.joinedPlayers) ? tData.joinedPlayers : [];
+      const maxSlots = tData.slotsTotal || tData.maxSlots || 48;
+      const remainingSlots = Math.max(0, maxSlots - existingJoined.length);
+      if (remainingSlots <= 0) continue;
+
       const existingUids = new Set(existingJoined.map(p => String(p.uid || '').trim()));
+      const availableBots = DEMO_PLAYERS.filter(dp => !existingUids.has(String(dp.uid).trim()));
+      if (availableBots.length === 0) continue;
 
-      const toAdd = DEMO_PLAYERS.filter(dp => !existingUids.has(dp.uid));
-      if (toAdd.length > 0) {
-        const newJoined = [
-          ...existingJoined,
-          ...toAdd.map(p => ({
-            uid: p.uid,
-            nickname: p.nickname,
-            email: p.email,
-            phone: p.phone,
-            joinedAt: new Date().toISOString()
-          }))
-        ];
-
-        await updateDoc(doc(db, "tournaments", tId), {
-          joinedPlayers: newJoined,
-          slotsJoined: newJoined.length,
-          updatedAt: serverTimestamp()
-        });
-        totalAdded += toAdd.length;
+      let howMany = remainingSlots;
+      if (countPerMatch !== null && countPerMatch !== undefined && !isNaN(countPerMatch)) {
+        howMany = Math.min(Math.max(1, parseInt(countPerMatch, 10)), remainingSlots);
       }
+      const toAdd = availableBots.slice(0, howMany);
+      if (toAdd.length === 0) continue;
+
+      const newJoined = [
+        ...existingJoined,
+        ...toAdd.map(p => ({
+          uid: p.uid,
+          nickname: p.nickname,
+          email: p.email || 'N/A',
+          phone: p.phone || 'N/A',
+          isBot: true,
+          joinedAt: new Date().toISOString()
+        }))
+      ];
+
+      await updateDoc(doc(db, "tournaments", tId), {
+        joinedPlayers: newJoined,
+        slotsJoined: newJoined.length,
+        updatedAt: serverTimestamp()
+      });
+      totalAdded += toAdd.length;
     }
     return { success: true, count: totalAdded };
   } catch (err) {
