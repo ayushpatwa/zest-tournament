@@ -1512,6 +1512,21 @@ export const seedDemoPlayersRealtime = async () => {
 /**
  * Adds demo players to a specific tournament in Firestore
  * @param {string} tournamentId
+/**
+ * Utility: Fisher-Yates shuffle array to randomize bot selection
+ */
+const shuffleBots = (array) => {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+};
+
+/**
+ * Adds demo players to a specific tournament in Firestore ensuring DIFFERENT bots in every match
+ * @param {string} tournamentId
  * @param {number|null} count - Number of bots to add
  */
 export const addDemoPlayersToTournamentRealtime = async (tournamentId, count = null) => {
@@ -1530,18 +1545,44 @@ export const addDemoPlayersToTournamentRealtime = async (tournamentId, count = n
       return { success: false, error: "Match is already full (Housefull)!" };
     }
 
-    const existingUids = new Set(existingJoined.map(p => String(p.uid || '').trim()));
-    const availableBots = DEMO_PLAYERS.filter(dp => !existingUids.has(String(dp.uid).trim()));
+    const currentMatchUids = new Set(existingJoined.map(p => String(p.uid || '').trim()));
 
-    if (availableBots.length === 0) {
+    // 1. Gather all bot UIDs already participating in OTHER tournaments to ensure distinct bots in every match
+    const allTourneysSnap = await getDocs(collection(db, "tournaments"));
+    const uidsInOtherMatches = new Set();
+    allTourneysSnap.forEach(snap => {
+      if (snap.id !== tournamentId) {
+        const otherData = snap.data();
+        if (Array.isArray(otherData.joinedPlayers)) {
+          otherData.joinedPlayers.forEach(p => {
+            if (p.uid) uidsInOtherMatches.add(String(p.uid).trim());
+          });
+        }
+      }
+    });
+
+    // 2. Filter bots that are not yet in the current match
+    const botsNotInCurrentMatch = DEMO_PLAYERS.filter(dp => !currentMatchUids.has(String(dp.uid).trim()));
+
+    if (botsNotInCurrentMatch.length === 0) {
       return { success: false, error: "All available bots are already in this match!" };
     }
+
+    // 3. Prioritize bots that are NOT used in any other match, then fall back to remaining bots
+    const unusedAcrossMatches = botsNotInCurrentMatch.filter(dp => !uidsInOtherMatches.has(String(dp.uid).trim()));
+    const usedInOtherMatches = botsNotInCurrentMatch.filter(dp => uidsInOtherMatches.has(String(dp.uid).trim()));
+
+    // 4. Shuffle both pools randomly so selection is always fresh and randomized
+    const prioritizedPool = [
+      ...shuffleBots(unusedAcrossMatches),
+      ...shuffleBots(usedInOtherMatches)
+    ];
 
     let howMany = remainingSlots;
     if (count !== null && count !== undefined && !isNaN(count)) {
       howMany = Math.min(Math.max(1, parseInt(count, 10)), remainingSlots);
     }
-    const toAdd = availableBots.slice(0, howMany);
+    const toAdd = prioritizedPool.slice(0, howMany);
 
     const newJoined = [
       ...existingJoined,
@@ -1561,7 +1602,7 @@ export const addDemoPlayersToTournamentRealtime = async (tournamentId, count = n
       updatedAt: serverTimestamp()
     });
 
-    console.log(`[Firebase] Added ${toAdd.length} demo bots to tournament ${tournamentId}`);
+    console.log(`[Firebase] Added ${toAdd.length} distinct demo bots to tournament ${tournamentId}`);
     return { success: true, added: toAdd.length, total: newJoined.length, maxSlots };
   } catch (err) {
     console.error("[Firebase] Error adding demo players to tournament:", err);
@@ -1570,13 +1611,24 @@ export const addDemoPlayersToTournamentRealtime = async (tournamentId, count = n
 };
 
 /**
- * Adds demo players to all active tournaments in Firestore
+ * Adds demo players to all active tournaments in Firestore, distributing DIFFERENT bots to each match
  * @param {number|null} countPerMatch - Max bots to add per match
  */
 export const addDemoPlayersToAllMatchesRealtime = async (countPerMatch = null) => {
   try {
     const tourneysSnap = await getDocs(collection(db, "tournaments"));
     let totalAdded = 0;
+
+    // Track all bots assigned across all tournaments so each match receives distinct bots
+    const globallyUsedUids = new Set();
+    tourneysSnap.docs.forEach(docSnap => {
+      const tData = docSnap.data();
+      if (Array.isArray(tData.joinedPlayers)) {
+        tData.joinedPlayers.forEach(p => {
+          if (p.uid) globallyUsedUids.add(String(p.uid).trim());
+        });
+      }
+    });
 
     for (const docSnap of tourneysSnap.docs) {
       const tData = docSnap.data();
@@ -1586,16 +1638,25 @@ export const addDemoPlayersToAllMatchesRealtime = async (countPerMatch = null) =
       const remainingSlots = Math.max(0, maxSlots - existingJoined.length);
       if (remainingSlots <= 0) continue;
 
-      const existingUids = new Set(existingJoined.map(p => String(p.uid || '').trim()));
-      const availableBots = DEMO_PLAYERS.filter(dp => !existingUids.has(String(dp.uid).trim()));
-      if (availableBots.length === 0) continue;
+      const currentMatchUids = new Set(existingJoined.map(p => String(p.uid || '').trim()));
+      const botsNotInThisMatch = DEMO_PLAYERS.filter(dp => !currentMatchUids.has(String(dp.uid).trim()));
+      if (botsNotInThisMatch.length === 0) continue;
+
+      // Prioritize completely fresh bots not used in any other match yet
+      const freshBots = botsNotInThisMatch.filter(dp => !globallyUsedUids.has(String(dp.uid).trim()));
+      const otherBots = botsNotInThisMatch.filter(dp => globallyUsedUids.has(String(dp.uid).trim()));
+
+      const pool = [...shuffleBots(freshBots), ...shuffleBots(otherBots)];
 
       let howMany = remainingSlots;
       if (countPerMatch !== null && countPerMatch !== undefined && !isNaN(countPerMatch)) {
         howMany = Math.min(Math.max(1, parseInt(countPerMatch, 10)), remainingSlots);
       }
-      const toAdd = availableBots.slice(0, howMany);
+      const toAdd = pool.slice(0, howMany);
       if (toAdd.length === 0) continue;
+
+      // Mark these bots as globally assigned so the next match gets DIFFERENT bots!
+      toAdd.forEach(b => globallyUsedUids.add(String(b.uid).trim()));
 
       const newJoined = [
         ...existingJoined,
