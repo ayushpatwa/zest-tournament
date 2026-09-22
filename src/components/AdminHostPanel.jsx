@@ -538,7 +538,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
 
   const handleGenerateTomorrowSchedule = async () => {
     setIsGeneratingSchedule(true);
-    setScheduleStatusMsg("⏳ Generating Tomorrow's 100 1v1 matches in real-time...");
+    setScheduleStatusMsg("⏳ Generating Tomorrow's 25 sequential 1v1 matches in real-time...");
     const res = await generateDaily1v1Matches(getTomorrowDateString());
     setIsGeneratingSchedule(false);
     if (res.success) {
@@ -2527,9 +2527,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   </span>
                 </div>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Generates 100 matches daily (25 time slots in 30-min intervals × 4 modes: Clash squad 1v1, CS 1v1 head, Lone wolf 1v1, Lone wolf 1v1 head).
+                  Generates 25 matches daily in 30-min intervals (10:00 AM – 10:00 PM) rotating sequentially:
                   <br />
-                  <strong style={{ color: 'var(--accent)' }}>Entry Fee: ₹4 | Winning Prize: ₹6 | Slots: 2</strong>
+                  <span style={{ color: 'var(--secondary)' }}>⚔️ Clash squad 1v1 ➔ 🎯 CS 1v1 (head) ➔ 🐺 Lone wolf 1v1 ➔ 🎯 Lone wolf 1v1 (head)</span>
+                  <br />
+                  <strong style={{ color: 'var(--accent)' }}>Entry Fee: ₹4 | Winning Prize: ₹6 | Slots: 2 (30 min gap between matches)</strong>
                 </p>
               </div>
             </div>
@@ -2552,8 +2554,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                       gap: '6px'
                     }}>
                       <span>📅 Today ({formatMatchDate(todayStr)}):</span>
-                      <strong style={{ color: todayCount >= 100 ? '#00e676' : '#ffd600' }}>
-                        {todayCount}/100 active
+                      <strong style={{ color: todayCount >= 25 ? '#00e676' : '#ffd600' }}>
+                        {todayCount}/25 active
                       </strong>
                     </div>
 
@@ -2567,8 +2569,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                       gap: '6px'
                     }}>
                       <span>🚀 Tomorrow ({formatMatchDate(tomorrowStr)}):</span>
-                      <strong style={{ color: tomorrowCount >= 100 ? '#00e676' : 'var(--text-muted)' }}>
-                        {tomorrowCount}/100 active
+                      <strong style={{ color: tomorrowCount >= 25 ? '#00e676' : 'var(--text-muted)' }}>
+                        {tomorrowCount}/25 active
                       </strong>
                     </div>
                   </>
@@ -2594,7 +2596,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   boxShadow: '0 4px 12px rgba(0, 229, 255, 0.25)'
                 }}
               >
-                {isGeneratingSchedule ? '⏳ Processing...' : "🚀 Auto-Generate Tomorrow's Schedule (100 Matches)"}
+                {isGeneratingSchedule ? '⏳ Processing...' : "🚀 Auto-Generate Tomorrow's Schedule (25 Matches)"}
               </button>
 
               <button
