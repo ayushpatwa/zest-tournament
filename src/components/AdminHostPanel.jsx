@@ -2528,7 +2528,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                     Daily 1v1 Match Auto-Scheduler (10:00 AM – 10:00 PM)
                   </h4>
                   <span className="badge" style={{ background: 'rgba(0, 230, 118, 0.2)', color: '#00e676', border: '1px solid rgba(0, 230, 118, 0.4)', fontSize: '0.68rem' }}>
-                    ⏰ Auto-Adds Everyday at 11:00 PM
+                    ⏰ Auto-Adds Everyday at 10:30 PM
                   </span>
                 </div>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
