@@ -41,7 +41,9 @@ export default function ReferEarnPage({ userProfile = {}, currentUser = {}, setC
     || (totalInvited * referralReward);
 
   const appShareUrl = typeof window !== 'undefined' ? window.location.origin : 'https://zest-tournament.vercel.app';
-  const shareMessage = `🔥 Hey Gamer! Join me on ZEST TOURNAMENTS to play Free Fire Esports, 1v1 Clash Squad, and Win Real Cash Prizes! 🏆\n\n🎁 Use my Referral Code: ${myReferralCode} during signup to get Instant Free Coins!\n\n🎮 Play & Win Now: ${appShareUrl}`;
+  const shareMessage = referralReward > 0
+    ? `🔥 Hey Gamer! Join me on ZEST TOURNAMENTS to play Free Fire Esports, 1v1 Clash Squad, and Win Real Cash Prizes! 🏆\n\n🎁 Use my Referral Code: ${myReferralCode} during signup to get Instant Free Coins!\n\n🎮 Play & Win Now: ${appShareUrl}`
+    : `🔥 Hey Gamer! Join me on ZEST TOURNAMENTS to play Free Fire Esports, 1v1 Clash Squad, and Win Real Cash Prizes! 🏆\n\n🎁 Join using my Invite Code: ${myReferralCode}\n\n🎮 Play & Win Now: ${appShareUrl}`;
 
   const handleCopyCode = async () => {
     try {
@@ -109,10 +111,14 @@ export default function ReferEarnPage({ userProfile = {}, currentUser = {}, setC
           margin: '0 0 6px 0',
           textTransform: 'uppercase'
         }}>
-          REFER & EARN COINS
+          {referralReward > 0 ? 'REFER & EARN COINS' : 'INVITE SQUAD & FRIENDS'}
         </h2>
         <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
-          Invite your Free Fire squad and friends. Get <strong style={{ color: '#ffd600' }}>₹{referralReward} Free Coins</strong> for every friend who signs up!
+          {referralReward > 0 ? (
+            <>Invite your Free Fire squad and friends. Get <strong style={{ color: '#ffd600' }}>₹{referralReward} Free Coins</strong> for every friend who signs up!</>
+          ) : (
+            <>Invite your Free Fire squad and friends to play together in custom tournaments & 1v1 battles!</>
+          )}
         </p>
       </div>
 
@@ -275,8 +281,8 @@ export default function ReferEarnPage({ userProfile = {}, currentUser = {}, setC
           <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700' }}>
             PER INVITE
           </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: '900', color: 'var(--success)', fontFamily: 'var(--font-heading)', marginTop: '2px' }}>
-            +₹{referralReward}
+          <div style={{ fontSize: '1.25rem', fontWeight: '900', color: referralReward > 0 ? 'var(--success)' : 'var(--text-muted)', fontFamily: 'var(--font-heading)', marginTop: '2px' }}>
+            {referralReward > 0 ? `+₹${referralReward}` : '0 Coins'}
           </div>
           <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>Per Friend</div>
         </div>
@@ -363,8 +369,15 @@ export default function ReferEarnPage({ userProfile = {}, currentUser = {}, setC
               flexShrink: 0
             }}>3</div>
             <div>
-              <strong style={{ fontSize: '0.82rem', color: '#fff', display: 'block' }}>Get Instant Reward Coins!</strong>
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>You get ₹{referralReward} coins added straight to your wallet. Use them to enter tournaments or withdraw!</span>
+              <strong style={{ fontSize: '0.82rem', color: '#fff', display: 'block' }}>
+                {referralReward > 0 ? 'Get Instant Reward Coins!' : 'Squad Up & Compete!'}
+              </strong>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                {referralReward > 0 
+                  ? `You get ₹${referralReward} coins added straight to your wallet. Use them to enter tournaments or withdraw!`
+                  : `Your friend connects to your squad team on Zest to play head-to-head matches and custom rooms together.`
+                }
+              </span>
             </div>
           </div>
         </div>

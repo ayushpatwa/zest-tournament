@@ -153,8 +153,8 @@ export default function LoginPage({ onLoginSuccess }) {
     setGeneratedOtp(code);
     setEnteredOtp('');
 
-    const bonusAmount = typeof welcomeBonus === 'number' ? welcomeBonus : 5;
-    const initialTransactions = [
+    const bonusAmount = typeof welcomeBonus === 'number' ? Math.max(0, welcomeBonus) : 5;
+    const initialTransactions = bonusAmount > 0 ? [
       {
         id: `tx_${Date.now()}`,
         type: 'CREDIT',
@@ -165,7 +165,7 @@ export default function LoginPage({ onLoginSuccess }) {
         timestamp: new Date().toISOString(),
         status: 'Success'
       }
-    ];
+    ] : [];
 
     const targetUser = {
       id: `user_${Date.now()}`,
@@ -292,7 +292,7 @@ export default function LoginPage({ onLoginSuccess }) {
     localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
 
     // 3. If user signed up with a referral code, credit the referrer instantly
-    if (pendingUser.referredBy) {
+    if (pendingUser.referredBy && referralRewardAmount > 0) {
       try {
         await creditReferralRewardRealtime(
           pendingUser.referredBy, 
@@ -1018,22 +1018,24 @@ export default function LoginPage({ onLoginSuccess }) {
           <form onSubmit={handleInitiateSignUp} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             
             {/* Welcome Bonus Notice */}
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(255, 214, 0, 0.15) 0%, rgba(0, 230, 118, 0.15) 100%)',
-              border: '1px solid rgba(255, 214, 0, 0.4)',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '0.8rem',
-              color: '#ffd600',
-              fontWeight: '800',
-              boxShadow: '0 2px 10px rgba(255, 214, 0, 0.1)'
-            }}>
-              <span style={{ fontSize: '1.1rem' }}>🎁</span>
-              <span>WELCOME BONUS: Get {welcomeBonus} Coins Free Added Instantly!</span>
-            </div>
+            {welcomeBonus > 0 && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(255, 214, 0, 0.15) 0%, rgba(0, 230, 118, 0.15) 100%)',
+                border: '1px solid rgba(255, 214, 0, 0.4)',
+                borderRadius: '8px',
+                padding: '10px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.8rem',
+                color: '#ffd600',
+                fontWeight: '800',
+                boxShadow: '0 2px 10px rgba(255, 214, 0, 0.1)'
+              }}>
+                <span style={{ fontSize: '1.1rem' }}>🎁</span>
+                <span>WELCOME BONUS: Get {welcomeBonus} Coins Free Added Instantly!</span>
+              </div>
+            )}
 
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Free Fire Nickname <span style={{ color: 'var(--primary)' }}>*</span></label>

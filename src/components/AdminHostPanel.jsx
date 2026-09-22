@@ -181,13 +181,17 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     e.preventDefault();
     setIsSavingReferralSettings(true);
     setReferralSaveStatus('');
+    const parsedRef = Number(referralRewardSetting);
+    const parsedWel = Number(welcomeBonusSetting);
+    const cleanRef = isNaN(parsedRef) ? 0 : Math.max(0, parsedRef);
+    const cleanWel = isNaN(parsedWel) ? 0 : Math.max(0, parsedWel);
     const res = await saveAppSettingsRealtime({
-      referralReward: Number(referralRewardSetting) || 5,
-      welcomeBonus: Number(welcomeBonusSetting) || 5
+      referralReward: cleanRef,
+      welcomeBonus: cleanWel
     });
     setIsSavingReferralSettings(false);
     if (res.success) {
-      setReferralSaveStatus('✅ Referral and Welcome Bonus rewards saved to Cloud successfully!');
+      setReferralSaveStatus(`✅ Saved to Cloud! Referral: ₹${cleanRef}, Signup Bonus: ₹${cleanWel}`);
       setTimeout(() => setReferralSaveStatus(''), 4000);
     } else {
       setReferralSaveStatus(`❌ Error saving settings: ${res.error}`);
@@ -3461,6 +3465,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '700' }}>Quick Presets:</span>
             <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
               {[
+                { label: '0 Coins (Disable Both)', ref: 0, wel: 0 },
                 { label: '5 Coins / Invite', ref: 5, wel: 5 },
                 { label: '10 Coins / Invite', ref: 10, wel: 10 },
                 { label: '15 Coins / Invite', ref: 15, wel: 10 },

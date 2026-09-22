@@ -1751,7 +1751,12 @@ export const findUserByReferralCodeOrUid = async (referralCodeInput) => {
  */
 export const creditReferralRewardRealtime = async (referrerUidOrId, rewardAmount, refereeNickname, refereeUid) => {
   try {
-    const amt = Number(rewardAmount) || 5;
+    const parsedAmt = Number(rewardAmount);
+    const amt = isNaN(parsedAmt) ? 5 : parsedAmt;
+    if (amt <= 0) {
+      console.log(`[Firebase] Referral reward is 0. Skipping wallet credit.`);
+      return { success: true, message: 'Reward amount is 0, no credit added.' };
+    }
     const cleanReferrer = String(referrerUidOrId || '').trim();
 
     if (!cleanReferrer) return { success: false, error: 'Missing referrer identifier.' };
