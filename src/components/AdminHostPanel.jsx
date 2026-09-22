@@ -18,7 +18,8 @@ import {
   subscribeToNotificationsRealtime,
   seedDemoPlayersRealtime,
   addDemoPlayersToTournamentRealtime,
-  addDemoPlayersToAllMatchesRealtime
+  addDemoPlayersToAllMatchesRealtime,
+  DEMO_PLAYERS
 } from '../services/firebase';
 
 import { 
@@ -26,6 +27,11 @@ import {
   getTomorrowDateString, 
   formatMatchDate 
 } from '../services/dateUtils';
+import { 
+  generateDaily1v1Matches, 
+  DAILY_1V1_TEMPLATES, 
+  DAILY_TIME_SLOTS 
+} from '../services/scheduleService';
 
 import paymentQrImg from '../assets/payment_qr.jpg';
 
@@ -64,6 +70,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [errorMsg, setErrorMsg] = useState('');
   const [deleteStatusMsg, setDeleteStatusMsg] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+
+  // Daily 1v1 Auto-Scheduler states
+  const [isGeneratingSchedule, setIsGeneratingSchedule] = useState(false);
+  const [scheduleStatusMsg, setScheduleStatusMsg] = useState('');
+  const [manageDateFilter, setManageDateFilter] = useState('all'); // 'all' | 'today' | 'tomorrow'
 
   // Broadcast Notification (Bell 🔔) states
   const [notifTitle, setNotifTitle] = useState('🔥 Match Starting in 15 Minutes!');
@@ -495,6 +506,32 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
 
     onAddTournament(newTournament);
     setCurrentView('dashboard');
+  };
+
+  const handleGenerateTodaySchedule = async () => {
+    setIsGeneratingSchedule(true);
+    setScheduleStatusMsg("⏳ Generating Today's 100 1v1 matches in real-time...");
+    const res = await generateDaily1v1Matches(getTodayDateString());
+    setIsGeneratingSchedule(false);
+    if (res.success) {
+      setScheduleStatusMsg(`🎉 Done! Created ${res.createdCount} new matches for Today (${res.skippedCount} already existed).`);
+    } else {
+      setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to generate schedule'}`);
+    }
+    setTimeout(() => setScheduleStatusMsg(''), 7000);
+  };
+
+  const handleGenerateTomorrowSchedule = async () => {
+    setIsGeneratingSchedule(true);
+    setScheduleStatusMsg("⏳ Generating Tomorrow's 100 1v1 matches in real-time...");
+    const res = await generateDaily1v1Matches(getTomorrowDateString());
+    setIsGeneratingSchedule(false);
+    if (res.success) {
+      setScheduleStatusMsg(`🎉 Done! Created ${res.createdCount} new matches for Tomorrow (${res.skippedCount} already existed).`);
+    } else {
+      setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to generate schedule'}`);
+    }
+    setTimeout(() => setScheduleStatusMsg(''), 7000);
   };
 
   const handleBroadcastRoom = async (e) => {
@@ -1434,6 +1471,68 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   Tap <strong>Edit Match</strong> on any match below to modify its details, timing, prize pool, or room ID.
                 </p>
               </div>
+
+              {/* Date Filter Tabs */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {(() => {
+                  const todayStr = getTodayDateString();
+                  const tomorrowStr = getTomorrowDateString();
+                  const todayCount = tournaments.filter(t => t.matchDate === todayStr).length;
+                  const tomorrowCount = tournaments.filter(t => t.matchDate === tomorrowStr).length;
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setManageDateFilter('all')}
+                        style={{
+                          padding: '3px 10px',
+                          fontSize: '0.72rem',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          background: manageDateFilter === 'all' ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
+                          color: manageDateFilter === 'all' ? '#000' : '#fff',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        All ({tournaments.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setManageDateFilter('today')}
+                        style={{
+                          padding: '3px 10px',
+                          fontSize: '0.72rem',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          background: manageDateFilter === 'today' ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
+                          color: manageDateFilter === 'today' ? '#000' : '#fff',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        📅 Today ({todayCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setManageDateFilter('tomorrow')}
+                        style={{
+                          padding: '3px 10px',
+                          fontSize: '0.72rem',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          background: manageDateFilter === 'tomorrow' ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
+                          color: manageDateFilter === 'tomorrow' ? '#000' : '#fff',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🚀 Tomorrow ({tomorrowCount})
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
 
             {tournaments.length === 0 ? (
@@ -1442,7 +1541,13 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {tournaments.map(t => (
+                {tournaments.filter(t => {
+                  const todayStr = getTodayDateString();
+                  const tomorrowStr = getTomorrowDateString();
+                  if (manageDateFilter === 'today') return t.matchDate === todayStr;
+                  if (manageDateFilter === 'tomorrow') return t.matchDate === tomorrowStr;
+                  return true;
+                }).map(t => (
                   <div 
                     key={t.id} 
                     className="glass-panel flex-between"
@@ -2347,9 +2452,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   const promptVal = window.prompt(
                     `🤖 ADD BOTS TO ALL ACTIVE MATCHES\n\n` +
                     `Total Active Tournaments: ${tournaments.length}\n` +
-                    `Total Available Bots in Catalog: 108\n\n` +
-                    `Enter number of bots to add per match (e.g. 5, 10, or 20):`,
-                    "5"
+                    `Total Available Bots in Catalog: ${DEMO_PLAYERS.length}\n\n` +
+                    `Enter number of bots to add per match (e.g. 1, 2, or 5):`,
+                    "1"
                   );
                   if (promptVal === null) return;
                   const countNum = parseInt(promptVal, 10);
@@ -2383,6 +2488,196 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
             )}
           </div>
 
+          {/* Daily 1v1 Auto-Scheduler Card */}
+          <div 
+            style={{
+              padding: '16px 18px',
+              background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.08) 0%, rgba(124, 77, 255, 0.08) 100%)',
+              border: '1px solid rgba(0, 229, 255, 0.35)',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}
+          >
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '1.3rem' }}>⚡</span>
+                  <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#00e5ff' }}>
+                    Daily 1v1 Match Auto-Scheduler (10:00 AM – 10:00 PM)
+                  </h4>
+                  <span className="badge" style={{ background: 'rgba(0, 230, 118, 0.2)', color: '#00e676', border: '1px solid rgba(0, 230, 118, 0.4)', fontSize: '0.68rem' }}>
+                    ⏰ Auto-Adds Everyday at 11:00 PM
+                  </span>
+                </div>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Generates 100 matches daily (25 time slots in 30-min intervals × 4 modes: Clash squad 1v1, CS 1v1 head, Lone wolf 1v1, Lone wolf 1v1 head).
+                  <br />
+                  <strong style={{ color: 'var(--accent)' }}>Entry Fee: ₹4 | Winning Prize: ₹6 | Slots: 2</strong>
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+              {(() => {
+                const todayStr = getTodayDateString();
+                const tomorrowStr = getTomorrowDateString();
+                const todayCount = tournaments.filter(t => t.matchDate === todayStr).length;
+                const tomorrowCount = tournaments.filter(t => t.matchDate === tomorrowStr).length;
+                return (
+                  <>
+                    <div style={{
+                      padding: '6px 12px',
+                      background: 'rgba(255,255,255,0.05)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      gap: '6px'
+                    }}>
+                      <span>📅 Today ({formatMatchDate(todayStr)}):</span>
+                      <strong style={{ color: todayCount >= 100 ? '#00e676' : '#ffd600' }}>
+                        {todayCount}/100 active
+                      </strong>
+                    </div>
+
+                    <div style={{
+                      padding: '6px 12px',
+                      background: 'rgba(255,255,255,0.05)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      gap: '6px'
+                    }}>
+                      <span>🚀 Tomorrow ({formatMatchDate(tomorrowStr)}):</span>
+                      <strong style={{ color: tomorrowCount >= 100 ? '#00e676' : 'var(--text-muted)' }}>
+                        {tomorrowCount}/100 active
+                      </strong>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                disabled={isGeneratingSchedule}
+                onClick={handleGenerateTodaySchedule}
+                className="btn"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.82rem',
+                  fontWeight: '800',
+                  background: 'linear-gradient(135deg, #00e5ff 0%, #00baf2 100%)',
+                  color: '#000',
+                  borderRadius: '8px',
+                  cursor: isGeneratingSchedule ? 'wait' : 'pointer',
+                  border: 'none'
+                }}
+              >
+                {isGeneratingSchedule ? '⏳ Generating...' : "⚡ Auto-Generate Today's 1v1 Schedule (100 Matches)"}
+              </button>
+
+              <button
+                type="button"
+                disabled={isGeneratingSchedule}
+                onClick={handleGenerateTomorrowSchedule}
+                className="btn"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.82rem',
+                  fontWeight: '800',
+                  background: 'linear-gradient(135deg, #7c4dff 0%, #ff007f 100%)',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  cursor: isGeneratingSchedule ? 'wait' : 'pointer',
+                  border: 'none'
+                }}
+              >
+                {isGeneratingSchedule ? '⏳ Generating...' : "🚀 Auto-Generate Tomorrow's Schedule (100 Matches)"}
+              </button>
+            </div>
+
+            {scheduleStatusMsg && (
+              <div style={{
+                fontSize: '0.85rem',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'rgba(0, 229, 255, 0.15)',
+                color: '#00e5ff',
+                border: '1px solid rgba(0, 229, 255, 0.4)'
+              }}>
+                {scheduleStatusMsg}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Date Filter Tabs for Manage View */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Filter Matches:</span>
+            {(() => {
+              const todayStr = getTodayDateString();
+              const tomorrowStr = getTomorrowDateString();
+              const todayCount = tournaments.filter(t => t.matchDate === todayStr).length;
+              const tomorrowCount = tournaments.filter(t => t.matchDate === tomorrowStr).length;
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setManageDateFilter('all')}
+                    style={{
+                      padding: '4px 12px',
+                      fontSize: '0.75rem',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: manageDateFilter === 'all' ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
+                      color: manageDateFilter === 'all' ? '#000' : '#fff',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    All Matches ({tournaments.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManageDateFilter('today')}
+                    style={{
+                      padding: '4px 12px',
+                      fontSize: '0.75rem',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: manageDateFilter === 'today' ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
+                      color: manageDateFilter === 'today' ? '#000' : '#fff',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📅 Today ({todayCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManageDateFilter('tomorrow')}
+                    style={{
+                      padding: '4px 12px',
+                      fontSize: '0.75rem',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: manageDateFilter === 'tomorrow' ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
+                      color: manageDateFilter === 'tomorrow' ? '#000' : '#fff',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🚀 Tomorrow ({tomorrowCount})
+                  </button>
+                </>
+              );
+            })()}
+          </div>
+
           {deleteStatusMsg && (
             <div style={{ color: 'var(--success)', background: 'rgba(0,230,118,0.1)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--success)', fontSize: '0.85rem' }}>
               {deleteStatusMsg}
@@ -2395,7 +2690,13 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {tournaments.map(t => (
+              {tournaments.filter(t => {
+                const todayStr = getTodayDateString();
+                const tomorrowStr = getTomorrowDateString();
+                if (manageDateFilter === 'today') return t.matchDate === todayStr;
+                if (manageDateFilter === 'tomorrow') return t.matchDate === tomorrowStr;
+                return true;
+              }).map(t => (
                 <div 
                   key={t.id} 
                   className="glass-panel flex-between"
