@@ -25,7 +25,8 @@ import {
 import { 
   getTodayDateString, 
   getTomorrowDateString, 
-  formatMatchDate 
+  formatMatchDate,
+  sortTournamentsByTime 
 } from '../services/dateUtils';
 import { 
   generateDaily1v1Matches, 
@@ -1556,13 +1557,13 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {tournaments.filter(t => {
+                {sortTournamentsByTime(tournaments.filter(t => {
                   const todayStr = getTodayDateString();
                   const tomorrowStr = getTomorrowDateString();
                   if (manageDateFilter === 'today') return t.matchDate === todayStr;
                   if (manageDateFilter === 'tomorrow') return t.matchDate === tomorrowStr;
                   return true;
-                }).map(t => (
+                })).map(t => (
                   <div 
                     key={t.id} 
                     className="glass-panel flex-between"
@@ -2708,13 +2709,13 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {tournaments.filter(t => {
+              {sortTournamentsByTime(tournaments.filter(t => {
                 const todayStr = getTodayDateString();
                 const tomorrowStr = getTomorrowDateString();
                 if (manageDateFilter === 'today') return t.matchDate === todayStr;
                 if (manageDateFilter === 'tomorrow') return t.matchDate === tomorrowStr;
                 return true;
-              }).map(t => (
+              })).map(t => (
                 <div 
                   key={t.id} 
                   className="glass-panel flex-between"

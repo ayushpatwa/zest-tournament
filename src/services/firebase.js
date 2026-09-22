@@ -17,6 +17,7 @@ import {
   limit,
   serverTimestamp
 } from "firebase/firestore";
+import { compareTournamentsByTime } from "./dateUtils.js";
 
 // User's Firebase Configuration
 const firebaseConfig = {
@@ -78,7 +79,8 @@ export const subscribeToTournamentsRealtime = (onUpdate, onError) => {
       snapshot.forEach((docSnap) => {
         list.push({ id: docSnap.id, ...docSnap.data() });
       });
-      console.log(`[Firebase Realtime] Received ${list.length} tournaments live.`);
+      list.sort(compareTournamentsByTime);
+      console.log(`[Firebase Realtime] Received ${list.length} tournaments live (sorted by time).`);
       onUpdate(list);
     }, (error) => {
       console.warn("[Firebase] Realtime listener error:", error);

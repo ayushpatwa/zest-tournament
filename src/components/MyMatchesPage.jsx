@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { formatMatchDate } from '../services/dateUtils';
+import { formatMatchDate, sortTournamentsByTime } from '../services/dateUtils';
 
 // Countdown Timer Component
 function CountdownTimer({ startTime }) {
@@ -78,6 +78,8 @@ export default function MyMatchesPage({
     if (filter === 'completed') return t.status === 'completed';
     return true;
   });
+
+  const sortedMatches = sortTournamentsByTime(filteredMatches);
 
   const copyToClipboard = (text, key) => {
     navigator.clipboard.writeText(text);
@@ -160,7 +162,7 @@ export default function MyMatchesPage({
       </div>
 
       {/* Matches List */}
-      {filteredMatches.length === 0 ? (
+      {sortedMatches.length === 0 ? (
         <div className="glass-panel" style={{ padding: '40px 20px', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎮</div>
           <h3 style={{ fontSize: '1.1rem', color: '#fff', margin: '0 0 6px 0' }}>
@@ -182,7 +184,7 @@ export default function MyMatchesPage({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {filteredMatches.map(t => {
+          {sortedMatches.map(t => {
             const playerSlot = t.joinedPlayers?.find(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
             const slotIndex = t.joinedPlayers?.findIndex(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
 

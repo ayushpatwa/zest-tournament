@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { formatMatchDate } from '../services/dateUtils';
+import { formatMatchDate, sortTournamentsByTime } from '../services/dateUtils';
 
 // Countdown Timer Component
 function CountdownTimer({ startTime }) {
@@ -154,6 +154,8 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                           t.mode?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  const sortedTournaments = sortTournamentsByTime(filteredTournaments);
 
   const sortedHof = [...HALL_OF_FAME_DATA].sort((a, b) => {
     if (hofCategory === 'earnings') return b.earnings - a.earnings;
@@ -414,7 +416,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
           </div>
 
           {/* Tournament Grid */}
-          {filteredTournaments.length === 0 ? (
+          {sortedTournaments.length === 0 ? (
             <div className="glass-panel" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🎮</div>
               <h3 style={{ fontSize: '1.05rem', color: '#fff', margin: '0 0 6px 0' }}>
@@ -437,7 +439,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {filteredTournaments.map(t => {
+              {sortedTournaments.map(t => {
                 const totalSlots = t.slotsTotal || t.maxSlots || 48;
                 const joinedSlots = Math.max(t.slotsJoined || 0, (t.joinedPlayers || []).length);
                 const isMatchFull = joinedSlots >= totalSlots;
