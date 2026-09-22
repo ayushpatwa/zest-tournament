@@ -29,6 +29,7 @@ import {
 } from '../services/dateUtils';
 import { 
   generateDaily1v1Matches, 
+  deleteDailyMatchesByDate,
   DAILY_1V1_TEMPLATES, 
   DAILY_TIME_SLOTS 
 } from '../services/scheduleService';
@@ -506,6 +507,20 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
 
     onAddTournament(newTournament);
     setCurrentView('dashboard');
+  };
+
+  const handleDeleteTodaySchedule = async () => {
+    if (!window.confirm("Are you sure you want to delete Today's 1v1 auto-generated matches?")) return;
+    setIsGeneratingSchedule(true);
+    setScheduleStatusMsg("⏳ Deleting Today's 1v1 matches in real-time...");
+    const res = await deleteDailyMatchesByDate(getTodayDateString());
+    setIsGeneratingSchedule(false);
+    if (res.success) {
+      setScheduleStatusMsg(`🗑️ Successfully deleted ${res.count} 1v1 matches for Today.`);
+    } else {
+      setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to delete'}`);
+    }
+    setTimeout(() => setScheduleStatusMsg(''), 7000);
   };
 
   const handleGenerateTodaySchedule = async () => {
@@ -2565,39 +2580,40 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
               <button
                 type="button"
                 disabled={isGeneratingSchedule}
-                onClick={handleGenerateTodaySchedule}
+                onClick={handleGenerateTomorrowSchedule}
                 className="btn"
                 style={{
-                  padding: '8px 16px',
-                  fontSize: '0.82rem',
+                  padding: '9px 18px',
+                  fontSize: '0.84rem',
                   fontWeight: '800',
-                  background: 'linear-gradient(135deg, #00e5ff 0%, #00baf2 100%)',
+                  background: 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)',
                   color: '#000',
                   borderRadius: '8px',
                   cursor: isGeneratingSchedule ? 'wait' : 'pointer',
-                  border: 'none'
+                  border: 'none',
+                  boxShadow: '0 4px 12px rgba(0, 229, 255, 0.25)'
                 }}
               >
-                {isGeneratingSchedule ? '⏳ Generating...' : "⚡ Auto-Generate Today's 1v1 Schedule (100 Matches)"}
+                {isGeneratingSchedule ? '⏳ Processing...' : "🚀 Auto-Generate Tomorrow's Schedule (100 Matches)"}
               </button>
 
               <button
                 type="button"
                 disabled={isGeneratingSchedule}
-                onClick={handleGenerateTomorrowSchedule}
+                onClick={handleDeleteTodaySchedule}
                 className="btn"
                 style={{
-                  padding: '8px 16px',
+                  padding: '9px 16px',
                   fontSize: '0.82rem',
                   fontWeight: '800',
-                  background: 'linear-gradient(135deg, #7c4dff 0%, #ff007f 100%)',
-                  color: '#fff',
+                  background: 'rgba(255, 43, 85, 0.15)',
+                  color: 'var(--danger)',
+                  border: '1px solid rgba(255, 43, 85, 0.4)',
                   borderRadius: '8px',
-                  cursor: isGeneratingSchedule ? 'wait' : 'pointer',
-                  border: 'none'
+                  cursor: isGeneratingSchedule ? 'wait' : 'pointer'
                 }}
               >
-                {isGeneratingSchedule ? '⏳ Generating...' : "🚀 Auto-Generate Tomorrow's Schedule (100 Matches)"}
+                🗑️ Delete Today's Matches
               </button>
             </div>
 
