@@ -15,8 +15,8 @@ import { updateLiveResendConfig } from '../services/resendService';
 
 export default function LoginPage({ onLoginSuccess }) {
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'forgot'
-  const [welcomeBonus, setWelcomeBonus] = useState(5);
-  const [referralRewardAmount, setReferralRewardAmount] = useState(5);
+  const [welcomeBonus, setWelcomeBonus] = useState(0);
+  const [referralRewardAmount, setReferralRewardAmount] = useState(0);
   const [referralCodeInput, setReferralCodeInput] = useState('');
 
   useEffect(() => {
@@ -153,7 +153,7 @@ export default function LoginPage({ onLoginSuccess }) {
     setGeneratedOtp(code);
     setEnteredOtp('');
 
-    const bonusAmount = typeof welcomeBonus === 'number' ? Math.max(0, welcomeBonus) : 5;
+    const bonusAmount = typeof welcomeBonus === 'number' ? Math.max(0, welcomeBonus) : 0;
     const initialTransactions = bonusAmount > 0 ? [
       {
         id: `tx_${Date.now()}`,
@@ -291,8 +291,8 @@ export default function LoginPage({ onLoginSuccess }) {
     filtered.push(pendingUser);
     localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
 
-    // 3. If user signed up with a referral code, credit the referrer instantly
-    if (pendingUser.referredBy && referralRewardAmount > 0) {
+    // 3. If user signed up with a referral code, credit or record the referral
+    if (pendingUser.referredBy) {
       try {
         await creditReferralRewardRealtime(
           pendingUser.referredBy, 
@@ -300,7 +300,7 @@ export default function LoginPage({ onLoginSuccess }) {
           pendingUser.nickname, 
           pendingUser.uid
         );
-        console.log(`[Referral] Credited ₹${referralRewardAmount} to referrer ${pendingUser.referredBy}`);
+        console.log(`[Referral] Processed referral (reward: ₹${referralRewardAmount}) for referrer ${pendingUser.referredBy}`);
         
         // Dispatch referral webhook event
         await sendToMakeWebhook({
@@ -309,10 +309,10 @@ export default function LoginPage({ onLoginSuccess }) {
           ffUid: pendingUser.uid,
           email: pendingUser.email,
           phone: pendingUser.phone,
-          details: `Referred by UID ${pendingUser.referredBy} (${pendingUser.referredByNickname || 'Referrer'}). Referrer awarded ₹${referralRewardAmount} coins.`
+          details: `Referred by UID ${pendingUser.referredBy} (${pendingUser.referredByNickname || 'Referrer'}). Reward: ₹${referralRewardAmount} coins.`
         });
       } catch (refErr) {
-        console.warn("[Referral] Failed to credit referral reward:", refErr);
+        console.warn("[Referral] Failed to record referral:", refErr);
       }
     }
 

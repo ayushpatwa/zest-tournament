@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatMatchDate, sortTournamentsByTime } from '../services/dateUtils';
+import { subscribeToAppSettingsRealtime } from '../services/firebase';
 
 // Countdown Timer Component
 function CountdownTimer({ startTime }) {
@@ -67,6 +68,16 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [hofCategory, setHofCategory] = useState('earnings'); // 'earnings' | 'kills' | 'wins'
+  const [referralReward, setReferralReward] = useState(0);
+
+  useEffect(() => {
+    const unsub = subscribeToAppSettingsRealtime((settings) => {
+      if (settings && typeof settings.referralReward === 'number') {
+        setReferralReward(settings.referralReward);
+      }
+    });
+    return () => unsub();
+  }, []);
   
   const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
   const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
@@ -335,10 +346,12 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
               <span style={{ fontSize: '1.2rem' }}>🎁</span>
               <div>
                 <strong style={{ fontSize: '0.8rem', color: '#ffd600', display: 'block' }}>
-                  Refer Friends & Win Free Coins!
+                  {referralReward > 0 ? 'Refer Friends & Win Free Coins!' : 'Invite Squad & Compete Together!'}
                 </strong>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                  Earn ₹5 instant bonus coins on every friend's signup.
+                  {referralReward > 0 
+                    ? `Earn ₹${referralReward} instant bonus coins on every friend's signup.` 
+                    : 'Invite your friends to play tournaments & 1v1 custom battles.'}
                 </span>
               </div>
             </div>

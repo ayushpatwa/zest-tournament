@@ -1767,11 +1767,7 @@ export const findUserByReferralCodeOrUid = async (referralCodeInput) => {
 export const creditReferralRewardRealtime = async (referrerUidOrId, rewardAmount, refereeNickname, refereeUid) => {
   try {
     const parsedAmt = Number(rewardAmount);
-    const amt = isNaN(parsedAmt) ? 5 : parsedAmt;
-    if (amt <= 0) {
-      console.log(`[Firebase] Referral reward is 0. Skipping wallet credit.`);
-      return { success: true, message: 'Reward amount is 0, no credit added.' };
-    }
+    const amt = isNaN(parsedAmt) ? 0 : Math.max(0, parsedAmt);
     const cleanReferrer = String(referrerUidOrId || '').trim();
 
     if (!cleanReferrer) return { success: false, error: 'Missing referrer identifier.' };
@@ -1792,7 +1788,7 @@ export const creditReferralRewardRealtime = async (referrerUidOrId, rewardAmount
       }
     });
 
-    const newTx = {
+    const newTx = amt > 0 ? {
       id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type: 'CREDIT',
       amount: amt,
@@ -1801,17 +1797,20 @@ export const creditReferralRewardRealtime = async (referrerUidOrId, rewardAmount
       date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
       timestamp: new Date().toISOString(),
       status: 'Success'
-    };
+    } : null;
 
     if (referrerDocRef) {
-      await updateDoc(referrerDocRef, {
-        wallet: increment(amt),
+      const updatePayload = {
         referralCount: increment(1),
-        referralEarnings: increment(amt),
-        transactions: arrayUnion(newTx),
         updatedAt: serverTimestamp()
-      });
-      console.log(`[Firebase] Successfully credited ₹${amt} referral bonus to ${cleanReferrer}`);
+      };
+      if (amt > 0) {
+        updatePayload.wallet = increment(amt);
+        updatePayload.referralEarnings = increment(amt);
+        if (newTx) updatePayload.transactions = arrayUnion(newTx);
+      }
+      await updateDoc(referrerDocRef, updatePayload);
+      console.log(`[Firebase] Successfully recorded referral (reward: ₹${amt}) for ${cleanReferrer}`);
     }
 
     // 2. Also log in dedicated "referrals" collection for clear activity streaming
@@ -1834,7 +1833,7 @@ export const creditReferralRewardRealtime = async (referrerUidOrId, rewardAmount
         wallet: (Number(currentUser.wallet) || 0) + amt,
         referralCount: (Number(currentUser.referralCount) || 0) + 1,
         referralEarnings: (Number(currentUser.referralEarnings) || 0) + amt,
-        transactions: [newTx, ...(currentUser.transactions || [])]
+        transactions: newTx ? [newTx, ...(currentUser.transactions || [])] : (currentUser.transactions || [])
       };
       localStorage.setItem('zest_current_user', JSON.stringify(updatedUser));
       localStorage.setItem('zest_user_profile', JSON.stringify(updatedUser));

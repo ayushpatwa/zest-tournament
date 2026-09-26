@@ -39,10 +39,13 @@ import paymentQrImg from '../assets/payment_qr.jpg';
 
 export default function AdminHostPanel({ tournaments = [], onAddTournament, onUpdateTournament, onDeleteTournament, onRemovePlayerFromTournament, onBroadcastRoomCredentials, depositQrConfig, setCurrentView, currentUser, userProfile }) {
   const isSuperAdmin = 
-    String(currentUser?.uid || userProfile?.uid || '').trim() === '9084311275';
+    String(currentUser?.uid || userProfile?.uid || '').trim() === '9084311275' ||
+    String(currentUser?.phone || userProfile?.phone || '').trim() === '9084311275' ||
+    userProfile?.role === 'admin' ||
+    userProfile?.isHost;
 
   const isHost = isSuperAdmin;
-  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'deposit_qr' | 'broadcast' | 'manage' | 'webhook' | 'app_update'
+  const [activeTab, setActiveTab] = useState('host'); // 'host' | 'rooms' | 'payout' | 'deposit_qr' | 'broadcast' | 'manage' | 'webhook' | 'app_update' | 'refer_settings'
   
   // Host Form states
   const [editingTournament, setEditingTournament] = useState(null);
@@ -146,8 +149,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [qrUploadPreview, setQrUploadPreview] = useState(depositQrConfig?.qrImageUrl || '');
 
   // Referral & Signup Bonus Settings
-  const [referralRewardSetting, setReferralRewardSetting] = useState(5);
-  const [welcomeBonusSetting, setWelcomeBonusSetting] = useState(5);
+  const [referralRewardSetting, setReferralRewardSetting] = useState(0);
+  const [welcomeBonusSetting, setWelcomeBonusSetting] = useState(0);
   const [referralSaveStatus, setReferralSaveStatus] = useState('');
   const [isSavingReferralSettings, setIsSavingReferralSettings] = useState(false);
 

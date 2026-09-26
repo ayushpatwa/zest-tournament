@@ -4,7 +4,7 @@ import { subscribeToUserReferralsRealtime, subscribeToAppSettingsRealtime } from
 export default function ReferEarnPage({ userProfile = {}, currentUser = {}, setCurrentView }) {
   const [referrals, setReferrals] = useState([]);
   const [copied, setCopied] = useState(false);
-  const [referralReward, setReferralReward] = useState(5);
+  const [referralReward, setReferralReward] = useState(0);
   const [loadingList, setLoadingList] = useState(true);
 
   const activeUser = userProfile.uid ? userProfile : currentUser;
