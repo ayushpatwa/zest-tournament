@@ -133,9 +133,9 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [testPushStatus, setTestPushStatus] = useState('');
 
   // App Update Publisher states
-  const [updateVersion, setUpdateVersion] = useState('1.4.8');
-  const [updateTitle, setUpdateTitle] = useState('⚡ Android Notification Panel & Performance (v1.4.8)!');
-  const [updateNotes, setUpdateNotes] = useState('• Android Pull-down Notification Panel & Heads-Up Alerts\n• Instant Room ID & Password Device Alerts\n• Resend.com Ultra-Fast OTP Gateway\n• Streamlined Performance & Reliability');
+  const [updateVersion, setUpdateVersion] = useState('1.4.9');
+  const [updateTitle, setUpdateTitle] = useState('⚡ Announcement Board & Security Update (v1.4.9)!');
+  const [updateNotes, setUpdateNotes] = useState('• Global App-Open Announcement Board\n• Room ID & Password Participant Privacy Shield\n• Dynamic Referral & Welcome Bonus Settings\n• Performance & Security Enhancements');
   const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatePublishStatus, setUpdatePublishStatus] = useState('');
