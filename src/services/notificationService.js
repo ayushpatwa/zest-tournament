@@ -263,21 +263,34 @@ export const saveCurrentUserToken = async (currentUser) => {
  */
 export const dispatchPushNotification = async (notificationData) => {
   try {
-    // 1. Trigger local system notification on current device
-    await showSystemNotification({
-      id: notificationData.id || `broadcast_${Date.now()}`,
-      title: notificationData.title || 'ZEST TOURNAMENT',
-      body: notificationData.message || '',
-      extra: {
-        tournamentId: notificationData.targetTournamentId,
-        type: notificationData.type
-      }
-    });
+    const isBroadcast = notificationData.isBroadcast === true;
+    const isMatchDrop = notificationData.type === 'match' || Boolean(notificationData.targetTournamentId) || String(notificationData.title || '').toLowerCase().includes('room id');
+    const targetUids = Array.isArray(notificationData.targetUids) 
+      ? notificationData.targetUids.map(u => String(u || '').trim().toLowerCase()).filter(Boolean) 
+      : [];
 
-    console.log('[PushNotifications] Local notification dispatched.');
+    // Critical Security Guard: If it's a match room drop, NEVER allow it to broadcast to everyone
+    if (isMatchDrop && targetUids.length === 0) {
+      console.warn('[PushNotifications] Room drop push aborted: 0 target players provided.');
+      return { success: true, sentCount: 0, reason: 'no_targets' };
+    }
 
-    // 2. Fetch target device tokens from Firestore
-    const tokens = await getTargetDeviceTokensRealtime(notificationData.targetUids);
+    // 1. Trigger local system notification on current device ONLY for broadcasts or if host is targeted
+    if (isBroadcast) {
+      await showSystemNotification({
+        id: notificationData.id || `broadcast_${Date.now()}`,
+        title: notificationData.title || 'ZEST TOURNAMENT',
+        body: notificationData.message || '',
+        extra: {
+          tournamentId: notificationData.targetTournamentId,
+          type: notificationData.type
+        }
+      });
+      console.log('[PushNotifications] Local broadcast notification dispatched.');
+    }
+
+    // 2. Fetch target device tokens from Firestore strictly
+    const tokens = await getTargetDeviceTokensRealtime(targetUids, isBroadcast);
     if (!tokens || tokens.length === 0) {
       console.log('[PushNotifications] No target device tokens found to send closed-app push.');
       return { success: true, sentCount: 0, reason: 'no_tokens' };

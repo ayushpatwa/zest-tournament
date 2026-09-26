@@ -17,22 +17,34 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
   const cleanUid = String(userProfile?.uid || currentUser?.uid || '').trim().toLowerCase();
   const cleanEmail = String(userProfile?.email || currentUser?.email || '').trim().toLowerCase();
   const cleanId = String(userProfile?.id || currentUser?.id || '').trim().toLowerCase();
+  const cleanPhone = String(userProfile?.phone || currentUser?.phone || '').trim().toLowerCase();
 
   // Filter notifications strictly:
   // - Global announcements: shown to everyone
-  // - Room ID & Pass drops (targetTournamentId / type === 'match' / targetUids): strictly shown ONLY to registered players of that match + Super Admin
+  // - Room ID & Pass drops: strictly shown ONLY to registered players of that match + Super Admin
   const userVisibleNotifications = cloudNotifications.filter(n => {
-    const isRoomDropNotif = n.targetTournamentId || n.type === 'match' || (Array.isArray(n.targetUids) && n.targetUids.length > 0);
+    const isRoomDropNotif = 
+      Boolean(n.targetTournamentId) || 
+      n.type === 'match' || 
+      String(n.title || '').toLowerCase().includes('room id') ||
+      String(n.message || '').toLowerCase().includes('room id') ||
+      String(n.title || '').toLowerCase().includes('password') ||
+      (Array.isArray(n.targetUids) && n.targetUids.length > 0);
 
     if (isRoomDropNotif) {
       // 1. Super Admin can view all alerts for monitoring
       if (isAdmin) return true;
 
-      // 2. Check if player UID is in targetUids array
+      // 2. Check if player UID/email/phone is in targetUids array
       if (Array.isArray(n.targetUids) && n.targetUids.length > 0) {
         const inTargetUids = n.targetUids.some(u => {
-          const cleanTarget = String(u).trim().toLowerCase();
-          return cleanTarget && (cleanTarget === cleanUid || cleanTarget === cleanId || cleanTarget === cleanEmail);
+          const cleanTarget = String(u || '').trim().toLowerCase();
+          return cleanTarget && (
+            cleanTarget === cleanUid || 
+            cleanTarget === cleanId || 
+            cleanTarget === cleanEmail || 
+            cleanTarget === cleanPhone
+          );
         });
         if (inTargetUids) return true;
       }
@@ -45,10 +57,12 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
             const pUid = String(p.uid || '').trim().toLowerCase();
             const pEmail = String(p.email || '').trim().toLowerCase();
             const pId = String(p.id || '').trim().toLowerCase();
+            const pPhone = String(p.phone || '').trim().toLowerCase();
 
             return (cleanUid && pUid === cleanUid) ||
                    (cleanEmail && pEmail === cleanEmail) ||
-                   (cleanId && pId === cleanId);
+                   (cleanId && pId === cleanId) ||
+                   (cleanPhone && pPhone === cleanPhone);
           });
           if (isPlayerRegistered) return true;
         }

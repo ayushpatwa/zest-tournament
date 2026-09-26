@@ -102,13 +102,19 @@ export default function App() {
         seenIds = [];
       }
 
-      // Check current user identifier for targeted room drops
+      // Check current user identifiers for strictly targeted notifications
       let currentUid = '';
+      let currentEmail = '';
+      let currentPhone = '';
+      let currentId = '';
       try {
-        const storedUser = localStorage.getItem('zest_user');
+        const storedUser = localStorage.getItem('zest_current_user') || localStorage.getItem('zest_user_profile') || localStorage.getItem('zest_user');
         if (storedUser) {
           const parsed = JSON.parse(storedUser);
-          currentUid = String(parsed.uid || parsed.id || parsed.phone || '').trim().toLowerCase();
+          currentUid = String(parsed.uid || '').trim().toLowerCase();
+          currentEmail = String(parsed.email || '').trim().toLowerCase();
+          currentPhone = String(parsed.phone || '').trim().toLowerCase();
+          currentId = String(parsed.id || '').trim().toLowerCase();
         }
       } catch (_) {}
 
@@ -133,13 +139,53 @@ export default function App() {
           return;
         }
 
-        // Check targeting
-        const targets = Array.isArray(item.targetUids) ? item.targetUids.map(u => String(u).trim().toLowerCase()) : [];
-        const isBroadcast = targets.length === 0;
-        const isTargetedToMe = currentUid && targets.includes(currentUid);
+        // Detect if this notification contains sensitive Custom Room credentials
+        const isMatchRoomDrop = 
+          item.type === 'match' || 
+          Boolean(item.targetTournamentId) || 
+          String(item.title || '').toLowerCase().includes('room id') || 
+          String(item.message || '').toLowerCase().includes('room id');
 
-        if (isBroadcast || isTargetedToMe) {
-          console.log('[App] New real-time notification detected for device:', item.title);
+        const targets = Array.isArray(item.targetUids) 
+          ? item.targetUids.map(u => String(u || '').trim().toLowerCase()).filter(Boolean) 
+          : [];
+
+        if (isMatchRoomDrop) {
+          // CRITICAL SECURITY RULE: Room ID & Password must NEVER be shown as a public broadcast!
+          const isTargetedToMe = Boolean(
+            (currentUid && targets.includes(currentUid)) ||
+            (currentId && targets.includes(currentId)) ||
+            (currentEmail && targets.includes(currentEmail)) ||
+            (currentPhone && targets.includes(currentPhone))
+          );
+
+          // Secondary verification: check if player is registered in the live tournament roster
+          let isPlayerInRoster = false;
+          if (item.targetTournamentId && Array.isArray(liveTournaments)) {
+            const tourney = liveTournaments.find(t => t.id === item.targetTournamentId);
+            if (tourney && Array.isArray(tourney.joinedPlayers)) {
+              isPlayerInRoster = tourney.joinedPlayers.some(p => {
+                const pUid = String(p.uid || '').trim().toLowerCase();
+                const pId = String(p.id || '').trim().toLowerCase();
+                const pEmail = String(p.email || '').trim().toLowerCase();
+                const pPhone = String(p.phone || '').trim().toLowerCase();
+                return (currentUid && pUid === currentUid) ||
+                       (currentId && pId === currentId) ||
+                       (currentEmail && pEmail === currentEmail) ||
+                       (currentPhone && pPhone === currentPhone);
+              });
+            }
+          }
+
+          // Super Admin can receive notification for verification
+          const isSuperAdmin = currentUid === '9084311275' || currentPhone === '9084311275';
+
+          if (!isTargetedToMe && !isPlayerInRoster && !isSuperAdmin) {
+            // NOT a participant of this match -> DO NOT DISPLAY NOTIFICATION!
+            return;
+          }
+
+          console.log('[App] Match Room notification delivered to registered participant:', item.title);
           showSystemNotification({
             id: item.id,
             title: item.title,
@@ -150,6 +196,30 @@ export default function App() {
             }
           });
           seenIds.push(item.id);
+
+        } else {
+          // General Announcement (non-confidential)
+          const isBroadcast = targets.length === 0;
+          const isTargetedToMe = Boolean(
+            (currentUid && targets.includes(currentUid)) ||
+            (currentId && targets.includes(currentId)) ||
+            (currentEmail && targets.includes(currentEmail)) ||
+            (currentPhone && targets.includes(currentPhone))
+          );
+
+          if (isBroadcast || isTargetedToMe) {
+            console.log('[App] New general notification detected for device:', item.title);
+            showSystemNotification({
+              id: item.id,
+              title: item.title,
+              body: item.message,
+              extra: {
+                tournamentId: item.targetTournamentId,
+                type: item.type
+              }
+            });
+            seenIds.push(item.id);
+          }
         }
       });
 

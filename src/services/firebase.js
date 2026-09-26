@@ -1047,6 +1047,17 @@ export const subscribeToNotificationsRealtime = (onUpdate) => {
  */
 export const sendNotificationRealtime = async (notificationData) => {
   try {
+    const isMatchDrop = notificationData.type === 'match' || Boolean(notificationData.targetTournamentId) || String(notificationData.title || '').toLowerCase().includes('room id');
+    const cleanTargets = Array.isArray(notificationData.targetUids) 
+      ? notificationData.targetUids.map(u => String(u || '').trim().toLowerCase()).filter(Boolean) 
+      : [];
+
+    // Security Guard: Never allow room credentials to be stored as a public broadcast
+    if (isMatchDrop && cleanTargets.length === 0) {
+      console.warn("[Firebase Realtime] Aborted saving room drop notification with 0 targets to prevent public leak.");
+      return { success: false, error: 'No registered players found in match to send Room ID.' };
+    }
+
     const now = Date.now();
     const notifId = `notif_${now}`;
     const notifRef = doc(db, "notifications", notifId);
@@ -1056,13 +1067,13 @@ export const sendNotificationRealtime = async (notificationData) => {
       message: notificationData.message || '',
       type: notificationData.type || 'info', // 'alert' | 'match' | 'prize' | 'info'
       targetTournamentId: notificationData.targetTournamentId || null,
-      targetUids: Array.isArray(notificationData.targetUids) ? notificationData.targetUids : [],
+      targetUids: cleanTargets,
       tournamentTitle: notificationData.tournamentTitle || '',
       timestamp: now,
       createdAt: serverTimestamp(),
       createdTimeStr: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + ', ' + new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
     });
-    console.log(`[Firebase Realtime] Broadcast notification sent:`, notifId);
+    console.log(`[Firebase Realtime] Notification saved:`, notifId, `targets: ${cleanTargets.length}`);
     return { success: true, id: notifId };
   } catch (error) {
     console.error("[Firebase] Error sending notification:", error);
@@ -1109,30 +1120,34 @@ export const saveDeviceTokenRealtime = async (userIdOrUid, token, metadata = {})
 /**
  * Retrieves target device push tokens from Firestore for closed-app notification dispatch
  */
-export const getTargetDeviceTokensRealtime = async (targetUids = []) => {
+export const getTargetDeviceTokensRealtime = async (targetUids = [], isBroadcast = false) => {
   try {
     const tokensCollection = collection(db, "device_tokens");
     const snapshot = await getDocs(tokensCollection);
     const tokens = new Set();
-    const cleanTargets = Array.isArray(targetUids) ? targetUids.map(u => String(u).trim().toLowerCase()) : [];
+    const cleanTargets = Array.isArray(targetUids) 
+      ? targetUids.map(u => String(u || '').trim().toLowerCase()).filter(Boolean) 
+      : [];
 
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
       if (!data || !data.token) return;
 
-      if (cleanTargets.length === 0) {
-        // Broadcast mode: include all device tokens
+      if (isBroadcast) {
+        // Explicit Broadcast mode: include all device tokens
         tokens.add(data.token);
-      } else {
+      } else if (cleanTargets.length > 0) {
         // Targeted mode: match uid, email, or phone
         const uUid = String(data.uid || '').trim().toLowerCase();
-        if (cleanTargets.includes(uUid)) {
+        const uEmail = String(data.email || '').trim().toLowerCase();
+        const uPhone = String(data.phone || '').trim().toLowerCase();
+        if (cleanTargets.includes(uUid) || (uEmail && cleanTargets.includes(uEmail)) || (uPhone && cleanTargets.includes(uPhone))) {
           tokens.add(data.token);
         }
       }
     });
 
-    console.log(`[Firebase Realtime] Found ${tokens.size} target device tokens for push dispatch.`);
+    console.log(`[Firebase Realtime] Found ${tokens.size} device tokens for push dispatch (isBroadcast: ${isBroadcast}, targets: ${cleanTargets.length}).`);
     return Array.from(tokens);
   } catch (err) {
     console.warn('[Firebase Realtime] Error fetching device tokens:', err);

@@ -38,13 +38,18 @@ export default function TournamentLobby({
 
   const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
   const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
+  const cleanUserPhone = String(userProfile?.phone || userProfile?.phoneNumber || '').trim().toLowerCase();
 
   const isUserJoined = Boolean(
-    (cleanUserUid || cleanUserEmail) && 
+    (cleanUserUid || cleanUserEmail || cleanUserPhone) && 
     tournament.joinedPlayers?.some(p => {
       const pUid = String(p.uid || '').trim().toLowerCase();
+      const pId = String(p.id || '').trim().toLowerCase();
       const pEmail = String(p.email || '').trim().toLowerCase();
-      return (cleanUserUid && pUid === cleanUserUid) || (cleanUserEmail && pEmail === cleanUserEmail);
+      const pPhone = String(p.phone || '').trim().toLowerCase();
+      return (cleanUserUid && (pUid === cleanUserUid || pId === cleanUserUid)) || 
+             (cleanUserEmail && pEmail === cleanUserEmail) ||
+             (cleanUserPhone && pPhone === cleanUserPhone);
     })
   );
   const isSquadMode = tournament.mode === 'Duo' || tournament.mode === 'Squad';
@@ -53,7 +58,11 @@ export default function TournamentLobby({
   const totalSlots = tournament.slotsTotal || tournament.maxSlots || 48;
   const joinedSlots = Math.max(tournament.slotsJoined || 0, (tournament.joinedPlayers || []).length);
   const isMatchFull = joinedSlots >= totalSlots;
-  const isHostOrAdmin = String(userProfile?.uid || '').trim() === '9084311275' || userProfile?.role === 'admin' || userProfile?.isHost;
+  const isHostOrAdmin = String(userProfile?.uid || '').trim() === '9084311275' || 
+                        String(userProfile?.phone || '').trim() === '9084311275' ||
+                        userProfile?.role === 'admin' || 
+                        userProfile?.isHost;
+  const canViewCredentials = isUserJoined || isHostOrAdmin;
 
   const copyToClipboard = (text, key) => {
     navigator.clipboard.writeText(text);
@@ -323,10 +332,10 @@ export default function TournamentLobby({
             className="glass-panel animate-slide-in" 
             style={{
               padding: '16px',
-              background: tournament.roomId 
+              background: (tournament.roomId && canViewCredentials) 
                 ? 'linear-gradient(135deg, rgba(0, 230, 118, 0.12) 0%, rgba(0, 229, 255, 0.08) 100%)' 
                 : 'rgba(15, 18, 29, 0.6)',
-              border: tournament.roomId 
+              border: (tournament.roomId && canViewCredentials) 
                 ? '1px solid var(--success)' 
                 : '1px dashed rgba(255, 255, 255, 0.15)',
               borderRadius: '12px'
@@ -338,28 +347,45 @@ export default function TournamentLobby({
                   fontFamily: 'var(--font-heading)',
                   fontSize: '0.88rem', 
                   fontWeight: '700',
-                  color: tournament.roomId ? 'var(--success)' : 'var(--text-muted)',
+                  color: (tournament.roomId && canViewCredentials) ? 'var(--success)' : 'var(--text-muted)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}>
-                  <span>🔑</span> {tournament.roomId ? 'ROOM ID & PASSWORD (LIVE)' : 'CUSTOM ROOM CREDENTIALS'}
+                  <span>🔑</span> {(tournament.roomId && canViewCredentials) ? 'ROOM ID & PASSWORD (LIVE)' : 'CUSTOM ROOM CREDENTIALS'}
                 </span>
                 <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                  {tournament.roomId 
+                  {(tournament.roomId && canViewCredentials)
                     ? 'Room is now created in Free Fire! Join immediately.' 
-                    : 'Admin broadcasts credentials 15 minutes before the match start.'}
+                    : canViewCredentials
+                    ? 'Admin broadcasts credentials 15 minutes before the match start.'
+                    : 'Join this match to receive Room ID and Password.'}
                 </p>
               </div>
 
-              {tournament.roomId && (
+              {(tournament.roomId && canViewCredentials) && (
                 <span className="badge badge-live" style={{ background: 'var(--success)', color: '#000' }}>
                   ● LIVE
                 </span>
               )}
             </div>
 
-            {tournament.roomId ? (
+            {!canViewCredentials ? (
+              <div style={{ 
+                background: 'rgba(255, 68, 68, 0.08)', 
+                border: '1px dashed rgba(255, 68, 68, 0.3)',
+                padding: '16px', 
+                borderRadius: '8px', 
+                textAlign: 'center',
+                color: 'rgba(255, 255, 255, 0.85)',
+                fontSize: '0.8rem'
+              }}>
+                🔒 <strong>Room Credentials Protected</strong><br />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Room ID & Password are kept strictly confidential and only visible to registered players who joined this match.
+                </span>
+              </div>
+            ) : tournament.roomId ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px' }}>ROOM ID:</div>

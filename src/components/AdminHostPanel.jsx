@@ -568,13 +568,30 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
 
     const targetTourney = tournaments.find(t => t.id === selectedTourneyId);
     const tourneyTitle = targetTourney?.title || 'Tournament Match';
-    const joinedUids = (targetTourney?.joinedPlayers || [])
-      .map(p => String(p.uid || '').trim().toLowerCase())
-      .filter(Boolean);
+    const rawJoined = Array.isArray(targetTourney?.joinedPlayers) ? targetTourney.joinedPlayers : [];
+
+    // Collect all valid participant identifiers from real human participants
+    const joinedUidsSet = new Set();
+    rawJoined.forEach(p => {
+      if (p.isBot) return;
+      if (p.uid) joinedUidsSet.add(String(p.uid).trim().toLowerCase());
+      if (p.id) joinedUidsSet.add(String(p.id).trim().toLowerCase());
+      if (p.email) joinedUidsSet.add(String(p.email).trim().toLowerCase());
+      if (p.phone) joinedUidsSet.add(String(p.phone).trim().toLowerCase());
+      if (p.ffUid) joinedUidsSet.add(String(p.ffUid).trim().toLowerCase());
+    });
+    const joinedUids = Array.from(joinedUidsSet).filter(Boolean);
 
     if (onBroadcastRoomCredentials) {
       await onBroadcastRoomCredentials(selectedTourneyId, inputRoomId.trim(), inputRoomPass.trim());
       
+      // If there are 0 registered human players, do NOT send push/notification to prevent any accidental public leak
+      if (joinedUids.length === 0) {
+        setRoomBroadcastStatus('✅ Room ID & Password updated in Match Lobby! (No registered human players yet, so no push alerts were sent to prevent public leak).');
+        setTimeout(() => setRoomBroadcastStatus(''), 5000);
+        return;
+      }
+
       // Dispatch targeted notification strictly for registered players
       await sendNotificationRealtime({
         title: `🔑 Custom Room ID Dropped: ${tourneyTitle}`,
@@ -582,7 +599,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         type: 'match',
         targetTournamentId: selectedTourneyId,
         targetUids: joinedUids,
-        tournamentTitle: tourneyTitle
+        tournamentTitle: tourneyTitle,
+        isBroadcast: false
       });
 
       // Dispatch Closed-App Push Notification strictly to registered match players
@@ -591,10 +609,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         message: `Room ID: ${inputRoomId.trim()} | Pass: ${inputRoomPass.trim() || 'None'}. Join custom room now!`,
         type: 'match',
         targetTournamentId: selectedTourneyId,
-        targetUids: joinedUids
+        targetUids: joinedUids,
+        isBroadcast: false
       });
 
-      setRoomBroadcastStatus(`✅ Room ID & Password broadcasted to registered players & dispatched push notification!`);
+      setRoomBroadcastStatus(`✅ Room ID & Password broadcasted strictly to ${joinedUids.length} registered player(s) & dispatched push notification!`);
       setTimeout(() => setRoomBroadcastStatus(''), 4000);
     }
   };
