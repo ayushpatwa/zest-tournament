@@ -53,6 +53,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [rosterPrizePlayer, setRosterPrizePlayer] = useState(null); // { player, tourney }
   const [rosterPrizeAmount, setRosterPrizeAmount] = useState('');
   const [rosterPrizeReason, setRosterPrizeReason] = useState('');
+  const [rosterPrizeCustomMsg, setRosterPrizeCustomMsg] = useState('');
   const [rosterPrizeLoading, setRosterPrizeLoading] = useState(false);
   const [rosterPrizeStatus, setRosterPrizeStatus] = useState('');
   const [title, setTitle] = useState('');
@@ -865,6 +866,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     const defaultAmt = tourney.bounty || tourney.prizePool || '50';
     setRosterPrizeAmount(String(defaultAmt));
     setRosterPrizeReason(`1st Place Winner - ${tourney.title}`);
+    setRosterPrizeCustomMsg(`Congratulations ${player.nickname || 'Champion'}! Excellent match performance. Your winning prize has been credited!`);
     setRosterPrizeStatus('');
   };
 
@@ -885,12 +887,14 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     try {
       const targetIdentifier = player.uid || player.email || player.nickname;
       const finalReason = rosterPrizeReason.trim() || `Prize Winnings - ${tourney.title}`;
+      const customMsg = rosterPrizeCustomMsg.trim();
+      const txReason = customMsg ? `${finalReason} • "${customMsg}"` : finalReason;
       
       const res = await creditUserWalletRealtime(
         targetIdentifier, 
         amt, 
         '🏆 Tournament Prize Winnings', 
-        finalReason
+        txReason
       );
 
       if (res.success) {
@@ -903,18 +907,36 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
           ffUid: player.uid || targetIdentifier,
           email: player.email || 'N/A',
           phone: player.phone || 'N/A',
-          details: `Match Roster Direct Prize: ₹${amt} (${finalReason}) [Match: ${tourney.title}]`
+          details: `Match Roster Direct Prize: ₹${amt} (${finalReason}) [Match: ${tourney.title}]${customMsg ? ` | Msg: "${customMsg}"` : ''}`
         });
 
-        // Send in-app notification to the winner
+        // Send in-app notification & closed-app push notification to the winner
+        const notifMessage = customMsg
+          ? `${customMsg}\n\n🏆 ₹${amt} winning coins credited for "${tourney.title}".`
+          : `Congratulations ${player.nickname || 'Player'}! You have won ₹${amt} in "${tourney.title}". The prize has been added directly to your wallet balance!`;
+
+        const playerUids = [
+          String(player.uid || '').trim().toLowerCase(),
+          String(targetIdentifier).trim().toLowerCase()
+        ].filter(Boolean);
+
         try {
           await sendNotificationRealtime({
             title: `🏆 Prize Money Credited: ₹${amt}!`,
-            message: `Congratulations ${player.nickname || 'Player'}! You have won ₹${amt} in "${tourney.title}". The prize has been added directly to your wallet balance!`,
+            message: notifMessage,
             type: 'prize',
             category: 'WINNINGS',
             badgeText: 'PRIZE',
-            targetUid: player.uid
+            targetTournamentId: tourney.id,
+            targetUids: playerUids,
+            tournamentTitle: tourney.title
+          });
+
+          await dispatchPushNotification({
+            title: `🏆 Prize Money Won: ₹${amt}!`,
+            message: customMsg ? `"${customMsg}" (₹${amt} credited)` : `You won ₹${amt} in "${tourney.title}"! Checked into your wallet.`,
+            type: 'prize',
+            targetUids: playerUids
           });
         } catch (notifErr) {
           console.warn('Failed to dispatch prize notification:', notifErr);
@@ -924,6 +946,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         setTimeout(() => {
           setRosterPrizePlayer(null);
           setRosterPrizeStatus('');
+          setRosterPrizeCustomMsg('');
         }, 2200);
       } else {
         setRosterPrizeStatus(`⚠️ ${res.error || 'Failed to credit prize money'}`);
@@ -3934,6 +3957,60 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                 placeholder="e.g. 1st Place Winner"
                 className="input-field"
                 style={{ fontSize: '0.85rem' }}
+              />
+            </div>
+
+            {/* Custom Message to Winner / Player */}
+            <div>
+              <div className="flex-between" style={{ marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-muted)', margin: 0 }}>
+                  💬 Custom Message to Player / Winner (Optional)
+                </label>
+                <span style={{ fontSize: '0.68rem', color: '#00e5ff', fontWeight: '700' }}>
+                  Delivered via Notification & Wallet History
+                </span>
+              </div>
+
+              {/* Message Quick Presets */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                {[
+                  "🎉 Well played champion! Keep grinding!",
+                  "🔥 Dominating gameplay & insane kills! GG!",
+                  "👑 Fantastic 1v1 victory! Well deserved!",
+                  "⚡ Headshot master! Great match play!"
+                ].map(msgPreset => (
+                  <button
+                    key={msgPreset}
+                    type="button"
+                    onClick={() => setRosterPrizeCustomMsg(msgPreset)}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '0.68rem',
+                      borderRadius: '6px',
+                      border: rosterPrizeCustomMsg === msgPreset ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.1)',
+                      background: rosterPrizeCustomMsg === msgPreset ? 'rgba(0, 229, 255, 0.2)' : 'rgba(255,255,255,0.05)',
+                      color: rosterPrizeCustomMsg === msgPreset ? '#00e5ff' : '#fff',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {msgPreset}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                value={rosterPrizeCustomMsg}
+                onChange={(e) => setRosterPrizeCustomMsg(e.target.value)}
+                placeholder="Write a custom congratulations message for the winner (e.g. Booyah! Outstanding Lone Wolf match!)..."
+                className="input-field"
+                rows={2}
+                style={{
+                  fontSize: '0.82rem',
+                  resize: 'vertical',
+                  padding: '8px 12px',
+                  lineHeight: '1.4'
+                }}
               />
             </div>
 
