@@ -154,6 +154,17 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [referralSaveStatus, setReferralSaveStatus] = useState('');
   const [isSavingReferralSettings, setIsSavingReferralSettings] = useState(false);
 
+  // Global Announcement Board (App-Open Popup) States
+  const [activeAnnouncement, setActiveAnnouncement] = useState(null);
+  const [annTitle, setAnnTitle] = useState('');
+  const [annMessage, setAnnMessage] = useState('');
+  const [annTag, setAnnTag] = useState('🚨 IMPORTANT NOTICE');
+  const [annLink, setAnnLink] = useState('');
+  const [annLinkText, setAnnLinkText] = useState('View Details');
+  const [isSavingAnn, setIsSavingAnn] = useState(false);
+  const [isDeletingAnn, setIsDeletingAnn] = useState(false);
+  const [annStatusMsg, setAnnStatusMsg] = useState('');
+
   useEffect(() => {
     const unsub = subscribeToAppSettingsRealtime((settings) => {
       if (settings) {
@@ -164,6 +175,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         if (settings.fcmServiceAccount) {
           setFcmServiceAccountInput(settings.fcmServiceAccount);
           updateLiveFcmConfig(settings.fcmServiceAccount);
+        }
+        if (settings.announcementBoard && settings.announcementBoard.title && settings.announcementBoard.active !== false) {
+          setActiveAnnouncement(settings.announcementBoard);
+        } else {
+          setActiveAnnouncement(null);
         }
       }
     });
@@ -199,6 +215,61 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
       setTimeout(() => setReferralSaveStatus(''), 4000);
     } else {
       setReferralSaveStatus(`❌ Error saving settings: ${res.error}`);
+    }
+  };
+
+  const handlePublishAnnouncementBoard = async (e) => {
+    if (e) e.preventDefault();
+    if (!annTitle.trim()) {
+      setAnnStatusMsg('⚠️ Please enter an announcement title.');
+      return;
+    }
+    setIsSavingAnn(true);
+    setAnnStatusMsg('');
+
+    const newAnnouncement = {
+      id: `ann_${Date.now()}`,
+      title: annTitle.trim(),
+      message: annMessage.trim(),
+      tag: annTag.trim() || '🚨 IMPORTANT NOTICE',
+      link: annLink.trim(),
+      linkText: annLinkText.trim() || 'View Details',
+      createdAt: new Date().toISOString(),
+      createdTimeStr: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + ', ' + new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
+      active: true
+    };
+
+    const res = await saveAppSettingsRealtime({
+      announcementBoard: newAnnouncement
+    });
+    setIsSavingAnn(false);
+    if (res.success) {
+      setActiveAnnouncement(newAnnouncement);
+      setAnnStatusMsg('✅ Announcement Board published! It will now pop up for all players every time they open the app.');
+      setTimeout(() => setAnnStatusMsg(''), 5000);
+    } else {
+      setAnnStatusMsg(`❌ Failed to publish announcement: ${res.error}`);
+    }
+  };
+
+  const handleDeleteAnnouncementBoard = async () => {
+    if (!window.confirm('Are you sure you want to permanently delete this announcement? It will immediately stop appearing when players open the app.')) {
+      return;
+    }
+    setIsDeletingAnn(true);
+    setAnnStatusMsg('');
+    const res = await saveAppSettingsRealtime({
+      announcementBoard: null
+    });
+    setIsDeletingAnn(false);
+    if (res.success) {
+      setActiveAnnouncement(null);
+      setAnnTitle('');
+      setAnnMessage('');
+      setAnnStatusMsg('✅ Announcement deleted! It will no longer appear when players open the app.');
+      setTimeout(() => setAnnStatusMsg(''), 5000);
+    } else {
+      setAnnStatusMsg(`❌ Error deleting announcement: ${res.error}`);
     }
   };
 
@@ -1094,7 +1165,23 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   fontWeight: '900'
                 }}
               >
-                🔔 Announcements ({broadcastList.length})
+                🔔 Bell Broadcast ({broadcastList.length})
+              </button>
+
+              <button
+                onClick={() => setActiveTab('announcement_board')}
+                className="btn"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  borderRadius: '8px',
+                  background: activeTab === 'announcement_board' ? 'linear-gradient(135deg, #ff5722 0%, #ffd600 100%)' : 'rgba(255,255,255,0.05)',
+                  color: activeTab === 'announcement_board' ? '#000' : '#ff7043',
+                  border: '1px solid rgba(255,87,34,0.4)',
+                  fontWeight: '900'
+                }}
+              >
+                📢 Announcement Board {activeAnnouncement ? '🟢' : ''}
               </button>
 
               <button
@@ -2496,6 +2583,254 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
             )}
           </div>
         </form>
+      )}
+
+      {/* MODE 2.8: GLOBAL ANNOUNCEMENT BOARD POPUP */}
+      {activeTab === 'announcement_board' && (
+        <div className="glass-panel animate-slide-in" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.2rem', color: '#ff7043', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-heading)' }}>
+              <span>📢</span> Global Announcement Board (App-Open Popup)
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.5' }}>
+              Publish an urgent announcement that pops up on screen whenever <strong>ANY player opens or starts the app</strong> (just like an app update notification).
+              <br />
+              <span style={{ color: '#ffd600' }}>⚡ It will keep appearing every time a player opens the app until you delete it below!</span>
+            </p>
+          </div>
+
+          {annStatusMsg && (
+            <div style={{
+              color: annStatusMsg.includes('✅') ? 'var(--success)' : 'var(--danger)',
+              background: annStatusMsg.includes('✅') ? 'rgba(0,230,118,0.1)' : 'rgba(255,23,68,0.1)',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              border: `1px solid ${annStatusMsg.includes('✅') ? 'var(--success)' : 'var(--danger)'}`,
+              fontSize: '0.88rem'
+            }}>
+              {annStatusMsg}
+            </div>
+          )}
+
+          {/* ACTIVE ANNOUNCEMENT STATUS & DELETE BUTTON */}
+          {activeAnnouncement ? (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(255, 87, 34, 0.12) 0%, rgba(255, 214, 0, 0.08) 100%)',
+              border: '1.5px solid rgba(255, 87, 34, 0.5)',
+              borderRadius: '12px',
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ flex: 1, minWidth: '240px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span className="badge" style={{ background: '#ff5722', color: '#fff', fontSize: '0.7rem', fontWeight: '900' }}>
+                      {activeAnnouncement.tag || '🚨 IMPORTANT NOTICE'}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--success)', fontWeight: '800' }}>
+                      ● CURRENTLY LIVE (Appears every time any player opens the app)
+                    </span>
+                  </div>
+                  <h4 style={{ fontSize: '1.05rem', color: '#fff', margin: '0 0 6px 0', fontFamily: 'var(--font-heading)' }}>
+                    {activeAnnouncement.title}
+                  </h4>
+                  {activeAnnouncement.message && (
+                    <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.9)', whiteSpace: 'pre-line', lineHeight: '1.5', background: 'rgba(0,0,0,0.35)', padding: '10px 12px', borderRadius: '8px' }}>
+                      {activeAnnouncement.message}
+                    </div>
+                  )}
+                  {activeAnnouncement.link && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--secondary)', marginTop: '8px' }}>
+                      🔗 Link: <a href={activeAnnouncement.link} target="_blank" rel="noreferrer" style={{ color: 'var(--secondary)' }}>{activeAnnouncement.link}</a> ({activeAnnouncement.linkText || 'View Details'})
+                    </div>
+                  )}
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    Published: {activeAnnouncement.createdTimeStr || activeAnnouncement.createdAt || 'Recent'}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteAnnouncementBoard}
+                  disabled={isDeletingAnn}
+                  className="btn"
+                  style={{
+                    background: 'var(--danger)',
+                    color: '#fff',
+                    padding: '8px 16px',
+                    fontSize: '0.78rem',
+                    fontWeight: '900',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <span>🗑️</span> {isDeletingAnn ? 'Deleting...' : 'Delete Announcement Now'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px dashed rgba(255,255,255,0.15)',
+              borderRadius: '12px',
+              padding: '16px',
+              textAlign: 'center',
+              color: 'var(--text-muted)',
+              fontSize: '0.82rem'
+            }}>
+              ⚪ No announcement board is currently active. Fill out the form below to publish one.
+            </div>
+          )}
+
+          {/* 1-CLICK QUICK PRESETS */}
+          <div>
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px', fontWeight: '700' }}>
+              ⚡ 1-Click Quick Preset Announcement Templates:
+            </label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {[
+                { 
+                  label: '⚠️ 50rs Topup Rule', 
+                  title: 'Jab tk tum 50rs topup ni kroge tb tk deposit rqst accept ni hogi', 
+                  msg: 'Sabhi players dhyan de: Pehle kam se kam ₹50 ka topup / deposit complete karo. Bina ₹50 topup ke deposit request approve nahi ki jayegi.',
+                  tag: '⚠️ DEPOSIT RULE'
+                },
+                { 
+                  label: '🚫 Fair Play / Anti-Hack', 
+                  title: 'Zero Tolerance Fair Play Policy', 
+                  msg: 'Hacking, auto-headshot injectors, teaming, or emulator scripts will lead to an instant permanent device ban and forfeiture of wallet balance.',
+                  tag: '🚨 FAIR PLAY'
+                },
+                { 
+                  label: '🛠️ Server Maintenance', 
+                  title: 'Scheduled Server Maintenance', 
+                  msg: 'We are optimizing room distribution and server response. Tournament matches will resume in 30 minutes. Thank you for your patience!',
+                  tag: '🛠️ MAINTENANCE'
+                },
+                { 
+                  label: '🏆 Mega Tournament Open', 
+                  title: 'Mega ₹5000 Tournament Registration Open!', 
+                  msg: 'Limited slots are available for tonight\'s mega showdown! Register your team in the Arena before slots fill up.',
+                  tag: '🏆 SPECIAL EVENT'
+                }
+              ].map((p, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setAnnTitle(p.title);
+                    setAnnMessage(p.msg);
+                    setAnnTag(p.tag);
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    color: '#fff',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    fontWeight: '700'
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* CREATE / UPDATE FORM */}
+          <form onSubmit={handlePublishAnnouncementBoard} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div className="grid-2">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Notice Tag / Badge <span style={{ color: 'var(--primary)' }}>*</span></label>
+                <input 
+                  type="text" 
+                  value={annTag} 
+                  onChange={(e) => setAnnTag(e.target.value)} 
+                  placeholder="e.g. 🚨 IMPORTANT NOTICE, ⚠️ RULES ALERT"
+                  className="form-input"
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Announcement Headline / Title <span style={{ color: 'var(--primary)' }}>*</span></label>
+                <input 
+                  type="text" 
+                  value={annTitle} 
+                  onChange={(e) => setAnnTitle(e.target.value)} 
+                  placeholder="e.g. Jab tk tum 50rs topup ni kroge..."
+                  className="form-input"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Detailed Announcement Message</label>
+              <textarea 
+                value={annMessage} 
+                onChange={(e) => setAnnMessage(e.target.value)} 
+                placeholder="Write the complete announcement details here. Players will see this in the popup modal when opening the app."
+                className="form-input"
+                rows={4}
+                style={{ resize: 'vertical' }}
+              />
+            </div>
+
+            <div className="grid-2">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Optional Action Link URL</label>
+                <input 
+                  type="url" 
+                  value={annLink} 
+                  onChange={(e) => setAnnLink(e.target.value)} 
+                  placeholder="https://..."
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Action Link Button Label</label>
+                <input 
+                  type="text" 
+                  value={annLinkText} 
+                  onChange={(e) => setAnnLinkText(e.target.value)} 
+                  placeholder="e.g. Open Rules, Join WhatsApp"
+                  className="form-input"
+                />
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn"
+              disabled={isSavingAnn}
+              style={{ 
+                width: '100%', 
+                height: '48px', 
+                background: 'linear-gradient(135deg, #ff5722 0%, #ffd600 100%)', 
+                color: '#000', 
+                fontWeight: '900',
+                fontFamily: 'var(--font-heading)',
+                fontSize: '0.92rem',
+                letterSpacing: '0.5px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                marginTop: '6px'
+              }}
+            >
+              {isSavingAnn ? 'Publishing Announcement...' : (activeAnnouncement ? '🔄 Update Announcement Board for All Players' : '📢 Publish Announcement Board to All Players')}
+            </button>
+          </form>
+        </div>
       )}
 
       {/* MODE 3: MANAGE & DELETE TOURNAMENTS */}

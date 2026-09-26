@@ -11,6 +11,7 @@ import RulesPage from './components/RulesPage';
 import ReferEarnPage from './components/ReferEarnPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import AppUpdateModal from './components/AppUpdateModal';
+import AnnouncementBoardModal from './components/AnnouncementBoardModal';
 import { isNewVersionAvailable, CURRENT_APP_VERSION } from './services/appUpdateService';
 import { sendToMakeWebhook, updateLiveWebhookUrl } from './services/webhookService';
 import { updateLiveResendConfig } from './services/resendService';
@@ -73,10 +74,12 @@ export default function App() {
     };
   });
 
-  // App update & deposit QR states
+  // App update & deposit QR & announcement board states
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [depositQrConfig, setDepositQrConfig] = useState(null);
+  const [announcementBoardInfo, setAnnouncementBoardInfo] = useState(null);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
 
   // 1. Subscribe to Real-Time Firebase Firestore Tournaments, Notifications & App Settings
   useEffect(() => {
@@ -252,6 +255,17 @@ export default function App() {
           setShowUpdateModal(true);
         } else {
           setShowUpdateModal(false);
+        }
+        if (settings.announcementBoard && settings.announcementBoard.title && settings.announcementBoard.active !== false) {
+          const ann = settings.announcementBoard;
+          setAnnouncementBoardInfo(ann);
+          const dismissedInSession = sessionStorage.getItem(`zest_dismissed_announcement_${ann.id || 'board'}`);
+          if (!dismissedInSession) {
+            setShowAnnouncementModal(true);
+          }
+        } else {
+          setAnnouncementBoardInfo(null);
+          setShowAnnouncementModal(false);
         }
       }
     });
@@ -536,9 +550,34 @@ export default function App() {
     await updateRoomCredentialsRealtime(tournamentId, roomId, roomPass);
   };
 
+  const handleDismissAnnouncement = () => {
+    if (announcementBoardInfo?.id) {
+      try {
+        sessionStorage.setItem(`zest_dismissed_announcement_${announcementBoardInfo.id}`, 'true');
+      } catch (_) {}
+    }
+    setShowAnnouncementModal(false);
+  };
+
   // Render Login page if not authenticated
   if (!currentUser) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+    return (
+      <>
+        <LoginPage onLoginSuccess={handleLoginSuccess} />
+        {showUpdateModal && updateInfo && (
+          <AppUpdateModal 
+            updateInfo={updateInfo} 
+            onDismiss={() => setShowUpdateModal(false)} 
+          />
+        )}
+        {showAnnouncementModal && announcementBoardInfo && (
+          <AnnouncementBoardModal
+            announcement={announcementBoardInfo}
+            onDismiss={handleDismissAnnouncement}
+          />
+        )}
+      </>
+    );
   }
 
   const selectedTournament = tournaments.find(t => t.id === selectedTournamentId);
@@ -668,6 +707,14 @@ export default function App() {
         <AppUpdateModal 
           updateInfo={updateInfo} 
           onDismiss={() => setShowUpdateModal(false)} 
+        />
+      )}
+
+      {/* Real-time Global Announcement Board Modal */}
+      {showAnnouncementModal && announcementBoardInfo && (
+        <AnnouncementBoardModal
+          announcement={announcementBoardInfo}
+          onDismiss={handleDismissAnnouncement}
         />
       )}
     </div>
