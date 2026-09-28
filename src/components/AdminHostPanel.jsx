@@ -147,9 +147,9 @@ export default function AdminHostPanel({
   const [testPushStatus, setTestPushStatus] = useState('');
 
   // App Update Publisher states
-  const [updateVersion, setUpdateVersion] = useState('1.4.9');
-  const [updateTitle, setUpdateTitle] = useState('⚡ Announcement Board & Security Update (v1.4.9)!');
-  const [updateNotes, setUpdateNotes] = useState('• Global App-Open Announcement Board\n• Room ID & Password Participant Privacy Shield\n• Dynamic Referral & Welcome Bonus Settings\n• Performance & Security Enhancements');
+  const [updateVersion, setUpdateVersion] = useState('1.5.0');
+  const [updateTitle, setUpdateTitle] = useState('⚡ Pinned Matches & Arena Highlights (v1.5.0)!');
+  const [updateNotes, setUpdateNotes] = useState('• Pin & Highlight Matches at Top of Arena\n• 1-Click Match Pinning for Hosts\n• Global App-Open Announcement Board\n• Real-Time Match List Sorting & Performance');
   const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatePublishStatus, setUpdatePublishStatus] = useState('');
