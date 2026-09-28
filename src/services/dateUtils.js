@@ -158,9 +158,26 @@ export const getTournamentSortTimestamp = (t) => {
 };
 
 /**
- * Compares two tournaments chronologically by date and time
+ * Compares two tournaments chronologically by date and time,
+ * with pinned/highlighted tournaments always prioritized at the top.
  */
 export const compareTournamentsByTime = (a, b) => {
+  const isPinnedA = Boolean(a?.isPinned || a?.pinned || a?.isHighlighted);
+  const isPinnedB = Boolean(b?.isPinned || b?.pinned || b?.isHighlighted);
+
+  // Pinned matches always appear at the top
+  if (isPinnedA && !isPinnedB) return -1;
+  if (!isPinnedA && isPinnedB) return 1;
+
+  // If both are pinned, prioritize the most recently pinned one
+  if (isPinnedA && isPinnedB) {
+    const pinTimeA = Number(a?.pinnedAt || 0);
+    const pinTimeB = Number(b?.pinnedAt || 0);
+    if (pinTimeA && pinTimeB && pinTimeA !== pinTimeB) {
+      return pinTimeB - pinTimeA;
+    }
+  }
+
   const timeA = getTournamentSortTimestamp(a);
   const timeB = getTournamentSortTimestamp(b);
   if (timeA !== timeB) {

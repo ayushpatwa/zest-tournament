@@ -193,25 +193,45 @@ export default function TournamentLobby({
       </div>
 
       {/* Hero Tournament Title Banner */}
-      <div 
-        className="glass-panel" 
-        style={{
-          background: 'linear-gradient(135deg, rgba(255, 87, 34, 0.15) 0%, rgba(21, 28, 51, 0.95) 100%)',
-          border: '1px solid rgba(255, 87, 34, 0.3)',
-          padding: '20px',
-          borderRadius: '16px',
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-      >
-        <div className="flex-between" style={{ marginBottom: '8px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--secondary)', fontWeight: '700', textTransform: 'uppercase' }}>
-            {tournament.mode} • {tournament.type}
-          </span>
-          <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-heading)', fontWeight: '900', fontSize: '1.2rem' }}>
-            ₹{tournament.prizePool} PRIZE POOL
-          </span>
-        </div>
+      {(() => {
+        const isPinned = Boolean(tournament.isPinned || tournament.pinned || tournament.isHighlighted);
+        return (
+          <div 
+            className="glass-panel" 
+            style={{
+              background: isPinned 
+                ? 'linear-gradient(135deg, rgba(255, 214, 0, 0.12) 0%, rgba(21, 28, 51, 0.95) 100%)' 
+                : 'linear-gradient(135deg, rgba(255, 87, 34, 0.15) 0%, rgba(21, 28, 51, 0.95) 100%)',
+              border: isPinned ? '1.5px solid #ffd600' : '1px solid rgba(255, 87, 34, 0.3)',
+              boxShadow: isPinned ? '0 0 20px rgba(255, 214, 0, 0.22)' : undefined,
+              padding: '20px',
+              borderRadius: '16px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            <div className="flex-between" style={{ marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--secondary)', fontWeight: '700', textTransform: 'uppercase' }}>
+                  {tournament.mode} • {tournament.type}
+                </span>
+                {isPinned && (
+                  <span className="badge" style={{ 
+                    background: 'linear-gradient(135deg, #ffd600 0%, #ff9100 100%)', 
+                    color: '#000', 
+                    fontWeight: '900', 
+                    fontSize: '0.68rem',
+                    boxShadow: '0 0 10px rgba(255, 214, 0, 0.4)',
+                    letterSpacing: '0.5px'
+                  }}>
+                    📌 PINNED MATCH
+                  </span>
+                )}
+              </div>
+              <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-heading)', fontWeight: '900', fontSize: '1.2rem' }}>
+                ₹{tournament.prizePool} PRIZE POOL
+              </span>
+            </div>
 
         <h1 style={{ fontSize: '1.35rem', margin: '0 0 12px 0', fontFamily: 'var(--font-heading)' }}>
           {tournament.title}
@@ -233,6 +253,8 @@ export default function TournamentLobby({
           </div>
         </div>
       </div>
+        );
+      })()}
 
       {/* Lobby Navigation Tabs */}
       <div className="glass-panel" style={{ display: 'flex', padding: '4px', borderRadius: '12px', border: '1px solid var(--border-color)', gap: '4px' }}>

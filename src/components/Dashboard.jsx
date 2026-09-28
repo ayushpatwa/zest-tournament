@@ -469,6 +469,8 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                   })
                 );
 
+                const isPinned = Boolean(t.isPinned || t.pinned || t.isHighlighted);
+
                 return (
                   <div 
                     key={t.id} 
@@ -478,7 +480,17 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '12px',
-                      border: isMatchFull ? '1px solid rgba(255, 23, 68, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      border: isPinned 
+                        ? '1.5px solid #ffd600' 
+                        : isMatchFull 
+                          ? '1px solid rgba(255, 23, 68, 0.35)' 
+                          : '1px solid rgba(255, 255, 255, 0.08)',
+                      boxShadow: isPinned 
+                        ? '0 0 16px rgba(255, 214, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.4)' 
+                        : undefined,
+                      background: isPinned 
+                        ? 'linear-gradient(135deg, rgba(255, 214, 0, 0.04) 0%, rgba(21, 28, 51, 0.95) 100%)' 
+                        : undefined,
                       transition: 'all 0.3s ease',
                       cursor: 'pointer',
                       position: 'relative'
@@ -488,6 +500,18 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                     {/* Header info */}
                     <div className="flex-between">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        {isPinned && (
+                          <span className="badge" style={{ 
+                            background: 'linear-gradient(135deg, #ffd600 0%, #ff9100 100%)', 
+                            color: '#000', 
+                            fontWeight: '900', 
+                            fontSize: '0.68rem',
+                            boxShadow: '0 0 10px rgba(255, 214, 0, 0.5)',
+                            letterSpacing: '0.5px'
+                          }}>
+                            📌 PINNED MATCH
+                          </span>
+                        )}
                         {isMatchFull ? (
                           <span className="badge" style={{ background: '#ff1744', color: '#fff', fontWeight: '900', fontSize: '0.65rem', boxShadow: '0 0 10px rgba(255,23,68,0.5)' }}>
                             🔴 HOUSEFULL

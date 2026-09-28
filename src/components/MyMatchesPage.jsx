@@ -188,6 +188,8 @@ export default function MyMatchesPage({
             const playerSlot = t.joinedPlayers?.find(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
             const slotIndex = t.joinedPlayers?.findIndex(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
 
+            const isPinned = Boolean(t.isPinned || t.pinned || t.isHighlighted);
+
             return (
               <div 
                 key={t.id}
@@ -197,15 +199,33 @@ export default function MyMatchesPage({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '12px',
-                  border: t.roomId ? '1px solid var(--success)' : '1px solid rgba(0, 229, 255, 0.2)',
+                  border: isPinned 
+                    ? '1.5px solid #ffd600' 
+                    : t.roomId 
+                      ? '1px solid var(--success)' 
+                      : '1px solid rgba(0, 229, 255, 0.2)',
+                  boxShadow: isPinned ? '0 0 15px rgba(255, 214, 0, 0.22)' : undefined,
                   background: t.roomId 
                     ? 'linear-gradient(135deg, rgba(0, 230, 118, 0.05) 0%, rgba(21, 28, 51, 0.9) 100%)' 
+                    : isPinned
+                    ? 'linear-gradient(135deg, rgba(255, 214, 0, 0.05) 0%, rgba(21, 28, 51, 0.8) 100%)'
                     : 'rgba(21, 28, 51, 0.7)'
                 }}
               >
                 {/* Header info */}
                 <div className="flex-between">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {isPinned && (
+                      <span className="badge" style={{ 
+                        background: 'linear-gradient(135deg, #ffd600 0%, #ff9100 100%)', 
+                        color: '#000', 
+                        fontWeight: '900', 
+                        fontSize: '0.68rem',
+                        boxShadow: '0 0 10px rgba(255, 214, 0, 0.4)'
+                      }}>
+                        📌 PINNED MATCH
+                      </span>
+                    )}
                     <span className="badge badge-live" style={{ background: 'rgba(0, 230, 118, 0.15)', color: 'var(--success)', border: '1px solid var(--success)' }}>
                       ✓ REGISTERED
                     </span>

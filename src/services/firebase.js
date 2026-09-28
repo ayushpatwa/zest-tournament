@@ -169,6 +169,26 @@ export const deleteTournamentRealtime = async (tournamentId) => {
 };
 
 /**
+ * Toggles pin/highlight status for a tournament in Firestore in real-time
+ */
+export const togglePinTournamentRealtime = async (tournamentId, isPinned) => {
+  try {
+    const tourneyRef = doc(db, "tournaments", tournamentId);
+    await updateDoc(tourneyRef, {
+      isPinned: Boolean(isPinned),
+      pinned: Boolean(isPinned),
+      pinnedAt: isPinned ? Date.now() : null,
+      updatedAt: serverTimestamp()
+    });
+    console.log(`[Firebase] Updated pin status for tournament ${tournamentId}:`, isPinned);
+    return { success: true };
+  } catch (error) {
+    console.error("[Firebase] Error toggling pin tournament:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
  * Atomically joins a tournament in Firestore in real-time
  */
 export const joinTournamentRealtime = async (tournamentId, participantData) => {

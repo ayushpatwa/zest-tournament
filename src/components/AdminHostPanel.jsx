@@ -5,8 +5,9 @@ import { dispatchPushNotification, showSystemNotification, getLiveFcmConfig, upd
 import { 
   saveAppSettingsRealtime, 
   subscribeToAppSettingsRealtime,
-  saveFcmConfigRealtime,
+  saveFcmConfigRealtime, 
   saveTournamentRealtime,
+  togglePinTournamentRealtime,
   creditUserWalletRealtime, 
   deductUserWalletRealtime, 
   subscribeToAllUsersRealtime,
@@ -37,7 +38,19 @@ import {
 
 import paymentQrImg from '../assets/payment_qr.jpg';
 
-export default function AdminHostPanel({ tournaments = [], onAddTournament, onUpdateTournament, onDeleteTournament, onRemovePlayerFromTournament, onBroadcastRoomCredentials, depositQrConfig, setCurrentView, currentUser, userProfile }) {
+export default function AdminHostPanel({ 
+  tournaments = [], 
+  onAddTournament, 
+  onUpdateTournament, 
+  onTogglePinTournament,
+  onDeleteTournament, 
+  onRemovePlayerFromTournament, 
+  onBroadcastRoomCredentials, 
+  depositQrConfig, 
+  setCurrentView, 
+  currentUser, 
+  userProfile 
+}) {
   const isSuperAdmin = 
     String(currentUser?.uid || userProfile?.uid || '').trim() === '9084311275' ||
     String(currentUser?.phone || userProfile?.phone || '').trim() === '9084311275' ||
@@ -72,6 +85,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
   const [editRoomId, setEditRoomId] = useState('');
   const [editRoomPassword, setEditRoomPassword] = useState('');
   const [editStatus, setEditStatus] = useState('upcoming');
+  const [isPinnedMatch, setIsPinnedMatch] = useState(false);
   const [editSuccessMsg, setEditSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [deleteStatusMsg, setDeleteStatusMsg] = useState('');
@@ -476,6 +490,7 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     setEditRoomId(t.roomId || '');
     setEditRoomPassword(t.roomPassword || '');
     setEditStatus(t.status || 'upcoming');
+    setIsPinnedMatch(Boolean(t.isPinned || t.pinned || t.isHighlighted));
     setErrorMsg('');
     setActiveTab('host');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -496,7 +511,17 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
     setEditRoomId('');
     setEditRoomPassword('');
     setEditStatus('upcoming');
+    setIsPinnedMatch(false);
     setErrorMsg('');
+  };
+
+  const handleTogglePinMatch = async (t) => {
+    const nextPinned = !Boolean(t.isPinned || t.pinned || t.isHighlighted);
+    if (onTogglePinTournament) {
+      await onTogglePinTournament(t.id, nextPinned);
+    } else {
+      await togglePinTournamentRealtime(t.id, nextPinned);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -549,7 +574,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
         startTime: matchTiming.trim(),
         roomId: editRoomId.trim(),
         roomPassword: editRoomPassword.trim(),
-        status: editStatus
+        status: editStatus,
+        isPinned: Boolean(isPinnedMatch),
+        pinned: Boolean(isPinnedMatch),
+        isHighlighted: Boolean(isPinnedMatch),
+        pinnedAt: isPinnedMatch ? (editingTournament.pinnedAt || Date.now()) : null
       };
 
       if (onUpdateTournament) {
@@ -582,7 +611,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
       status: 'upcoming',
       roomId: '',
       roomPassword: '',
-      leaderboard: []
+      leaderboard: [],
+      isPinned: Boolean(isPinnedMatch),
+      pinned: Boolean(isPinnedMatch),
+      isHighlighted: Boolean(isPinnedMatch),
+      pinnedAt: isPinnedMatch ? Date.now() : null
     };
 
     onAddTournament(newTournament);
@@ -1597,6 +1630,49 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
               </div>
             )}
 
+            {/* Pin / Highlight Match at Top Toggle */}
+            <div 
+              style={{ 
+                padding: '14px 16px', 
+                background: isPinnedMatch ? 'linear-gradient(135deg, rgba(255, 214, 0, 0.12) 0%, rgba(255, 87, 34, 0.08) 100%)' : 'rgba(255, 255, 255, 0.03)', 
+                borderRadius: '10px', 
+                border: isPinnedMatch ? '1.5px solid #ffd600' : '1px solid rgba(255, 255, 255, 0.1)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                gap: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.25s ease'
+              }}
+              onClick={() => setIsPinnedMatch(!isPinnedMatch)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.4rem' }}>📌</span>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <strong style={{ color: isPinnedMatch ? '#ffd600' : '#fff', fontSize: '0.88rem' }}>
+                      Pin / Highlight Match at Top of Arena
+                    </strong>
+                    {isPinnedMatch && (
+                      <span className="badge" style={{ background: '#ffd600', color: '#000', fontWeight: '900', fontSize: '0.62rem' }}>
+                        ACTIVE PIN
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.73rem', color: 'var(--text-muted)' }}>
+                    Pinned matches stay at the very top of the match list for all players with a golden glow and badge.
+                  </p>
+                </div>
+              </div>
+              <input 
+                type="checkbox"
+                checked={isPinnedMatch}
+                onChange={(e) => setIsPinnedMatch(e.target.checked)}
+                onClick={(e) => e.stopPropagation()}
+                style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#ffd600', flexShrink: 0 }}
+              />
+            </div>
+
             {errorMsg && (
               <div style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '8px' }}>
                 ⚠️ {errorMsg}
@@ -1699,14 +1775,25 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   if (manageDateFilter === 'today') return t.matchDate === todayStr;
                   if (manageDateFilter === 'tomorrow') return t.matchDate === tomorrowStr;
                   return true;
-                })).map(t => (
+                })).map(t => {
+                  const isPinned = Boolean(t.isPinned || t.pinned || t.isHighlighted);
+                  return (
                   <div 
                     key={t.id} 
                     className="glass-panel flex-between"
                     style={{
                       padding: '12px 14px',
-                      background: editingTournament?.id === t.id ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-                      border: editingTournament?.id === t.id ? '1px solid var(--secondary)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      background: editingTournament?.id === t.id 
+                        ? 'rgba(0, 229, 255, 0.08)' 
+                        : isPinned 
+                          ? 'linear-gradient(135deg, rgba(255, 214, 0, 0.06) 0%, rgba(255, 255, 255, 0.03) 100%)' 
+                          : 'rgba(255, 255, 255, 0.03)',
+                      border: editingTournament?.id === t.id 
+                        ? '1px solid var(--secondary)' 
+                        : isPinned 
+                          ? '1.5px solid #ffd600' 
+                          : '1px solid rgba(255, 255, 255, 0.08)',
+                      boxShadow: isPinned ? '0 0 12px rgba(255, 214, 0, 0.2)' : undefined,
                       borderRadius: '10px',
                       flexWrap: 'wrap',
                       gap: '10px'
@@ -1717,6 +1804,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                         <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#fff' }}>
                           {t.title}
                         </h4>
+                        {isPinned && (
+                          <span className="badge" style={{ background: '#ffd600', color: '#000', fontWeight: '900', fontSize: '0.65rem' }}>
+                            📌 PINNED
+                          </span>
+                        )}
                         <span className="badge" style={{ fontSize: '0.65rem' }}>
                           {t.mode} • {t.type}
                         </span>
@@ -1741,6 +1833,24 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                     </div>
 
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePinMatch(t)}
+                        className="btn"
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: '800',
+                          background: isPinned ? 'linear-gradient(135deg, #ffd600 0%, #ff9100 100%)' : 'rgba(255, 214, 0, 0.12)',
+                          color: isPinned ? '#000' : 'var(--accent)',
+                          border: isPinned ? '1px solid #ffd600' : '1px solid rgba(255, 214, 0, 0.35)',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                        title={isPinned ? 'Click to unpin match' : 'Click to pin match to top of Arena'}
+                      >
+                        {isPinned ? '📌 Pinned' : '📌 Pin'}
+                      </button>
                       <button
                         type="button"
                         onClick={() => setManagingPlayersTourney(t)}
@@ -1834,7 +1944,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                       </button>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             )}
           </div>
@@ -3099,14 +3210,21 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                 if (manageDateFilter === 'today') return t.matchDate === todayStr;
                 if (manageDateFilter === 'tomorrow') return t.matchDate === tomorrowStr;
                 return true;
-              })).map(t => (
+              })).map(t => {
+                const isPinned = Boolean(t.isPinned || t.pinned || t.isHighlighted);
+                return (
                 <div 
                   key={t.id} 
                   className="glass-panel flex-between"
                   style={{
                     padding: '14px 16px',
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    background: isPinned 
+                      ? 'linear-gradient(135deg, rgba(255, 214, 0, 0.06) 0%, rgba(255, 255, 255, 0.03) 100%)' 
+                      : 'rgba(255, 255, 255, 0.03)',
+                    border: isPinned 
+                      ? '1.5px solid #ffd600' 
+                      : '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: isPinned ? '0 0 12px rgba(255, 214, 0, 0.2)' : undefined,
                     borderRadius: '10px',
                     flexWrap: 'wrap',
                     gap: '12px'
@@ -3117,6 +3235,11 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                       <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#fff' }}>
                         {t.title}
                       </h4>
+                      {isPinned && (
+                        <span className="badge" style={{ background: '#ffd600', color: '#000', fontWeight: '900', fontSize: '0.65rem' }}>
+                          📌 PINNED
+                        </span>
+                      )}
                       <span className="badge" style={{ fontSize: '0.65rem' }}>
                         {t.mode} • {t.type}
                       </span>
@@ -3136,6 +3259,24 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                   </div>
 
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePinMatch(t)}
+                      className="btn"
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: '800',
+                        background: isPinned ? 'linear-gradient(135deg, #ffd600 0%, #ff9100 100%)' : 'rgba(255, 214, 0, 0.12)',
+                        color: isPinned ? '#000' : 'var(--accent)',
+                        border: isPinned ? '1px solid #ffd600' : '1px solid rgba(255, 214, 0, 0.35)',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                      title={isPinned ? 'Click to unpin match' : 'Click to pin match to top of Arena'}
+                    >
+                      {isPinned ? '📌 Pinned' : '📌 Pin'}
+                    </button>
                     <button
                       type="button"
                       onClick={() => setManagingPlayersTourney(t)}
@@ -3239,7 +3380,8 @@ export default function AdminHostPanel({ tournaments = [], onAddTournament, onUp
                     </button>
                   </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
           )}
         </div>
