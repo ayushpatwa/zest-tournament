@@ -33,6 +33,7 @@ import {
 import { 
   generateDaily1v1Matches, 
   deleteDailyMatchesByDate,
+  deleteAllTournaments,
   DAILY_1V1_TEMPLATES, 
   DAILY_TIME_SLOTS 
 } from '../services/scheduleService';
@@ -650,6 +651,21 @@ export default function AdminHostPanel({
       setScheduleStatusMsg(`🗑️ Successfully deleted ${res.count} matches for Tomorrow.`);
     } else {
       setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to delete'}`);
+    }
+    setTimeout(() => setScheduleStatusMsg(''), 7000);
+  };
+
+  const handleDeleteAllMatches = async () => {
+    if (!window.confirm("⚠️ DANGER: Are you sure you want to delete ALL matches (Today, Tomorrow, and all other dates)?")) return;
+    if (!window.confirm("Double confirmation: This will delete ALL matches in the entire app. Proceed?")) return;
+    setIsGeneratingSchedule(true);
+    setScheduleStatusMsg("⏳ Deleting all matches in real-time...");
+    const res = await deleteAllTournaments();
+    setIsGeneratingSchedule(false);
+    if (res.success) {
+      setScheduleStatusMsg(`🗑️ Successfully deleted all ${res.count} matches from the catalog.`);
+    } else {
+      setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to delete all matches'}`);
     }
     setTimeout(() => setScheduleStatusMsg(''), 7000);
   };
@@ -1782,6 +1798,29 @@ export default function AdminHostPanel({
                       >
                         🚀 Tomorrow ({tomorrowCount})
                       </button>
+                      {todayCount > 0 && (
+                        <button
+                          type="button"
+                          disabled={isGeneratingSchedule}
+                          onClick={handleDeleteTodaySchedule}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: '0.72rem',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(255, 43, 85, 0.4)',
+                            background: 'rgba(255, 43, 85, 0.15)',
+                            color: 'var(--danger)',
+                            fontWeight: '800',
+                            cursor: isGeneratingSchedule ? 'wait' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Delete all matches for Today"
+                        >
+                          <span>🗑️</span> Delete Today's ({todayCount})
+                        </button>
+                      )}
                       {tomorrowCount > 0 && (
                         <button
                           type="button"
@@ -3231,6 +3270,25 @@ export default function AdminHostPanel({
               >
                 🗑️ Delete Tomorrow's Matches
               </button>
+
+              <button
+                type="button"
+                disabled={isGeneratingSchedule}
+                onClick={handleDeleteAllMatches}
+                className="btn"
+                style={{
+                  padding: '9px 16px',
+                  fontSize: '0.82rem',
+                  fontWeight: '800',
+                  background: 'rgba(255, 23, 68, 0.18)',
+                  color: '#ff5252',
+                  border: '1px solid rgba(255, 23, 68, 0.5)',
+                  borderRadius: '8px',
+                  cursor: isGeneratingSchedule ? 'wait' : 'pointer'
+                }}
+              >
+                ⚠️ Delete All Matches (Entire Catalog)
+              </button>
             </div>
 
             {scheduleStatusMsg && (
@@ -3305,6 +3363,29 @@ export default function AdminHostPanel({
                   >
                     🚀 Tomorrow ({tomorrowCount})
                   </button>
+                  {todayCount > 0 && (
+                    <button
+                      type="button"
+                      disabled={isGeneratingSchedule}
+                      onClick={handleDeleteTodaySchedule}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '0.75rem',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 43, 85, 0.4)',
+                        background: 'rgba(255, 43, 85, 0.15)',
+                        color: 'var(--danger)',
+                        fontWeight: '800',
+                        cursor: isGeneratingSchedule ? 'wait' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Delete all matches for Today"
+                    >
+                      <span>🗑️</span> Delete Today's ({todayCount})
+                    </button>
+                  )}
                   {tomorrowCount > 0 && (
                     <button
                       type="button"
@@ -3326,6 +3407,29 @@ export default function AdminHostPanel({
                       title="Delete all matches for Tomorrow"
                     >
                       <span>🗑️</span> Delete Tomorrow's ({tomorrowCount})
+                    </button>
+                  )}
+                  {tournaments.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={isGeneratingSchedule}
+                      onClick={handleDeleteAllMatches}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '0.75rem',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 23, 68, 0.5)',
+                        background: 'rgba(255, 23, 68, 0.15)',
+                        color: '#ff5252',
+                        fontWeight: '800',
+                        cursor: isGeneratingSchedule ? 'wait' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Permanently delete all matches in the app"
+                    >
+                      <span>⚠️</span> Delete All ({tournaments.length})
                     </button>
                   )}
                 </>

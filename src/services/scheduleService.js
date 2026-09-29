@@ -2,6 +2,7 @@ import {
   collection, 
   doc, 
   setDoc, 
+  getDoc,
   getDocs, 
   query, 
   where, 
@@ -176,11 +177,13 @@ export const generateDaily1v1Matches = async (targetDateString, overwriteExistin
       console.log(`[AutoScheduler] All matches already exist for ${targetDate} (${skippedCount} existing). No new matches added.`);
     }
 
-    // Save schedule state metadata
+    // Save schedule state metadata and clear any admin deleted flag for this targetDate
     try {
       const stateRef = doc(db, "settings", "daily_1v1_schedule_state");
       await setDoc(stateRef, {
         [`lastGenerated_${targetDate}`]: serverTimestamp(),
+        [`adminDeleted_${targetDate}`]: false,
+        adminDeleted_all: false,
         lastRunDate: targetDate,
         lastRunCount: createdCount,
         updatedAt: serverTimestamp()
@@ -213,34 +216,55 @@ export const deleteDailyMatchesByDate = async (targetDateString, deleteAll = tru
 
     const isTargetTomorrow = targetDate === tomorrowStr || targetDate.toLowerCase() === 'tomorrow';
     const isTargetToday = targetDate === todayStr || targetDate.toLowerCase() === 'today';
+    const effectiveDateKey = isTargetTomorrow ? tomorrowStr : (isTargetToday ? todayStr : targetDate);
 
     const tourneysCol = collection(db, "tournaments");
     const snap = await getDocs(tourneysCol);
 
-    const batch = writeBatch(db);
-    let deletedCount = 0;
+    const docIdsToDelete = [];
 
     snap.forEach(d => {
       const data = d.data() || {};
       const docDate = String(data.matchDate || '').trim();
 
       const matchesDate = 
-        docDate === targetDate ||
+        docDate === effectiveDateKey ||
         (isTargetTomorrow && (docDate === tomorrowStr || docDate.toLowerCase() === 'tomorrow' || d.id.includes(tomorrowStr))) ||
         (isTargetToday && (docDate === todayStr || docDate.toLowerCase() === 'today' || d.id.includes(todayStr)));
 
       if (matchesDate) {
-        if (deleteAll || d.id.startsWith(`daily_${targetDate}`) || data.isDailyScheduled) {
-          batch.delete(doc(db, "tournaments", d.id));
-          deletedCount++;
+        if (deleteAll || d.id.startsWith(`daily_${effectiveDateKey}`) || data.isDailyScheduled) {
+          docIdsToDelete.push(d.id);
         }
       }
     });
 
-    if (deletedCount > 0) {
+    let deletedCount = 0;
+    // Commit in safe chunks of 400
+    for (let i = 0; i < docIdsToDelete.length; i += 400) {
+      const chunk = docIdsToDelete.slice(i, i + 400);
+      const batch = writeBatch(db);
+      chunk.forEach(id => {
+        batch.delete(doc(db, "tournaments", id));
+        deletedCount++;
+      });
       await batch.commit();
-      console.log(`[AutoScheduler] Successfully deleted ${deletedCount} matches for date: ${targetDate}`);
     }
+
+    console.log(`[AutoScheduler] Successfully deleted ${deletedCount} matches for date: ${effectiveDateKey}`);
+
+    // Mark adminDeleted in Firestore so auto-scheduler will NEVER regenerate matches against Admin intent
+    try {
+      const stateRef = doc(db, "settings", "daily_1v1_schedule_state");
+      await setDoc(stateRef, {
+        [`adminDeleted_${effectiveDateKey}`]: true,
+        lastDeletedDate: effectiveDateKey,
+        lastDeletedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (e) {
+      console.warn("[AutoScheduler] Failed to record admin delete state:", e);
+    }
+
     return { success: true, count: deletedCount };
   } catch (err) {
     console.error("[AutoScheduler] Error deleting daily matches:", err);
@@ -249,8 +273,54 @@ export const deleteDailyMatchesByDate = async (targetDateString, deleteAll = tru
 };
 
 /**
+ * Permanently deletes ALL tournaments and matches across all dates from Firestore.
+ * Sets adminDeleted_all flag to guarantee no automatic matches are recreated.
+ */
+export const deleteAllTournaments = async () => {
+  try {
+    const todayStr = getTodayDateString();
+    const tomorrowStr = getTomorrowDateString();
+    const tourneysCol = collection(db, "tournaments");
+    const snap = await getDocs(tourneysCol);
+
+    let deletedCount = 0;
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += 400) {
+      const chunk = docs.slice(i, i + 400);
+      const batch = writeBatch(db);
+      chunk.forEach(d => {
+        batch.delete(doc(db, "tournaments", d.id));
+        deletedCount++;
+      });
+      await batch.commit();
+    }
+
+    console.log(`[AutoScheduler] Successfully deleted ALL ${deletedCount} tournaments from database.`);
+
+    try {
+      const stateRef = doc(db, "settings", "daily_1v1_schedule_state");
+      await setDoc(stateRef, {
+        adminDeleted_all: true,
+        [`adminDeleted_${todayStr}`]: true,
+        [`adminDeleted_${tomorrowStr}`]: true,
+        lastDeletedDate: 'all',
+        lastDeletedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (e) {
+      console.warn("[AutoScheduler] Failed to record admin delete all state:", e);
+    }
+
+    return { success: true, count: deletedCount };
+  } catch (err) {
+    console.error("[AutoScheduler] Error deleting all tournaments:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
  * Checks and auto-generates matches ONLY for tomorrow at 10:30 PM (or if after 10:30 PM).
  * Matches are scheduled from tomorrow onwards (25 matches total, 30 min gap).
+ * If the Admin intentionally deleted tomorrow's matches or all matches, auto-generation is strictly skipped!
  */
 export const checkAndAutoGenerateDailyMatches = async () => {
   try {
@@ -261,22 +331,47 @@ export const checkAndAutoGenerateDailyMatches = async () => {
 
     // Check if current time is 10:30 PM (22:30) or later
     const isPast1030PM = (currentHour > 22) || (currentHour === 22 && currentMinute >= 30);
-    if (isPast1030PM) {
-      const tourneysCol = collection(db, "tournaments");
-      const tomorrowQuery = query(tourneysCol, where("matchDate", "==", tomorrow));
-      const tomorrowSnap = await getDocs(tomorrowQuery);
-      let tomorrowDailyCount = 0;
-      tomorrowSnap.forEach(d => {
-        const data = d.data();
-        if (data.isDailyScheduled || d.id.startsWith(`daily_${tomorrow}`)) {
-          tomorrowDailyCount++;
-        }
-      });
+    if (!isPast1030PM) {
+      return;
+    }
 
-      if (tomorrowDailyCount < 25) {
-        console.log(`[AutoScheduler] It is past 10:30 PM and tomorrow (${tomorrow}) has ${tomorrowDailyCount}/25 matches. Auto-generating 25 sequential matches for tomorrow...`);
-        await generateDaily1v1Matches(tomorrow, false);
+    // 1. Verify Firestore schedule state to ensure Admin did NOT intentionally delete matches
+    try {
+      const stateRef = doc(db, "settings", "daily_1v1_schedule_state");
+      const stateSnap = await getDoc(stateRef);
+      if (stateSnap.exists()) {
+        const stateData = stateSnap.data() || {};
+        
+        // If admin intentionally deleted matches for tomorrow or all, do NOT auto-generate!
+        if (stateData[`adminDeleted_${tomorrow}`] || stateData.adminDeleted_all) {
+          console.log(`[AutoScheduler] Admin marked tomorrow (${tomorrow}) matches as deleted. Auto-generation skipped.`);
+          return;
+        }
+
+        // If matches were already generated for tomorrow, do NOT re-generate!
+        if (stateData[`lastGenerated_${tomorrow}`]) {
+          console.log(`[AutoScheduler] Tomorrow (${tomorrow}) matches were already generated today. Auto-generation skipped.`);
+          return;
+        }
       }
+    } catch (e) {
+      console.warn("[AutoScheduler] Could not verify schedule state doc:", e);
+    }
+
+    const tourneysCol = collection(db, "tournaments");
+    const tomorrowQuery = query(tourneysCol, where("matchDate", "==", tomorrow));
+    const tomorrowSnap = await getDocs(tomorrowQuery);
+    let tomorrowDailyCount = 0;
+    tomorrowSnap.forEach(d => {
+      const data = d.data();
+      if (data.isDailyScheduled || d.id.startsWith(`daily_${tomorrow}`)) {
+        tomorrowDailyCount++;
+      }
+    });
+
+    if (tomorrowDailyCount < 25) {
+      console.log(`[AutoScheduler] It is past 10:30 PM and tomorrow (${tomorrow}) has ${tomorrowDailyCount}/25 matches. Auto-generating 25 sequential matches for tomorrow...`);
+      await generateDaily1v1Matches(tomorrow, false);
     }
   } catch (err) {
     console.warn("[AutoScheduler] checkAndAutoGenerateDailyMatches warning:", err);
@@ -304,9 +399,8 @@ export const setupDaily1030PmScheduleTimer = () => {
     console.log(`[AutoScheduler] 10:30 PM auto-scheduler timer set for ${target.toLocaleString()} (in ${Math.round(msUntil1030PM / 1000 / 60)} minutes)`);
 
     timeoutId = setTimeout(async () => {
-      console.log(`[AutoScheduler] 10:30 PM reached! Automatically creating tomorrow's 1v1 matches...`);
-      const tomorrow = getTomorrowDateString();
-      await generateDaily1v1Matches(tomorrow, false);
+      console.log(`[AutoScheduler] 10:30 PM reached! Checking and creating tomorrow's 1v1 matches...`);
+      await checkAndAutoGenerateDailyMatches();
 
       // Re-schedule for the next day's 10:30 PM
       scheduleNextRun();
@@ -315,22 +409,8 @@ export const setupDaily1030PmScheduleTimer = () => {
 
   scheduleNextRun();
 
-  // Also hook into visibilitychange to self-heal when app returns to foreground
-  const handleVisibilityChange = () => {
-    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-      checkAndAutoGenerateDailyMatches();
-    }
-  };
-
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-  }
-
   return () => {
     if (timeoutId) clearTimeout(timeoutId);
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }
   };
 };
 
