@@ -72,7 +72,7 @@ export const DAILY_1V1_TEMPLATES = [
 
 /**
  * Classic Battle Royale Match Template:
- * Title: "Classic battle royal"
+ * Title: "solo per kil BR"
  * Mode: Solo
  * Type: Classic Battle Royale
  * Map: Bermuda
@@ -83,7 +83,7 @@ export const DAILY_1V1_TEMPLATES = [
  */
 export const CLASSIC_BATTLE_ROYALE_TEMPLATE = {
   key: 'classic_br_solo',
-  title: 'Classic battle royal',
+  title: 'solo per kil BR',
   mode: 'Solo',
   type: 'Classic Battle Royale',
   map: 'Bermuda',
