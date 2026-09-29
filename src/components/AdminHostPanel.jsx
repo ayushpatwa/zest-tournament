@@ -153,9 +153,9 @@ export default function AdminHostPanel({
   const [testPushStatus, setTestPushStatus] = useState('');
 
   // App Update Publisher states
-  const [updateVersion, setUpdateVersion] = useState('1.5.0');
-  const [updateTitle, setUpdateTitle] = useState('⚡ Pinned Matches & Arena Highlights (v1.5.0)!');
-  const [updateNotes, setUpdateNotes] = useState('• Pin & Highlight Matches at Top of Arena\n• 1-Click Match Pinning for Hosts\n• Global App-Open Announcement Board\n• Real-Time Match List Sorting & Performance');
+  const [updateVersion, setUpdateVersion] = useState('1.5.1');
+  const [updateTitle, setUpdateTitle] = useState('⚡ Solo Per Kill Battle Royale & Schedule Controls (v1.5.1)!');
+  const [updateNotes, setUpdateNotes] = useState('• 25-Slot Classic Battle Royale Solo Matches (₹5 Entry / ₹3 Per Kill / 10 Slots)\n• Real-Time Match Title: "solo per kill BR"\n• Strict Winning Balance Withdrawal Rules\n• Opponent Free Fire UID Privacy Shield\n• On-Demand Match Generation Controls & Bug Fixes');
   const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatePublishStatus, setUpdatePublishStatus] = useState('');
