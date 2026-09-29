@@ -176,6 +176,8 @@ export default function LoginPage({ onLoginSuccess }) {
       password: password,
       role: 'player',
       wallet: bonusAmount,
+      depositBalance: bonusAmount,
+      winningBalance: 0,
       isVerified: true,
       verifiedMethod: verifyChannel,
       verifiedAt: new Date().toISOString(),
@@ -188,7 +190,7 @@ export default function LoginPage({ onLoginSuccess }) {
         matches: 0,
         wins: 0,
         kills: 0,
-        earnings: bonusAmount
+        earnings: 0
       },
       transactions: initialTransactions,
       createdAt: new Date().toISOString()

@@ -10,6 +10,7 @@ import {
   togglePinTournamentRealtime,
   creditUserWalletRealtime, 
   deductUserWalletRealtime, 
+  getUserBalances,
   subscribeToAllUsersRealtime,
   resetUserPasswordRealtime,
   deleteUserRealtime,
@@ -106,6 +107,7 @@ export default function AdminHostPanel({
 
   // Prize & Wallet Manager states
   const [walletAction, setWalletAction] = useState('credit'); // 'credit' | 'deduct'
+  const [creditCategory, setCreditCategory] = useState('winning'); // 'winning' | 'deposit'
   const [payoutPlayerIdentifier, setPayoutPlayerIdentifier] = useState('');
   const [payoutAmount, setPayoutAmount] = useState('500');
   const [payoutReason, setPayoutReason] = useState('1st Place Tournament Winner 🏆');
@@ -963,16 +965,22 @@ export default function AdminHostPanel({
     setPayoutLoading(true);
 
     if (walletAction === 'credit') {
-      const res = await creditUserWalletRealtime(payoutPlayerIdentifier.trim(), amt, payoutReason.trim());
+      const res = await creditUserWalletRealtime(
+        payoutPlayerIdentifier.trim(), 
+        amt, 
+        payoutReason.trim(), 
+        '', 
+        creditCategory
+      );
       if (res.success) {
-        setPayoutStatus(`✅ Successfully credited ₹${amt} coins to player (${payoutPlayerIdentifier})!`);
+        setPayoutStatus(`✅ Successfully credited ₹${amt} ${creditCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to player (${payoutPlayerIdentifier})!`);
         await sendToMakeWebhook({
           eventType: 'PRIZE_PAYOUT',
           nickname: res.user?.nickname || payoutPlayerIdentifier,
           ffUid: res.user?.uid || payoutPlayerIdentifier,
           email: res.user?.email || 'N/A',
           phone: res.user?.phone || 'N/A',
-          details: `Admin Credited Coins: +₹${amt} (${payoutReason})`
+          details: `Admin Credited Coins: +₹${amt} (${creditCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'}) (${payoutReason})`
         });
         setPayoutPlayerIdentifier('');
       } else {
@@ -980,7 +988,7 @@ export default function AdminHostPanel({
       }
     } else {
       // Deduct mode
-      const res = await deductUserWalletRealtime(payoutPlayerIdentifier.trim(), amt, payoutReason.trim());
+      const res = await deductUserWalletRealtime(payoutPlayerIdentifier.trim(), amt, payoutReason.trim(), 'penalty');
       if (res.success) {
         setPayoutStatus(`✅ Successfully deducted ₹${amt} coins from player (${payoutPlayerIdentifier})! New Balance: ₹${res.newBalance}`);
         await sendToMakeWebhook({
@@ -1036,7 +1044,8 @@ export default function AdminHostPanel({
         targetIdentifier, 
         amt, 
         '🏆 Tournament Prize Winnings', 
-        txReason
+        txReason,
+        'winning'
       );
 
       if (res.success) {
@@ -2129,6 +2138,51 @@ export default function AdminHostPanel({
             </button>
           </div>
 
+          {/* Category Selector for Credit: Winnings vs Deposit */}
+          {walletAction === 'credit' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Credit Destination Wallet Category: <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setCreditCategory('winning')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: creditCategory === 'winning' ? '1px solid #ffd600' : '1px solid var(--border-color)',
+                    background: creditCategory === 'winning' ? 'rgba(255, 214, 0, 0.15)' : 'rgba(255,255,255,0.03)',
+                    color: creditCategory === 'winning' ? '#ffd600' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.78rem',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🏆 Winnings Cash (Withdrawable)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreditCategory('deposit')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: creditCategory === 'deposit' ? '1px solid #00e5ff' : '1px solid var(--border-color)',
+                    background: creditCategory === 'deposit' ? 'rgba(0, 229, 255, 0.15)' : 'rgba(255,255,255,0.03)',
+                    color: creditCategory === 'deposit' ? '#00e5ff' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.78rem',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  💳 Deposit Cash (For Matches Only)
+                </button>
+              </div>
+            </div>
+          )}
+
           {payoutStatus && (
             <div style={{ 
               color: payoutStatus.includes('✅') ? 'var(--success)' : 'var(--danger)', 
@@ -2355,7 +2409,9 @@ export default function AdminHostPanel({
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
-                      {filteredDisplayUsers.map(u => (
+                      {filteredDisplayUsers.map(u => {
+                        const uBal = getUserBalances(u);
+                        return (
                   <div 
                     key={u.id || u.uid}
                     className="flex-between"
@@ -2386,8 +2442,11 @@ export default function AdminHostPanel({
                         )}
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>({u.email || u.phone || 'No Contact'})</span>
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--secondary)', fontFamily: 'monospace', marginTop: '2px' }}>
-                        UID: <strong style={{ color: '#fff' }}>{u.uid || u.id}</strong> | Live Balance: <strong style={{ color: 'var(--success)' }}>₹{u.wallet || 0}</strong>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--secondary)', fontFamily: 'monospace', marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <span>UID: <strong style={{ color: '#fff' }}>{u.uid || u.id}</strong></span>
+                        <span>Total: <strong style={{ color: 'var(--success)' }}>₹{uBal.totalBalance}</strong></span>
+                        <span style={{ color: '#00e5ff' }}>(💳 Dep: <strong>₹{uBal.depositBalance}</strong></span>
+                        <span style={{ color: '#ffd600' }}>🏆 Win: <strong>₹{uBal.winningBalance}</strong>)</span>
                       </div>
                     </div>
 
@@ -2523,7 +2582,8 @@ export default function AdminHostPanel({
                       </button>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             )}
           </div>

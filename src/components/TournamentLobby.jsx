@@ -100,7 +100,8 @@ export default function TournamentLobby({
         targetIdentifier, 
         amt, 
         '🏆 Tournament Prize Winnings', 
-        finalReason
+        finalReason,
+        'winning'
       );
 
       if (res.success) {

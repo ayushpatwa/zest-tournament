@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { sendToMakeWebhook } from '../services/webhookService';
+import { deductUserWalletRealtime, getUserBalances } from '../services/firebase';
 import paymentQrImg from '../assets/payment_qr.jpg';
 
 export default function WalletPage({ 
@@ -39,10 +40,10 @@ export default function WalletPage({
   const [withdrawErrorMsg, setWithdrawErrorMsg] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
-  // Guarantee clean numeric balance representation
-  const numericBalance = typeof walletBalance === 'number' 
-    ? walletBalance 
-    : (parseFloat(walletBalance) || 0);
+  // Guarantee clean numeric balance representation & separate wallet pools
+  const { totalBalance, depositBalance, winningBalance } = getUserBalances(
+    userProfile ? { ...userProfile, wallet: walletBalance } : { wallet: walletBalance }
+  );
 
   // Manual Deposit Request Handler
   const handleProceedDeposit = async (e) => {
@@ -92,7 +93,7 @@ export default function WalletPage({
     }, 3500);
   };
 
-  // 2. Handle Withdrawal Request
+  // 2. Handle Withdrawal Request (Strictly from winning amount)
   const handleProceedWithdrawal = async (e) => {
     e.preventDefault();
     setWithdrawErrorMsg('');
@@ -104,8 +105,9 @@ export default function WalletPage({
       return;
     }
 
-    if (amt > numericBalance) {
-      setWithdrawErrorMsg(`Insufficient balance! Your current wallet balance is ₹${numericBalance}.`);
+    // Strict rule: Only winning amount can be withdrawn
+    if (amt > winningBalance) {
+      setWithdrawErrorMsg(`Insufficient winning balance! You can only withdraw from your Winning Amount (₹${winningBalance}). Deposit cash (₹${depositBalance}) cannot be withdrawn.`);
       return;
     }
 
@@ -116,7 +118,22 @@ export default function WalletPage({
 
     setIsWithdrawing(true);
 
-    // Deduct balance from wallet cleanly
+    const targetUserId = userProfile?.uid || userProfile?.id || userProfile?.email;
+    if (targetUserId) {
+      const deductRes = await deductUserWalletRealtime(
+        targetUserId, 
+        amt, 
+        `Withdrawal to UPI: ${withdrawUpiId.trim()}`, 
+        'withdrawal'
+      );
+      if (!deductRes?.success) {
+        setWithdrawErrorMsg(deductRes?.error || 'Failed to process withdrawal.');
+        setIsWithdrawing(false);
+        return;
+      }
+    }
+
+    // Deduct balance from wallet state cleanly
     if (typeof setWalletBalance === 'function') {
       setWalletBalance(prev => Math.max(0, (typeof prev === 'number' ? prev : parseFloat(prev) || 0) - amt));
     }
@@ -126,6 +143,7 @@ export default function WalletPage({
       type: 'withdraw',
       amount: amt,
       title: `Withdrawal to UPI (${withdrawUpiId.trim()})`,
+      reason: `Winnings Payout Request: ₹${amt}`,
       date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       status: 'Processing'
     };
@@ -186,14 +204,61 @@ export default function WalletPage({
         </div>
 
         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-          Zest Account Balance
+          Zest Account Total Balance
         </span>
         <h1 style={{ fontSize: '2.5rem', fontFamily: 'var(--font-heading)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ color: 'var(--accent)' }}>🪙</span>
-          <span>₹{numericBalance}</span>
+          <span>₹{totalBalance}</span>
         </h1>
 
-        <div style={{ display: 'flex', width: '100%', gap: '12px', marginTop: '8px' }}>
+        {/* Separated Balance Breakdown Cards: Deposit vs Winnings */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '10px',
+          width: '100%',
+          marginTop: '4px'
+        }}>
+          {/* Deposit Balance Card */}
+          <div style={{
+            background: 'rgba(0, 229, 255, 0.06)',
+            border: '1px solid rgba(0, 229, 255, 0.25)',
+            borderRadius: '12px',
+            padding: '12px 10px',
+            textAlign: 'center'
+          }}>
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', fontWeight: '700' }}>
+              💳 Deposit Cash
+            </span>
+            <span style={{ fontSize: '1.25rem', fontWeight: '900', color: '#00e5ff', fontFamily: 'var(--font-heading)', display: 'block', marginTop: '2px' }}>
+              ₹{depositBalance}
+            </span>
+            <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', marginTop: '2px', display: 'block' }}>
+              For Match Entry
+            </span>
+          </div>
+
+          {/* Winning Balance Card */}
+          <div style={{
+            background: 'rgba(0, 230, 118, 0.08)',
+            border: '1px solid rgba(0, 230, 118, 0.35)',
+            borderRadius: '12px',
+            padding: '12px 10px',
+            textAlign: 'center'
+          }}>
+            <span style={{ fontSize: '0.68rem', color: '#00e676', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', fontWeight: '800' }}>
+              🏆 Winnings Cash
+            </span>
+            <span style={{ fontSize: '1.25rem', fontWeight: '900', color: '#ffd600', fontFamily: 'var(--font-heading)', display: 'block', marginTop: '2px' }}>
+              ₹{winningBalance}
+            </span>
+            <span style={{ fontSize: '0.65rem', color: 'var(--success)', marginTop: '2px', display: 'block', fontWeight: '700' }}>
+              ✓ Withdrawable
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', width: '100%', gap: '12px', marginTop: '6px' }}>
           <button 
             onClick={() => { setShowAddModal(true); setDepositErrorMsg(''); setDepositSuccessMsg(''); }}
             className="btn btn-secondary" 
@@ -698,19 +763,26 @@ export default function WalletPage({
             ) : (
               <form onSubmit={handleProceedWithdrawal} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 
-                {/* Available balance badge */}
+                {/* Available Withdrawable Balance Badge */}
                 <div style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
+                  background: 'rgba(0, 230, 118, 0.08)',
+                  padding: '12px 14px',
+                  borderRadius: '10px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  border: '1px solid var(--border-color)'
+                  border: '1px solid rgba(0, 230, 118, 0.3)'
                 }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Available Balance:</span>
-                  <span style={{ fontSize: '1rem', fontWeight: '900', color: 'var(--accent)', fontFamily: 'var(--font-heading)' }}>
-                    ₹{numericBalance}
+                  <div>
+                    <span style={{ fontSize: '0.74rem', color: '#00e676', fontWeight: '800', textTransform: 'uppercase', display: 'block', letterSpacing: '0.5px' }}>
+                      🏆 Withdrawable Winnings
+                    </span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                      Deposit Cash (₹{depositBalance}) cannot be withdrawn
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '1.25rem', fontWeight: '900', color: '#ffd600', fontFamily: 'var(--font-heading)' }}>
+                    ₹{winningBalance}
                   </span>
                 </div>
 
@@ -746,8 +818,14 @@ export default function WalletPage({
                     className="form-input"
                     required
                     min="50"
-                    max={numericBalance}
+                    max={winningBalance}
                   />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Min Limit: ₹50</span>
+                    <span style={{ color: winningBalance >= 50 ? '#00e676' : '#ff5252', fontWeight: '700' }}>
+                      Max Withdrawable: ₹{winningBalance}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Quick selection chips */}
@@ -786,6 +864,20 @@ export default function WalletPage({
                   />
                 </div>
 
+                {winningBalance < 50 && (
+                  <div style={{ 
+                    background: 'rgba(255, 23, 68, 0.1)', 
+                    border: '1px solid rgba(255, 23, 68, 0.3)', 
+                    padding: '8px 12px', 
+                    borderRadius: '8px', 
+                    color: '#ff80ab', 
+                    fontSize: '0.78rem', 
+                    fontWeight: '600' 
+                  }}>
+                    ℹ️ You have ₹{winningBalance} in Winnings Cash. Min ₹50 winning balance is required to withdraw. Play tournaments to win withdrawable cash!
+                  </div>
+                )}
+
                 {withdrawErrorMsg && (
                   <div style={{ color: 'var(--danger)', fontSize: '0.8rem' }}>
                     ⚠️ {withdrawErrorMsg}
@@ -794,17 +886,19 @@ export default function WalletPage({
 
                 <button 
                   type="submit" 
-                  disabled={isWithdrawing || numericBalance < 50}
+                  disabled={isWithdrawing || winningBalance < 50}
                   className="btn btn-primary"
                   style={{
                     width: '100%',
                     padding: '12px',
                     fontSize: '0.92rem',
                     fontWeight: '900',
-                    marginTop: '4px'
+                    marginTop: '4px',
+                    opacity: winningBalance < 50 ? 0.6 : 1,
+                    cursor: winningBalance < 50 ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {isWithdrawing ? 'Submitting Request...' : `Withdraw ₹${withdrawAmount} ➔`}
+                  {isWithdrawing ? 'Submitting Request...' : (winningBalance < 50 ? 'Min. ₹50 Winnings Required' : `Withdraw ₹${withdrawAmount} ➔`)}
                 </button>
               </form>
             )}

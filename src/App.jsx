@@ -345,7 +345,9 @@ export default function App() {
         ...liveUserData,
         role: isMasterAdmin ? 'admin' : (liveUserData.role === 'admin' ? 'player' : (liveUserData.role || 'player')),
         isHost: isMasterAdmin,
-        wallet: typeof liveUserData.wallet === 'number' ? liveUserData.wallet : prev.wallet
+        wallet: typeof liveUserData.wallet === 'number' ? liveUserData.wallet : prev.wallet,
+        depositBalance: liveUserData.depositBalance !== undefined ? liveUserData.depositBalance : prev.depositBalance,
+        winningBalance: liveUserData.winningBalance !== undefined ? liveUserData.winningBalance : prev.winningBalance
       }));
 
       // Real-time instant role synchronization across all tabs & connected devices
@@ -427,7 +429,7 @@ export default function App() {
     setWalletBalance(prev => Math.max(0, prev - numFee));
     const targetUserId = userProfile.uid || userProfile.id || uid;
     if (targetUserId && numFee > 0) {
-      await deductUserWalletRealtime(targetUserId, numFee, `Entry Fee: Match ${tournamentId}`);
+      await deductUserWalletRealtime(targetUserId, numFee, `Entry Fee: Match ${tournamentId}`, 'match_entry');
     }
     
     // 2. Add to transaction log

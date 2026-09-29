@@ -18,6 +18,7 @@ import {
   serverTimestamp
 } from "firebase/firestore";
 import { compareTournamentsByTime } from "./dateUtils.js";
+import { getUserBalances, calculateMatchEntrySplit } from "./walletUtils.js";
 
 // User's Firebase Configuration
 const firebaseConfig = {
@@ -701,10 +702,13 @@ export const subscribeToAllUsersRealtime = (onUpdate) => {
   }
 };
 
+export { getUserBalances, calculateMatchEntrySplit } from "./walletUtils.js";
+
 /**
- * Credits money into a user's wallet in Firestore and updates cloud balance in real-time
+ * Credits money into a user's wallet in Firestore and updates cloud balance in real-time.
+ * Supports walletCategory: 'winning' (eligible for withdrawal) or 'deposit' (non-withdrawable, for match entry).
  */
-export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tournament Prize Winnings', reason = '') => {
+export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tournament Prize Winnings', reason = '', walletCategory = 'winning') => {
   try {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -747,55 +751,88 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
     }
 
     const dateStr = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    const finalReason = reason || title || 'Tournament Prize / Winning';
+    const finalReason = reason || title || (walletCategory === 'deposit' ? 'Deposit Credit' : 'Tournament Prize / Winning');
+    const isDepositCategory = walletCategory === 'deposit';
     const txRecord = {
       id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      type: 'credit',
+      type: isDepositCategory ? 'deposit' : 'winning',
       amount: numAmount,
-      title: title || 'Admin Coin Credit',
+      title: title || (isDepositCategory ? 'Deposit Balance Added' : 'Admin Prize Credit'),
       reason: finalReason,
       date: dateStr,
       status: 'Success',
       createdAt: new Date().toISOString()
     };
 
-    // 3. If doc exists in Firestore, atomically increment wallet & earnings and push transaction
+    // 3. If doc exists in Firestore, atomically update wallet, depositBalance & winningBalance
     if (targetDocId) {
+      const currentBalances = getUserBalances(targetUserData);
+      const newDeposit = isDepositCategory 
+        ? Number((currentBalances.depositBalance + numAmount).toFixed(2)) 
+        : currentBalances.depositBalance;
+      const newWinning = !isDepositCategory 
+        ? Number((currentBalances.winningBalance + numAmount).toFixed(2)) 
+        : currentBalances.winningBalance;
+      const newTotal = Number((newDeposit + newWinning).toFixed(2));
+
       const targetRef = doc(db, "users", targetDocId);
-      await setDoc(targetRef, {
-        wallet: increment(numAmount),
-        "stats.earnings": increment(numAmount),
+      const updateData = {
+        wallet: newTotal,
+        depositBalance: newDeposit,
+        winningBalance: newWinning,
         transactions: arrayUnion(txRecord),
         lastPrize: {
           amount: numAmount,
           title: title,
           reason: finalReason,
+          category: walletCategory,
           creditedAt: new Date().toISOString()
         },
         updatedAt: serverTimestamp()
-      }, { merge: true });
+      };
 
-      console.log(`[Firebase Realtime] Successfully credited ₹${numAmount} to user ${targetDocId} with reason: ${finalReason}`);
-      return { success: true, user: { ...targetUserData, wallet: (targetUserData.wallet || 0) + numAmount } };
+      if (!isDepositCategory) {
+        updateData["stats.earnings"] = increment(numAmount);
+      }
+
+      await setDoc(targetRef, updateData, { merge: true });
+
+      console.log(`[Firebase Realtime] Successfully credited ₹${numAmount} (${walletCategory}) to user ${targetDocId}. New Balances: Total=₹${newTotal}, Dep=₹${newDeposit}, Win=₹${newWinning}`);
+      return { 
+        success: true, 
+        user: { 
+          ...targetUserData, 
+          wallet: newTotal, 
+          depositBalance: newDeposit, 
+          winningBalance: newWinning 
+        },
+        newBalance: newTotal,
+        balances: { totalBalance: newTotal, depositBalance: newDeposit, winningBalance: newWinning }
+      };
     }
 
-    // 3. If doc does not exist yet by query, create new user doc directly with the identifier as UID
+    // 4. If doc does not exist yet by query, create new user doc directly with the identifier as UID
     const newDocRef = doc(db, "users", rawQuery);
+    const initialDeposit = isDepositCategory ? numAmount : 0;
+    const initialWinning = !isDepositCategory ? numAmount : 0;
     await setDoc(newDocRef, {
       uid: rawQuery,
       nickname: rawQuery,
       wallet: numAmount,
+      depositBalance: initialDeposit,
+      winningBalance: initialWinning,
       transactions: [txRecord],
       stats: {
         matches: 1,
-        wins: 1,
+        wins: isDepositCategory ? 0 : 1,
         kills: 0,
-        earnings: numAmount
+        earnings: isDepositCategory ? 0 : numAmount
       },
       lastPrize: {
         amount: numAmount,
         title: title,
         reason: finalReason,
+        category: walletCategory,
         creditedAt: new Date().toISOString()
       },
       updatedAt: serverTimestamp()
@@ -803,7 +840,15 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
 
     return { 
       success: true, 
-      user: { uid: rawQuery, nickname: rawQuery, wallet: numAmount } 
+      user: { 
+        uid: rawQuery, 
+        nickname: rawQuery, 
+        wallet: numAmount, 
+        depositBalance: initialDeposit, 
+        winningBalance: initialWinning 
+      },
+      newBalance: numAmount,
+      balances: { totalBalance: numAmount, depositBalance: initialDeposit, winningBalance: initialWinning }
     };
   } catch (error) {
     console.error("[Firebase] Error crediting user wallet:", error);
@@ -812,9 +857,13 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
 };
 
 /**
- * Deducts / penalizes coins from a user's wallet in Firestore in real-time
+ * Deducts / penalizes coins from a user's wallet in Firestore in real-time.
+ * deductMode options:
+ * - 'withdrawal': Strictly checks winningBalance; only winning amount can be withdrawn.
+ * - 'match_entry': Deducts from depositBalance first, remainder from winningBalance.
+ * - 'penalty': Standard penalty or admin adjustment.
  */
-export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Penalty / Adjustment') => {
+export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Penalty / Adjustment', deductMode = 'match_entry') => {
   try {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -822,56 +871,127 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
     }
 
     const queryStr = String(uidOrEmail).trim().toLowerCase();
-    const usersCollection = collection(db, "users");
-    const snapshot = await getDocs(usersCollection);
+    const rawQuery = String(uidOrEmail).trim();
     
     let targetDocId = null;
     let targetUserData = null;
 
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
-      const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
-      const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
-      const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
-
-      if (docIdMatch || uidMatch || emailMatch || nickMatch) {
-        targetDocId = docSnap.id;
-        targetUserData = data;
+    // Fast universal lookup
+    try {
+      const fastMatched = await findUserInFirestoreAcrossDevices(rawQuery);
+      if (fastMatched && !fastMatched.isNetworkError) {
+        targetDocId = fastMatched.docId || fastMatched.id || rawQuery;
+        targetUserData = fastMatched;
       }
-    });
+    } catch (e) {
+      console.warn("[Deduct] Fast lookup notice:", e);
+    }
+
+    if (!targetDocId) {
+      const usersCollection = collection(db, "users");
+      const snapshot = await getDocs(usersCollection);
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
+        const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
+        const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
+        const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
+
+        if (docIdMatch || uidMatch || emailMatch || nickMatch) {
+          targetDocId = docSnap.id;
+          targetUserData = data;
+        }
+      });
+    }
 
     if (targetDocId) {
-      const currentWallet = typeof targetUserData.wallet === 'number' ? targetUserData.wallet : (parseFloat(targetUserData.wallet) || 0);
-      const newBalance = Math.max(0, currentWallet - numAmount);
-      const targetRef = doc(db, "users", targetDocId);
+      const balances = getUserBalances(targetUserData);
+      let newDeposit = balances.depositBalance;
+      let newWinning = balances.winningBalance;
+      let newTotal = balances.totalBalance;
+      let txType = 'penalty';
+      let txTitle = `Deduction: ${reason}`;
+      let txDetailReason = reason || 'Penalty / Balance Adjustment';
 
+      if (deductMode === 'withdrawal') {
+        // Enforce: Only winning amount can be used for withdrawal
+        if (numAmount > balances.winningBalance) {
+          return {
+            success: false,
+            error: `Only winning amount (₹${balances.winningBalance}) can be withdrawn. Deposit cash (₹${balances.depositBalance}) is reserved for tournament entries.`
+          };
+        }
+        newWinning = Math.max(0, Number((balances.winningBalance - numAmount).toFixed(2)));
+        newDeposit = balances.depositBalance;
+        newTotal = Number((newDeposit + newWinning).toFixed(2));
+        txType = 'withdrawal';
+        txTitle = `Withdrawal: ${reason}`;
+        txDetailReason = reason;
+      } else if (deductMode === 'match_entry') {
+        // Deduct from deposit balance first, remainder from winning balance
+        const split = calculateMatchEntrySplit(balances.depositBalance, balances.winningBalance, numAmount);
+        if (!split.canAfford) {
+          return {
+            success: false,
+            error: `Insufficient total balance (₹${balances.totalBalance}) for entry fee ₹${numAmount}.`
+          };
+        }
+        newDeposit = split.newDeposit;
+        newWinning = split.newWinning;
+        newTotal = split.newTotal;
+        txType = 'entry_fee';
+        txTitle = `Match Entry Fee: ${reason}`;
+        txDetailReason = `Paid from: ₹${split.deductFromDeposit} Deposit + ₹${split.deductFromWinning} Winnings`;
+      } else {
+        // General penalty or adjustment: deduct from deposit first, remainder from winning
+        const split = calculateMatchEntrySplit(balances.depositBalance, balances.winningBalance, numAmount);
+        newDeposit = split.newDeposit;
+        newWinning = split.newWinning;
+        newTotal = split.newTotal;
+        txType = 'penalty';
+        txTitle = `Deduction: ${reason}`;
+        txDetailReason = reason;
+      }
+
+      const targetRef = doc(db, "users", targetDocId);
       const dateStr = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-      const finalReason = reason || 'Penalty / Balance Adjustment';
       const txRecord = {
         id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-        type: 'penalty',
+        type: txType,
         amount: numAmount,
-        title: `Deduction: ${finalReason}`,
-        reason: finalReason,
+        title: txTitle,
+        reason: txDetailReason,
         date: dateStr,
-        status: 'Deducted',
+        status: deductMode === 'withdrawal' ? 'Processing' : 'Deducted',
         createdAt: new Date().toISOString()
       };
       
       await setDoc(targetRef, {
-        wallet: newBalance,
+        wallet: newTotal,
+        depositBalance: newDeposit,
+        winningBalance: newWinning,
         transactions: arrayUnion(txRecord),
         lastDeduction: {
           amount: numAmount,
-          reason: finalReason,
+          reason: reason,
+          deductMode: deductMode,
           deductedAt: new Date().toISOString()
         },
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      console.log(`[Firebase Realtime] Successfully deducted ₹${numAmount} from user ${targetDocId} with reason: ${finalReason}. New Balance: ₹${newBalance}`);
-      return { success: true, user: { ...targetUserData, wallet: newBalance }, newBalance };
+      console.log(`[Firebase Realtime] Successfully deducted ₹${numAmount} (${deductMode}) from user ${targetDocId}. New Balances: Total=₹${newTotal}, Dep=₹${newDeposit}, Win=₹${newWinning}`);
+      return { 
+        success: true, 
+        user: { 
+          ...targetUserData, 
+          wallet: newTotal, 
+          depositBalance: newDeposit, 
+          winningBalance: newWinning 
+        }, 
+        newBalance: newTotal,
+        balances: { totalBalance: newTotal, depositBalance: newDeposit, winningBalance: newWinning }
+      };
     }
 
     return { success: false, error: 'Player account not found in Firebase database.' };
@@ -1826,6 +1946,7 @@ export const creditReferralRewardRealtime = async (referrerUidOrId, rewardAmount
       };
       if (amt > 0) {
         updatePayload.wallet = increment(amt);
+        updatePayload.depositBalance = increment(amt);
         updatePayload.referralEarnings = increment(amt);
         if (newTx) updatePayload.transactions = arrayUnion(newTx);
       }
