@@ -159,6 +159,8 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
       matchesFilter = t.type?.toLowerCase().includes('headshot') || t.title?.toLowerCase().includes('headshot');
     } else if (selectedFilter === 'Clash Squad' || selectedFilter === 'Clash Squad ⚔️') {
       matchesFilter = t.type?.toLowerCase().includes('clash') || t.title?.toLowerCase().includes('clash');
+    } else if (selectedFilter === 'Classic BR 👑' || selectedFilter === 'Classic BR' || selectedFilter === 'Battle Royale') {
+      matchesFilter = t.type?.toLowerCase().includes('battle royal') || t.title?.toLowerCase().includes('battle royal') || Boolean(t.isBattleRoyale);
     } else {
       matchesFilter = t.mode?.toLowerCase() === filter || t.type?.toLowerCase().includes(filter);
     }
@@ -394,6 +396,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
               {[
                 'All', 
+                'Classic BR 👑',
                 'CS 1v1 ⚔️',
                 '1v1 Headshot 🎯',
                 'CS 2v2 ⚔️',

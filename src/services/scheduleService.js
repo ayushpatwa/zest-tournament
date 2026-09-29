@@ -71,6 +71,30 @@ export const DAILY_1V1_TEMPLATES = [
 ];
 
 /**
+ * Classic Battle Royale Match Template:
+ * Title: "Classic battle royal"
+ * Mode: Solo
+ * Type: Classic Battle Royale
+ * Map: Bermuda
+ * Entry fee: ₹5
+ * Per kill: ₹3
+ * Winning prize pool: ₹10
+ * Player slot: 10
+ */
+export const CLASSIC_BATTLE_ROYALE_TEMPLATE = {
+  key: 'classic_br_solo',
+  title: 'Classic battle royal',
+  mode: 'Solo',
+  type: 'Classic Battle Royale',
+  map: 'Bermuda',
+  prizePool: 10,
+  perKillPrize: 3,
+  entryFee: 5,
+  slotsTotal: 10,
+  maxSlots: 10
+};
+
+/**
  * 25 Daily Time Slots:
  * Every 30 minutes starting from 10:00 AM to 10:00 PM
  */
@@ -204,6 +228,113 @@ export const generateDaily1v1Matches = async (targetDateString, overwriteExistin
 };
 
 /**
+ * Generates 25 Classic Battle Royale matches spaced 30 minutes apart (10:00 AM to 10:00 PM)
+ * for the target date.
+ * Title: "Classic battle royal"
+ * Mode: Solo
+ * Type: Classic Battle Royale
+ * Map: Bermuda
+ * Entry fee: ₹5
+ * Per kill prize: ₹3
+ * Winning prize pool: ₹10
+ * Player slots: 10
+ */
+export const generateDailyClassicBRMatches = async (targetDateString, overwriteExisting = false) => {
+  try {
+    const targetDate = targetDateString ? String(targetDateString).trim() : getTodayDateString();
+    console.log(`[AutoScheduler] Generating Classic Battle Royale daily matches for date: ${targetDate}...`);
+
+    const tournamentsCol = collection(db, "tournaments");
+    const q = query(tournamentsCol, where("matchDate", "==", targetDate));
+    const querySnapshot = await getDocs(q);
+    const existingDocIds = new Set();
+    querySnapshot.forEach(docSnap => {
+      existingDocIds.add(docSnap.id);
+    });
+
+    const batch = writeBatch(db);
+    let createdCount = 0;
+    let skippedCount = 0;
+
+    for (let i = 0; i < DAILY_TIME_SLOTS.length; i++) {
+      const slot = DAILY_TIME_SLOTS[i];
+      const slotNumStr = String(slot.slotIndex).padStart(2, '0');
+      const tpl = CLASSIC_BATTLE_ROYALE_TEMPLATE;
+      const matchId = `daily_br_${targetDate}_slot${slotNumStr}_${tpl.key}`;
+
+      if (existingDocIds.has(matchId) && !overwriteExisting) {
+        skippedCount++;
+        continue;
+      }
+
+      const matchDocRef = doc(db, "tournaments", matchId);
+      const matchData = {
+        id: matchId,
+        title: tpl.title,
+        mode: tpl.mode,
+        type: tpl.type,
+        map: tpl.map,
+        prizePool: tpl.prizePool,
+        perKillPrize: tpl.perKillPrize,
+        entryFee: tpl.entryFee,
+        slotsTotal: tpl.slotsTotal,
+        maxSlots: tpl.maxSlots,
+        slotsJoined: 0,
+        joinedPlayers: [],
+        matchDate: targetDate,
+        startTime: slot.time,
+        status: 'upcoming',
+        roomId: '',
+        roomPassword: '',
+        leaderboard: [],
+        isDailyScheduled: true,
+        isBattleRoyale: true,
+        slotIndex: slot.slotIndex,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      batch.set(matchDocRef, matchData, { merge: true });
+      createdCount++;
+    }
+
+    if (createdCount > 0) {
+      await batch.commit();
+      console.log(`[AutoScheduler] Successfully committed ${createdCount} Classic BR matches for ${targetDate} (Skipped existing: ${skippedCount})`);
+    } else {
+      console.log(`[AutoScheduler] All Classic BR matches already exist for ${targetDate} (${skippedCount} existing). No new matches added.`);
+    }
+
+    return {
+      success: true,
+      createdCount,
+      skippedCount,
+      totalSlots: DAILY_TIME_SLOTS.length,
+      targetDate
+    };
+  } catch (err) {
+    console.error(`[AutoScheduler] Error generating Classic BR daily matches:`, err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Generates both Classic Battle Royale and 1v1 match schedules for the specified date
+ */
+export const generateAllDailyMatches = async (targetDateString, overwriteExisting = false) => {
+  const brRes = await generateDailyClassicBRMatches(targetDateString, overwriteExisting);
+  const oneVoneRes = await generateDaily1v1Matches(targetDateString, overwriteExisting);
+  return {
+    success: brRes.success && oneVoneRes.success,
+    createdCount: (brRes.createdCount || 0) + (oneVoneRes.createdCount || 0),
+    skippedCount: (brRes.skippedCount || 0) + (oneVoneRes.skippedCount || 0),
+    classicBR: brRes,
+    oneVone: oneVoneRes,
+    targetDate: targetDateString
+  };
+};
+
+/**
  * Deletes matches for a given date (Today, Tomorrow, or specific YYYY-MM-DD)
  * @param {string} targetDateString - Target date string
  * @param {boolean} deleteAll - If true, deletes all matches for that date (daily + custom); if false, only daily scheduled
@@ -233,7 +364,13 @@ export const deleteDailyMatchesByDate = async (targetDateString, deleteAll = tru
         (isTargetToday && (docDate === todayStr || docDate.toLowerCase() === 'today' || d.id.includes(todayStr)));
 
       if (matchesDate) {
-        if (deleteAll || d.id.startsWith(`daily_${effectiveDateKey}`) || data.isDailyScheduled) {
+        if (
+          deleteAll || 
+          d.id.startsWith(`daily_${effectiveDateKey}`) || 
+          d.id.startsWith(`daily_br_${effectiveDateKey}`) || 
+          d.id.startsWith('daily_') || 
+          data.isDailyScheduled
+        ) {
           docIdsToDelete.push(d.id);
         }
       }

@@ -32,8 +32,11 @@ import {
 } from '../services/dateUtils';
 import { 
   generateDaily1v1Matches, 
+  generateDailyClassicBRMatches,
+  generateAllDailyMatches,
   deleteDailyMatchesByDate,
   deleteAllTournaments,
+  CLASSIC_BATTLE_ROYALE_TEMPLATE,
   DAILY_1V1_TEMPLATES, 
   DAILY_TIME_SLOTS 
 } from '../services/scheduleService';
@@ -692,6 +695,32 @@ export default function AdminHostPanel({
       setScheduleStatusMsg(`🎉 Done! Created ${res.createdCount} new matches for Tomorrow (${res.skippedCount} already existed).`);
     } else {
       setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to generate schedule'}`);
+    }
+    setTimeout(() => setScheduleStatusMsg(''), 7000);
+  };
+
+  const handleGenerateClassicBRTodaySchedule = async () => {
+    setIsGeneratingSchedule(true);
+    setScheduleStatusMsg("⏳ Generating Today's 25 Classic Battle Royale matches (₹5 Entry / ₹3 Per Kill / 10 Slots) in real-time...");
+    const res = await generateDailyClassicBRMatches(getTodayDateString());
+    setIsGeneratingSchedule(false);
+    if (res.success) {
+      setScheduleStatusMsg(`👑 Done! Created ${res.createdCount} Classic Battle Royale matches for Today (${res.skippedCount} already existed).`);
+    } else {
+      setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to generate Classic BR matches'}`);
+    }
+    setTimeout(() => setScheduleStatusMsg(''), 7000);
+  };
+
+  const handleGenerateClassicBRTomorrowSchedule = async () => {
+    setIsGeneratingSchedule(true);
+    setScheduleStatusMsg("⏳ Generating Tomorrow's 25 Classic Battle Royale matches (₹5 Entry / ₹3 Per Kill / 10 Slots) in real-time...");
+    const res = await generateDailyClassicBRMatches(getTomorrowDateString());
+    setIsGeneratingSchedule(false);
+    if (res.success) {
+      setScheduleStatusMsg(`👑 Done! Created ${res.createdCount} Classic Battle Royale matches for Tomorrow (${res.skippedCount} already existed).`);
+    } else {
+      setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to generate Classic BR matches'}`);
     }
     setTimeout(() => setScheduleStatusMsg(''), 7000);
   };
@@ -3216,21 +3245,79 @@ export default function AdminHostPanel({
               <button
                 type="button"
                 disabled={isGeneratingSchedule}
-                onClick={handleGenerateTomorrowSchedule}
+                onClick={handleGenerateClassicBRTodaySchedule}
                 className="btn"
                 style={{
-                  padding: '9px 18px',
+                  padding: '9px 16px',
                   fontSize: '0.84rem',
                   fontWeight: '800',
-                  background: 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)',
+                  background: 'linear-gradient(135deg, #ffd600 0%, #ff6d00 100%)',
                   color: '#000',
                   borderRadius: '8px',
                   cursor: isGeneratingSchedule ? 'wait' : 'pointer',
                   border: 'none',
-                  boxShadow: '0 4px 12px rgba(0, 229, 255, 0.25)'
+                  boxShadow: '0 4px 12px rgba(255, 214, 0, 0.3)'
                 }}
               >
-                {isGeneratingSchedule ? '⏳ Processing...' : "🚀 Auto-Generate Tomorrow's Schedule (25 Matches)"}
+                {isGeneratingSchedule ? '⏳ Processing...' : "👑 Auto-Generate Today's Classic BR (25 Matches)"}
+              </button>
+
+              <button
+                type="button"
+                disabled={isGeneratingSchedule}
+                onClick={handleGenerateClassicBRTomorrowSchedule}
+                className="btn"
+                style={{
+                  padding: '9px 16px',
+                  fontSize: '0.84rem',
+                  fontWeight: '800',
+                  background: 'linear-gradient(135deg, #ff9100 0%, #ff3d00 100%)',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  cursor: isGeneratingSchedule ? 'wait' : 'pointer',
+                  border: 'none',
+                  boxShadow: '0 4px 12px rgba(255, 145, 0, 0.3)'
+                }}
+              >
+                {isGeneratingSchedule ? '⏳ Processing...' : "👑 Auto-Generate Tomorrow's Classic BR (25 Matches)"}
+              </button>
+
+              <button
+                type="button"
+                disabled={isGeneratingSchedule}
+                onClick={handleGenerateTodaySchedule}
+                className="btn"
+                style={{
+                  padding: '9px 14px',
+                  fontSize: '0.82rem',
+                  fontWeight: '800',
+                  background: 'rgba(0, 229, 255, 0.15)',
+                  color: '#00e5ff',
+                  border: '1px solid rgba(0, 229, 255, 0.4)',
+                  borderRadius: '8px',
+                  cursor: isGeneratingSchedule ? 'wait' : 'pointer'
+                }}
+              >
+                ⚔️ Generate Today's 1v1
+              </button>
+
+              <button
+                type="button"
+                disabled={isGeneratingSchedule}
+                onClick={handleGenerateTomorrowSchedule}
+                className="btn"
+                style={{
+                  padding: '9px 14px',
+                  fontSize: '0.82rem',
+                  fontWeight: '800',
+                  background: 'rgba(0, 230, 118, 0.15)',
+                  color: '#00e676',
+                  border: '1px solid rgba(0, 230, 118, 0.4)',
+                  borderRadius: '8px',
+                  cursor: isGeneratingSchedule ? 'wait' : 'pointer'
+                }}
+              >
+                {isGeneratingSchedule ? '⏳ Processing...' : "⚔️ Generate Tomorrow's 1v1"}
               </button>
 
               <button
