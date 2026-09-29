@@ -201,28 +201,45 @@ export const generateDaily1v1Matches = async (targetDateString, overwriteExistin
 };
 
 /**
- * Deletes auto-generated daily 1v1 matches for a given date
+ * Deletes matches for a given date (Today, Tomorrow, or specific YYYY-MM-DD)
+ * @param {string} targetDateString - Target date string
+ * @param {boolean} deleteAll - If true, deletes all matches for that date (daily + custom); if false, only daily scheduled
  */
-export const deleteDailyMatchesByDate = async (targetDateString) => {
+export const deleteDailyMatchesByDate = async (targetDateString, deleteAll = true) => {
   try {
     const targetDate = targetDateString ? String(targetDateString).trim() : getTodayDateString();
+    const todayStr = getTodayDateString();
+    const tomorrowStr = getTomorrowDateString();
+
+    const isTargetTomorrow = targetDate === tomorrowStr || targetDate.toLowerCase() === 'tomorrow';
+    const isTargetToday = targetDate === todayStr || targetDate.toLowerCase() === 'today';
+
     const tourneysCol = collection(db, "tournaments");
-    const q = query(tourneysCol, where("matchDate", "==", targetDate));
-    const snap = await getDocs(q);
+    const snap = await getDocs(tourneysCol);
 
     const batch = writeBatch(db);
     let deletedCount = 0;
+
     snap.forEach(d => {
-      const data = d.data();
-      if (d.id.startsWith(`daily_${targetDate}`) || data.isDailyScheduled) {
-        batch.delete(doc(db, "tournaments", d.id));
-        deletedCount++;
+      const data = d.data() || {};
+      const docDate = String(data.matchDate || '').trim();
+
+      const matchesDate = 
+        docDate === targetDate ||
+        (isTargetTomorrow && (docDate === tomorrowStr || docDate.toLowerCase() === 'tomorrow' || d.id.includes(tomorrowStr))) ||
+        (isTargetToday && (docDate === todayStr || docDate.toLowerCase() === 'today' || d.id.includes(todayStr)));
+
+      if (matchesDate) {
+        if (deleteAll || d.id.startsWith(`daily_${targetDate}`) || data.isDailyScheduled) {
+          batch.delete(doc(db, "tournaments", d.id));
+          deletedCount++;
+        }
       }
     });
 
     if (deletedCount > 0) {
       await batch.commit();
-      console.log(`[AutoScheduler] Successfully deleted ${deletedCount} daily matches for ${targetDate}`);
+      console.log(`[AutoScheduler] Successfully deleted ${deletedCount} matches for date: ${targetDate}`);
     }
     return { success: true, count: deletedCount };
   } catch (err) {

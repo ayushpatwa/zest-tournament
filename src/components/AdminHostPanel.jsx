@@ -623,13 +623,29 @@ export default function AdminHostPanel({
   };
 
   const handleDeleteTodaySchedule = async () => {
-    if (!window.confirm("Are you sure you want to delete Today's 1v1 auto-generated matches?")) return;
+    const todayStr = getTodayDateString();
+    if (!window.confirm(`Are you sure you want to delete all matches for Today (${formatMatchDate(todayStr)})?`)) return;
     setIsGeneratingSchedule(true);
-    setScheduleStatusMsg("⏳ Deleting Today's 1v1 matches in real-time...");
-    const res = await deleteDailyMatchesByDate(getTodayDateString());
+    setScheduleStatusMsg("⏳ Deleting Today's matches in real-time...");
+    const res = await deleteDailyMatchesByDate(todayStr, true);
     setIsGeneratingSchedule(false);
     if (res.success) {
-      setScheduleStatusMsg(`🗑️ Successfully deleted ${res.count} 1v1 matches for Today.`);
+      setScheduleStatusMsg(`🗑️ Successfully deleted ${res.count} matches for Today.`);
+    } else {
+      setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to delete'}`);
+    }
+    setTimeout(() => setScheduleStatusMsg(''), 7000);
+  };
+
+  const handleDeleteTomorrowSchedule = async () => {
+    const tomorrowStr = getTomorrowDateString();
+    if (!window.confirm(`Are you sure you want to delete all matches for Tomorrow (${formatMatchDate(tomorrowStr)})?`)) return;
+    setIsGeneratingSchedule(true);
+    setScheduleStatusMsg("⏳ Deleting Tomorrow's matches in real-time...");
+    const res = await deleteDailyMatchesByDate(tomorrowStr, true);
+    setIsGeneratingSchedule(false);
+    if (res.success) {
+      setScheduleStatusMsg(`🗑️ Successfully deleted ${res.count} matches for Tomorrow.`);
     } else {
       setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to delete'}`);
     }
@@ -1757,6 +1773,29 @@ export default function AdminHostPanel({
                       >
                         🚀 Tomorrow ({tomorrowCount})
                       </button>
+                      {tomorrowCount > 0 && (
+                        <button
+                          type="button"
+                          disabled={isGeneratingSchedule}
+                          onClick={handleDeleteTomorrowSchedule}
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: '0.72rem',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(255, 145, 0, 0.4)',
+                            background: 'rgba(255, 145, 0, 0.15)',
+                            color: '#ff9100',
+                            fontWeight: '800',
+                            cursor: isGeneratingSchedule ? 'wait' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Delete all matches for Tomorrow"
+                        >
+                          <span>🗑️</span> Delete Tomorrow's ({tomorrowCount})
+                        </button>
+                      )}
                     </>
                   );
                 })()}
@@ -3113,6 +3152,25 @@ export default function AdminHostPanel({
               >
                 🗑️ Delete Today's Matches
               </button>
+
+              <button
+                type="button"
+                disabled={isGeneratingSchedule}
+                onClick={handleDeleteTomorrowSchedule}
+                className="btn"
+                style={{
+                  padding: '9px 16px',
+                  fontSize: '0.82rem',
+                  fontWeight: '800',
+                  background: 'rgba(255, 145, 0, 0.15)',
+                  color: '#ff9100',
+                  border: '1px solid rgba(255, 145, 0, 0.4)',
+                  borderRadius: '8px',
+                  cursor: isGeneratingSchedule ? 'wait' : 'pointer'
+                }}
+              >
+                🗑️ Delete Tomorrow's Matches
+              </button>
             </div>
 
             {scheduleStatusMsg && (
@@ -3187,6 +3245,29 @@ export default function AdminHostPanel({
                   >
                     🚀 Tomorrow ({tomorrowCount})
                   </button>
+                  {tomorrowCount > 0 && (
+                    <button
+                      type="button"
+                      disabled={isGeneratingSchedule}
+                      onClick={handleDeleteTomorrowSchedule}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '0.75rem',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 145, 0, 0.4)',
+                        background: 'rgba(255, 145, 0, 0.15)',
+                        color: '#ff9100',
+                        fontWeight: '800',
+                        cursor: isGeneratingSchedule ? 'wait' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Delete all matches for Tomorrow"
+                    >
+                      <span>🗑️</span> Delete Tomorrow's ({tomorrowCount})
+                    </button>
+                  )}
                 </>
               );
             })()}
