@@ -64,6 +64,10 @@ const HALL_OF_FAME_DATA = [
 ];
 
 export default function Dashboard({ tournaments, onSelectTournament, setCurrentView, userProfile }) {
+  const isHostOrAdmin = String(userProfile?.uid || '').trim() === '9084311275' || 
+                        String(userProfile?.phone || '').trim() === '9084311275' ||
+                        userProfile?.role === 'admin' || 
+                        userProfile?.isHost;
   const [mainView, setMainView] = useState('tournaments'); // 'tournaments' | 'hall_of_fame'
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -772,7 +776,13 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                     <span style={{ fontSize: '1.2rem' }}>{player.avatar}</span>
                     <div>
                       <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff' }}>{player.nickname}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>UID: {player.uid} • KD: {player.kd}</div>
+                      {isHostOrAdmin ? (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>UID: <span style={{ color: '#00e5ff' }}>{player.uid}</span> • KD: {player.kd}</div>
+                      ) : player.uid === userProfile?.uid ? (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--secondary)' }}>UID: {player.uid} (You) • KD: {player.kd}</div>
+                      ) : (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>KD: {player.kd}</div>
+                      )}
                     </div>
                   </div>
 

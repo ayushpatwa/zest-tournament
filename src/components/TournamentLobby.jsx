@@ -623,19 +623,40 @@ export default function TournamentLobby({
           
           {tournament.joinedPlayers && tournament.joinedPlayers.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {tournament.joinedPlayers.map((player, idx) => (
+              {tournament.joinedPlayers.map((player, idx) => {
+                const pUid = String(player.uid || '').trim().toLowerCase();
+                const pId = String(player.id || '').trim().toLowerCase();
+                const pEmail = String(player.email || '').trim().toLowerCase();
+                const pPhone = String(player.phone || '').trim().toLowerCase();
+                const isCurrentPlayer = player.isUser || 
+                  (cleanUserUid && (pUid === cleanUserUid || pId === cleanUserUid)) || 
+                  (cleanUserEmail && pEmail === cleanUserEmail) ||
+                  (cleanUserPhone && pPhone === cleanUserPhone);
+
+                return (
                 <div key={idx} className="flex-between glass-panel" style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontWeight: '900', color: player.isUser ? 'var(--secondary)' : 'var(--text-muted)' }}>
+                    <span style={{ fontWeight: '900', color: isCurrentPlayer ? 'var(--secondary)' : 'var(--text-muted)' }}>
                       #{idx + 1}
                     </span>
                     <div>
-                      <div style={{ fontWeight: '700', color: player.isUser ? 'var(--secondary)' : '#fff', fontSize: '0.85rem' }}>
-                        {player.nickname} {player.isUser && '(You)'}
+                      <div style={{ fontWeight: '700', color: isCurrentPlayer ? 'var(--secondary)' : '#fff', fontSize: '0.85rem' }}>
+                        {player.nickname} {isCurrentPlayer && '(You)'}
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                        UID: {player.uid}
-                      </div>
+                      {isHostOrAdmin ? (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          UID: <span style={{ color: '#00e5ff', fontFamily: 'monospace' }}>{player.uid}</span>
+                        </div>
+                      ) : isCurrentPlayer ? (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--secondary)' }}>
+                          UID: {player.uid}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>🔒</span>
+                          <span>UID Hidden</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -696,7 +717,8 @@ export default function TournamentLobby({
                     )}
                   </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
           ) : (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0' }}>

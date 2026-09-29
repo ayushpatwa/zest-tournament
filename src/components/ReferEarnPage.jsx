@@ -9,6 +9,7 @@ export default function ReferEarnPage({ userProfile = {}, currentUser = {}, setC
 
   const activeUser = userProfile.uid ? userProfile : currentUser;
   const userUid = activeUser?.uid || '';
+  const isHostOrAdmin = String(activeUser?.uid || '').trim() === '9084311275' || activeUser?.role === 'admin' || activeUser?.isHost;
   const myReferralCode = activeUser?.referralCode || (userUid ? `ZEST${userUid}` : 'ZESTVIP');
 
   // 1. Subscribe to live App Settings for dynamic referral reward amount
@@ -481,7 +482,7 @@ export default function ReferEarnPage({ userProfile = {}, currentUser = {}, setC
                       {refItem.refereeNickname || 'Player'}
                     </strong>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      UID: {refItem.refereeUid} • {refItem.dateString || 'Recently joined'}
+                      {isHostOrAdmin ? `UID: ${refItem.refereeUid} • ` : ''}{refItem.dateString || 'Recently joined'}
                     </span>
                   </div>
                 </div>
