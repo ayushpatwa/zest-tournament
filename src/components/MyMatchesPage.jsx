@@ -66,18 +66,18 @@ export default function MyMatchesPage({
   const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
   const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
 
-  const joinedTournaments = tournaments.filter(t => {
-    if ((!cleanUserUid && !cleanUserEmail) || !t.joinedPlayers) return false;
-    return t.joinedPlayers.some(p => {
+  const joinedTournaments = tournaments.filter(tourney => {
+    if ((!cleanUserUid && !cleanUserEmail) || !tourney.joinedPlayers) return false;
+    return tourney.joinedPlayers.some(p => {
       const pUid = String(p.uid || '').trim().toLowerCase();
       const pEmail = String(p.email || '').trim().toLowerCase();
       return (cleanUserUid && pUid === cleanUserUid) || (cleanUserEmail && pEmail === cleanUserEmail);
     });
   });
 
-  const filteredMatches = joinedTournaments.filter(t => {
-    if (filter === 'upcoming') return t.status === 'upcoming' || t.status === 'live' || !t.status;
-    if (filter === 'completed') return t.status === 'completed';
+  const filteredMatches = joinedTournaments.filter(tourney => {
+    if (filter === 'upcoming') return tourney.status === 'upcoming' || tourney.status === 'live' || !tourney.status;
+    if (filter === 'completed') return tourney.status === 'completed';
     return true;
   });
 
@@ -190,15 +190,15 @@ export default function MyMatchesPage({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {sortedMatches.map(t => {
-            const playerSlot = t.joinedPlayers?.find(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
-            const slotIndex = t.joinedPlayers?.findIndex(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
+          {sortedMatches.map(tourney => {
+            const playerSlot = tourney.joinedPlayers?.find(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
+            const slotIndex = tourney.joinedPlayers?.findIndex(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
 
-            const isPinned = Boolean(t.isPinned || t.pinned || t.isHighlighted);
+            const isPinned = Boolean(tourney.isPinned || tourney.pinned || tourney.isHighlighted);
 
             return (
               <div 
-                key={t.id}
+                key={tourney.id}
                 className="glass-panel animate-slide-in"
                 style={{
                   padding: '16px',
@@ -207,11 +207,11 @@ export default function MyMatchesPage({
                   gap: '12px',
                   border: isPinned 
                     ? '1.5px solid #ffd600' 
-                    : t.roomId 
+                    : tourney.roomId 
                       ? '1px solid var(--success)' 
                       : '1px solid rgba(0, 229, 255, 0.2)',
                   boxShadow: isPinned ? '0 0 15px rgba(255, 214, 0, 0.22)' : undefined,
-                  background: t.roomId 
+                  background: tourney.roomId 
                     ? 'linear-gradient(135deg, rgba(0, 230, 118, 0.05) 0%, rgba(21, 28, 51, 0.9) 100%)' 
                     : isPinned
                     ? 'linear-gradient(135deg, rgba(255, 214, 0, 0.05) 0%, rgba(21, 28, 51, 0.8) 100%)'
@@ -236,7 +236,7 @@ export default function MyMatchesPage({
                       {t('matches.badge_registered', {}, '✓ REGISTERED')}
                     </span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {t.mode} • {t.type}
+                      {tourney.mode} • {tourney.type}
                     </span>
                     {playerSlot?.squadCode && (
                       <span className="badge" style={{ background: 'rgba(255,214,0,0.15)', color: 'var(--accent)', fontSize: '0.68rem' }}>
@@ -247,10 +247,10 @@ export default function MyMatchesPage({
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <span className="badge" style={{ background: 'rgba(0, 229, 255, 0.12)', color: 'var(--secondary)', border: '1px solid rgba(0, 229, 255, 0.3)', fontSize: '0.7rem', fontWeight: '800', padding: '3px 8px' }}>
-                      📅 {formatMatchDate(t.matchDate, t.startTime)}
+                      📅 {formatMatchDate(tourney.matchDate, tourney.startTime)}
                     </span>
                     <div style={{ fontSize: '0.78rem' }}>
-                      {t.startTime ? <CountdownTimer startTime={t.startTime} /> : <span style={{ color: 'var(--secondary)' }}>LIVE</span>}
+                      {tourney.startTime ? <CountdownTimer startTime={tourney.startTime} /> : <span style={{ color: 'var(--secondary)' }}>LIVE</span>}
                     </div>
                   </div>
                 </div>
@@ -258,13 +258,13 @@ export default function MyMatchesPage({
                 {/* Match title & map */}
                 <div>
                   <h3 style={{ fontSize: '1.1rem', color: '#fff', margin: '0 0 4px 0' }}>
-                    {t.title}
+                    {tourney.title}
                   </h3>
                   <div style={{ display: 'flex', gap: '14px', fontSize: '0.8rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-                    <span>🗺️ Map: <strong>{t.map}</strong></span>
-                    <span>{t.type?.toLowerCase().includes('lone wolf') ? '🏆 Prize: ' : '💰 Bounty: '}
-                      <strong style={{ color: t.type?.toLowerCase().includes('lone wolf') ? 'var(--accent)' : 'inherit' }}>
-                        {t.type?.toLowerCase().includes('lone wolf') ? `₹${t.prizePool} (Winner Takes All)` : `₹${t.perKillPrize || 25}/Kill`}
+                    <span>🗺️ Map: <strong>{tourney.map}</strong></span>
+                    <span>{tourney.type?.toLowerCase().includes('lone wolf') ? '🏆 Prize: ' : '💰 Bounty: '}
+                      <strong style={{ color: tourney.type?.toLowerCase().includes('lone wolf') ? 'var(--accent)' : 'inherit' }}>
+                        {tourney.type?.toLowerCase().includes('lone wolf') ? `₹${tourney.prizePool} (Winner Takes All)` : `₹${tourney.perKillPrize || 25}/Kill`}
                       </strong>
                     </span>
                     {slotIndex !== -1 && <span>🎯 Slot: <strong style={{ color: 'var(--secondary)' }}>#{slotIndex + 1}</strong></span>}
@@ -273,39 +273,39 @@ export default function MyMatchesPage({
 
                 {/* Live Free Fire Room Credentials Box (if dropped by Admin) */}
                 <div style={{
-                  background: t.roomId ? 'rgba(0, 230, 118, 0.08)' : 'rgba(0,0,0,0.3)',
-                  border: t.roomId ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.15)',
+                  background: tourney.roomId ? 'rgba(0, 230, 118, 0.08)' : 'rgba(0,0,0,0.3)',
+                  border: tourney.roomId ? '1px solid var(--success)' : '1px dashed rgba(255,255,255,0.15)',
                   borderRadius: '10px',
                   padding: '12px'
                 }}>
-                  <div className="flex-between" style={{ marginBottom: t.roomId ? '8px' : '0' }}>
+                  <div className="flex-between" style={{ marginBottom: tourney.roomId ? '8px' : '0' }}>
                     <span style={{ 
                       fontSize: '0.8rem', 
                       fontFamily: 'var(--font-heading)',
                       fontWeight: '700', 
-                      color: t.roomId ? 'var(--success)' : 'var(--accent)',
+                      color: tourney.roomId ? 'var(--success)' : 'var(--accent)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px'
                     }}>
-                      <span>🔑</span> {t.roomId ? 'ROOM ID & PASSWORD (LIVE)' : 'CUSTOM ROOM CREDENTIALS'}
+                      <span>🔑</span> {tourney.roomId ? 'ROOM ID & PASSWORD (LIVE)' : 'CUSTOM ROOM CREDENTIALS'}
                     </span>
-                    {t.roomId && <span className="badge badge-live">READY TO PLAY</span>}
+                    {tourney.roomId && <span className="badge badge-live">READY TO PLAY</span>}
                   </div>
 
-                  {t.roomId ? (
+                  {tourney.roomId ? (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       <div style={{ background: 'rgba(0,0,0,0.5)', padding: '8px 12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>ROOM ID:</div>
                           <div style={{ fontFamily: 'monospace', fontSize: '1rem', fontWeight: '900', color: 'var(--secondary)' }}>
-                            {t.roomId}
+                            {tourney.roomId}
                           </div>
                         </div>
                         <button
-                          onClick={() => copyToClipboard(t.roomId, `room_${t.id}`)}
+                          onClick={() => copyToClipboard(tourney.roomId, `room_${tourney.id}`)}
                           style={{
-                            background: copiedId === `room_${t.id}` ? 'var(--success)' : 'rgba(255,255,255,0.1)',
+                            background: copiedId === `room_${tourney.id}` ? 'var(--success)' : 'rgba(255,255,255,0.1)',
                             border: 'none',
                             color: '#fff',
                             fontSize: '0.7rem',
@@ -314,7 +314,7 @@ export default function MyMatchesPage({
                             cursor: 'pointer'
                           }}
                         >
-                          {copiedId === `room_${t.id}` ? '✓' : t('matches.copy_btn', {}, 'Copy')}
+                          {copiedId === `room_${tourney.id}` ? '✓' : t('matches.copy_btn', {}, 'Copy')}
                         </button>
                       </div>
 
@@ -322,14 +322,14 @@ export default function MyMatchesPage({
                         <div>
                           <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('matches.pass_label', {}, 'PASSWORD')}:</div>
                           <div style={{ fontFamily: 'monospace', fontSize: '1rem', fontWeight: '900', color: 'var(--accent)' }}>
-                            {t.roomPassword || 'None'}
+                            {tourney.roomPassword || 'None'}
                           </div>
                         </div>
-                        {t.roomPassword && (
+                        {tourney.roomPassword && (
                           <button
-                            onClick={() => copyToClipboard(t.roomPassword, `pass_${t.id}`)}
+                            onClick={() => copyToClipboard(tourney.roomPassword, `pass_${tourney.id}`)}
                             style={{
-                              background: copiedId === `pass_${t.id}` ? 'var(--success)' : 'rgba(255,255,255,0.1)',
+                              background: copiedId === `pass_${tourney.id}` ? 'var(--success)' : 'rgba(255,255,255,0.1)',
                               border: 'none',
                               color: '#fff',
                               fontSize: '0.7rem',
@@ -338,7 +338,7 @@ export default function MyMatchesPage({
                               cursor: 'pointer'
                             }}
                           >
-                            {copiedId === `pass_${t.id}` ? '✓' : t('matches.copy_btn', {}, 'Copy')}
+                            {copiedId === `pass_${tourney.id}` ? '✓' : t('matches.copy_btn', {}, 'Copy')}
                           </button>
                         )}
                       </div>
@@ -353,7 +353,7 @@ export default function MyMatchesPage({
                 {/* Action Button */}
                 <div>
                   <button 
-                    onClick={() => onSelectTournament(t.id)}
+                    onClick={() => onSelectTournament(tourney.id)}
                     className="btn btn-primary" 
                     style={{ width: '100%', padding: '12px', fontSize: '0.88rem', fontWeight: '700' }}
                   >

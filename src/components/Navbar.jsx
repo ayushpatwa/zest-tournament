@@ -53,7 +53,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
 
       // 3. Check if player is registered in the tournament object
       if (n.targetTournamentId) {
-        const targetTourney = tournaments.find(t => t.id === n.targetTournamentId);
+        const targetTourney = tournaments.find(tourney => tourney.id === n.targetTournamentId);
         if (targetTourney && Array.isArray(targetTourney.joinedPlayers)) {
           const isPlayerRegistered = targetTourney.joinedPlayers.some(p => {
             const pUid = String(p.uid || '').trim().toLowerCase();

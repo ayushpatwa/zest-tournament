@@ -88,16 +88,16 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
   const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
   const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
 
-  const isPlayerInMatch = (t) => {
-    if ((!cleanUserUid && !cleanUserEmail) || !t.joinedPlayers) return false;
-    return t.joinedPlayers.some(p => {
+  const isPlayerInMatch = (tourney) => {
+    if ((!cleanUserUid && !cleanUserEmail) || !tourney.joinedPlayers) return false;
+    return tourney.joinedPlayers.some(p => {
       const pUid = String(p.uid || '').trim().toLowerCase();
       const pEmail = String(p.email || '').trim().toLowerCase();
       return (cleanUserUid && pUid === cleanUserUid) || (cleanUserEmail && pEmail === cleanUserEmail);
     });
   };
 
-  const joinedCount = tournaments.filter(t => isPlayerInMatch(t)).length;
+  const joinedCount = tournaments.filter(tourney => isPlayerInMatch(tourney)).length;
   
   // Featured Banners list
   const featured = [
@@ -130,14 +130,14 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
     return () => clearInterval(timer);
   }, []);
 
-  const filteredTournaments = tournaments.filter(t => {
+  const filteredTournaments = tournaments.filter(tourney => {
     // 1. If Room ID has been dropped, remove match from public Arena
-    if (t.roomId && t.roomId.trim() !== '') {
+    if (tourney.roomId && tourney.roomId.trim() !== '') {
       return false;
     }
 
     // 2. If current player has joined this match, hide from Arena (shown exclusively in "My Matches")
-    if (isPlayerInMatch(t)) {
+    if (isPlayerInMatch(tourney)) {
       return false;
     }
 
@@ -148,29 +148,29 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
     if (selectedFilter === 'All') {
       matchesFilter = true;
     } else if (selectedFilter === 'CS 1v1' || selectedFilter === 'CS 1v1 ⚔️') {
-      matchesFilter = t.type?.toLowerCase().includes('clash') && (t.type?.toLowerCase().includes('1v1') || t.title?.toLowerCase().includes('1v1'));
+      matchesFilter = tourney.type?.toLowerCase().includes('clash') && (tourney.type?.toLowerCase().includes('1v1') || tourney.title?.toLowerCase().includes('1v1'));
     } else if (selectedFilter === 'CS 2v2' || selectedFilter === 'CS 2v2 ⚔️') {
-      matchesFilter = t.type?.toLowerCase().includes('clash') && t.type?.toLowerCase().includes('2v2');
+      matchesFilter = tourney.type?.toLowerCase().includes('clash') && tourney.type?.toLowerCase().includes('2v2');
     } else if (selectedFilter === '1v1 Headshot' || selectedFilter === '1v1 Headshot 🎯') {
-      matchesFilter = (t.type?.toLowerCase().includes('headshot') && (t.type?.toLowerCase().includes('1v1') || t.title?.toLowerCase().includes('1v1'))) || (t.title?.toLowerCase().includes('1v1') && t.title?.toLowerCase().includes('headshot'));
+      matchesFilter = (tourney.type?.toLowerCase().includes('headshot') && (tourney.type?.toLowerCase().includes('1v1') || tourney.title?.toLowerCase().includes('1v1'))) || (tourney.title?.toLowerCase().includes('1v1') && tourney.title?.toLowerCase().includes('headshot'));
     } else if (selectedFilter === 'Lone Wolf 1v1' || selectedFilter === 'Lone Wolf 1v1 🐺') {
-      matchesFilter = t.type?.toLowerCase().includes('lone wolf') && (t.type?.toLowerCase().includes('1v1') || t.mode?.toLowerCase() === 'solo');
+      matchesFilter = tourney.type?.toLowerCase().includes('lone wolf') && (tourney.type?.toLowerCase().includes('1v1') || tourney.mode?.toLowerCase() === 'solo');
     } else if (selectedFilter === 'Lone Wolf 2v2' || selectedFilter === 'Lone Wolf 2v2 🐺') {
-      matchesFilter = t.type?.toLowerCase().includes('lone wolf') && (t.type?.toLowerCase().includes('2v2') || t.mode?.toLowerCase() === 'duo');
+      matchesFilter = tourney.type?.toLowerCase().includes('lone wolf') && (tourney.type?.toLowerCase().includes('2v2') || tourney.mode?.toLowerCase() === 'duo');
     } else if (selectedFilter === 'Headshot Only' || selectedFilter === 'Headshot Only 🎯' || selectedFilter === 'CS Headshot 🎯') {
-      matchesFilter = t.type?.toLowerCase().includes('headshot') || t.title?.toLowerCase().includes('headshot');
+      matchesFilter = tourney.type?.toLowerCase().includes('headshot') || tourney.title?.toLowerCase().includes('headshot');
     } else if (selectedFilter === 'Clash Squad' || selectedFilter === 'Clash Squad ⚔️') {
-      matchesFilter = t.type?.toLowerCase().includes('clash') || t.title?.toLowerCase().includes('clash');
+      matchesFilter = tourney.type?.toLowerCase().includes('clash') || tourney.title?.toLowerCase().includes('clash');
     } else if (selectedFilter === 'Classic BR 👑' || selectedFilter === 'Classic BR' || selectedFilter === 'Battle Royale') {
-      matchesFilter = t.type?.toLowerCase().includes('battle royal') || t.title?.toLowerCase().includes('battle royal') || Boolean(t.isBattleRoyale);
+      matchesFilter = tourney.type?.toLowerCase().includes('battle royal') || tourney.title?.toLowerCase().includes('battle royal') || Boolean(tourney.isBattleRoyale);
     } else {
-      matchesFilter = t.mode?.toLowerCase() === filter || t.type?.toLowerCase().includes(filter);
+      matchesFilter = tourney.mode?.toLowerCase() === filter || tourney.type?.toLowerCase().includes(filter);
     }
 
-    const matchesSearch = t.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          t.map?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          t.type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          t.mode?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = tourney.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          tourney.map?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          tourney.type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          tourney.mode?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -461,9 +461,9 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {sortedTournaments.map(t => {
-                const totalSlots = t.slotsTotal || t.maxSlots || 48;
-                const joinedSlots = Math.max(t.slotsJoined || 0, (t.joinedPlayers || []).length);
+              {sortedTournaments.map(tourney => {
+                const totalSlots = tourney.slotsTotal || tourney.maxSlots || 48;
+                const joinedSlots = Math.max(tourney.slotsJoined || 0, (tourney.joinedPlayers || []).length);
                 const isMatchFull = joinedSlots >= totalSlots;
                 const slotsPct = Math.min(Math.round((joinedSlots / totalSlots) * 100), 100);
 
@@ -471,18 +471,18 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                 const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
                 const isUserJoined = Boolean(
                   (cleanUserUid || cleanUserEmail) &&
-                  t.joinedPlayers?.some(p => {
+                  tourney.joinedPlayers?.some(p => {
                     const pUid = String(p.uid || '').trim().toLowerCase();
                     const pEmail = String(p.email || '').trim().toLowerCase();
                     return (cleanUserUid && pUid === cleanUserUid) || (cleanUserEmail && pEmail === cleanUserEmail);
                   })
                 );
 
-                const isPinned = Boolean(t.isPinned || t.pinned || t.isHighlighted);
+                const isPinned = Boolean(tourney.isPinned || tourney.pinned || tourney.isHighlighted);
 
                 return (
                   <div 
-                    key={t.id} 
+                    key={tourney.id} 
                     className="glass-panel"
                     style={{
                       padding: '16px',
@@ -504,7 +504,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                       cursor: 'pointer',
                       position: 'relative'
                     }}
-                    onClick={() => onSelectTournament(t.id)}
+                    onClick={() => onSelectTournament(tourney.id)}
                   >
                     {/* Header info */}
                     <div className="flex-between">
@@ -527,31 +527,31 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                           </span>
                         ) : (
                           <span className={`badge ${
-                            t.status === 'live' ? 'badge-live' : 
-                            t.status === 'upcoming' ? 'badge-upcoming' : 'badge-completed'
+                            tourney.status === 'live' ? 'badge-live' : 
+                            tourney.status === 'upcoming' ? 'badge-upcoming' : 'badge-completed'
                           }`}>
-                            {t.status || 'open'}
+                            {tourney.status || 'open'}
                           </span>
                         )}
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          {t.mode}
+                          {tourney.mode}
                         </span>
-                        {t.type?.toLowerCase().includes('headshot') && (
+                        {tourney.type?.toLowerCase().includes('headshot') && (
                           <span className="badge" style={{ background: 'linear-gradient(135deg, rgba(255,214,0,0.2) 0%, rgba(255,87,34,0.2) 100%)', color: 'var(--accent)', border: '1px solid rgba(255,214,0,0.4)', fontSize: '0.65rem', fontWeight: '900' }}>
-                            🎯 {t.type?.toLowerCase().includes('1v1') ? '1v1 HEADSHOT' : 'HEADSHOT ONLY'}
+                            🎯 {tourney.type?.toLowerCase().includes('1v1') ? '1v1 HEADSHOT' : 'HEADSHOT ONLY'}
                           </span>
                         )}
-                        {t.type?.toLowerCase().includes('lone wolf') && (
+                        {tourney.type?.toLowerCase().includes('lone wolf') && (
                           <span className="badge" style={{ background: 'rgba(0, 229, 255, 0.15)', color: 'var(--secondary)', border: '1px solid rgba(0, 229, 255, 0.3)', fontSize: '0.65rem', fontWeight: '700' }}>
-                            🐺 {t.type}
+                            🐺 {tourney.type}
                           </span>
                         )}
-                        {t.type?.toLowerCase().includes('clash') && (
+                        {tourney.type?.toLowerCase().includes('clash') && (
                           <span className="badge" style={{ background: 'rgba(255, 87, 34, 0.15)', color: 'var(--primary)', border: '1px solid rgba(255, 87, 34, 0.3)', fontSize: '0.65rem', fontWeight: '700' }}>
-                            ⚔️ {t.type?.includes('1v1') ? 'CS 1v1' : t.type?.includes('2v2') ? 'CS 2v2' : 'CS 4v4'}
+                            ⚔️ {tourney.type?.includes('1v1') ? 'CS 1v1' : tourney.type?.includes('2v2') ? 'CS 2v2' : 'CS 4v4'}
                           </span>
                         )}
-                        {t.type === 'Classic' && (
+                        {tourney.type === 'Classic' && (
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             • Battle Royale
                           </span>
@@ -560,10 +560,10 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         <span className="badge" style={{ background: 'rgba(0, 229, 255, 0.12)', color: 'var(--secondary)', border: '1px solid rgba(0, 229, 255, 0.3)', fontSize: '0.7rem', fontWeight: '800', padding: '3px 8px' }}>
-                          📅 {formatMatchDate(t.matchDate, t.startTime)}
+                          📅 {formatMatchDate(tourney.matchDate, tourney.startTime)}
                         </span>
                         <div style={{ fontSize: '0.78rem' }}>
-                          {t.startTime ? <CountdownTimer startTime={t.startTime} /> : <span style={{ color: 'var(--secondary)' }}>LIVE</span>}
+                          {tourney.startTime ? <CountdownTimer startTime={tourney.startTime} /> : <span style={{ color: 'var(--secondary)' }}>LIVE</span>}
                         </div>
                       </div>
                     </div>
@@ -571,13 +571,13 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                     {/* Match title & map */}
                     <div>
                       <h3 style={{ fontSize: '1.05rem', color: '#fff', margin: '0 0 4px 0' }}>
-                        {t.title}
+                        {tourney.title}
                       </h3>
                       <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        <span>🗺️ {t('dashboard.map', {}, 'Map')}: <strong>{t.map}</strong></span>
-                        <span>{t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash') ? '🏆 ' : '💰 '}
-                          <strong style={{ color: (t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash')) ? 'var(--accent)' : 'inherit' }}>
-                            {(t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash')) ? t('dashboard.winner_takes_all', {}, 'Winner Takes All') : `₹${t.perKillPrize !== undefined && t.perKillPrize !== null && t.perKillPrize !== '' ? t.perKillPrize : 25}${t('dashboard.per_kill', {}, '/Kill')}`}
+                        <span>🗺️ {t('dashboard.map', {}, 'Map')}: <strong>{tourney.map}</strong></span>
+                        <span>{tourney.type?.toLowerCase().includes('lone wolf') && !tourney.type?.toLowerCase().includes('clash') ? '🏆 ' : '💰 '}
+                          <strong style={{ color: (tourney.type?.toLowerCase().includes('lone wolf') && !tourney.type?.toLowerCase().includes('clash')) ? 'var(--accent)' : 'inherit' }}>
+                            {(tourney.type?.toLowerCase().includes('lone wolf') && !tourney.type?.toLowerCase().includes('clash')) ? t('dashboard.winner_takes_all', {}, 'Winner Takes All') : `₹${tourney.perKillPrize !== undefined && tourney.perKillPrize !== null && tourney.perKillPrize !== '' ? tourney.perKillPrize : 25}${t('dashboard.per_kill', {}, '/Kill')}`}
                           </strong>
                         </span>
                       </div>
@@ -597,10 +597,10 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                     >
                       <div>
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                          {t.type?.toLowerCase().includes('lone wolf') ? t('dashboard.winning_prize', {}, 'Winning Prize') : t('dashboard.prize_pool', {}, 'Prize Pool')}
+                          {tourney.type?.toLowerCase().includes('lone wolf') ? t('dashboard.winning_prize', {}, 'Winning Prize') : t('dashboard.prize_pool', {}, 'Prize Pool')}
                         </div>
                         <div style={{ fontSize: '0.95rem', color: 'var(--accent)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
-                          ₹{t.prizePool}
+                          ₹{tourney.prizePool}
                         </div>
                       </div>
                       <div>
@@ -608,12 +608,12 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                           {t('dashboard.entry_fee', {}, 'Entry Fee')}
                         </div>
                         <div style={{ fontSize: '0.95rem', color: '#fff', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
-                          ₹{t.entryFee}
+                          ₹{tourney.entryFee}
                         </div>
                       </div>
                       <div>
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                          {t.type?.includes('1v1') ? '1v1 Slots' : (t.type?.includes('2v2') || t.type?.includes('Lone Wolf')) ? '2v2 Slots' : t.type?.includes('Clash') ? '4v4 Slots' : t('dashboard.slots', {}, 'Slots')}
+                          {tourney.type?.includes('1v1') ? '1v1 Slots' : (tourney.type?.includes('2v2') || tourney.type?.includes('Lone Wolf')) ? '2v2 Slots' : tourney.type?.includes('Clash') ? '4v4 Slots' : t('dashboard.slots', {}, 'Slots')}
                         </div>
                         <div style={{ fontSize: '0.95rem', color: isMatchFull ? '#ff1744' : 'var(--secondary)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
                           {joinedSlots}/{totalSlots} {isMatchFull && '🔥'}
