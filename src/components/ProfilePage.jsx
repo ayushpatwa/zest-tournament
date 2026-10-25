@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { saveUserProfileRealtime } from '../services/firebase';
 import { sendToMakeWebhook } from '../services/webhookService';
 
 export default function ProfilePage({ userProfile, setUserProfile, onLogout, currentUser, setCurrentView }) {
+  const { language, setLanguage, t, languages, currentLanguageObj } = useLanguage();
+  const [langSuccessMsg, setLangSuccessMsg] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [nick, setNick] = useState(userProfile.nickname || '');
   const [uid, setUid] = useState(userProfile.uid || '');
@@ -507,6 +510,115 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout, cur
               <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>{badge.desc}</span>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Settings Card: App Language Selection */}
+      <div 
+        className="glass-panel" 
+        style={{
+          padding: '16px',
+          borderRadius: '16px',
+          border: '1px solid rgba(0, 229, 255, 0.25)',
+          background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.06) 0%, rgba(255, 87, 34, 0.05) 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '1.25rem' }}>⚙️</span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontFamily: 'var(--font-heading)', fontWeight: '800', color: '#fff' }}>
+                {t('settings.title', {}, 'App Settings')}
+              </h3>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                {t('settings.language_preference', {}, 'Language Preference')}
+              </span>
+            </div>
+          </div>
+          <span className="badge" style={{
+            background: 'rgba(0, 229, 255, 0.15)',
+            color: 'var(--secondary)',
+            border: '1px solid rgba(0, 229, 255, 0.3)',
+            fontSize: '0.72rem',
+            fontWeight: '800',
+            padding: '2px 8px',
+            borderRadius: '12px'
+          }}>
+            🌐 {currentLanguageObj.native}
+          </span>
+        </div>
+
+        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+          {t('settings.language_desc', {}, 'Select your preferred language for the whole app. Changes apply immediately across all screens.')}
+        </p>
+
+        {langSuccessMsg && (
+          <div style={{
+            background: 'rgba(0, 230, 118, 0.15)',
+            border: '1px solid rgba(0, 230, 118, 0.4)',
+            color: '#69f0ae',
+            fontSize: '0.75rem',
+            padding: '8px 12px',
+            borderRadius: '8px',
+            fontWeight: '700'
+          }}>
+            ✅ {langSuccessMsg}
+          </div>
+        )}
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '8px'
+        }}>
+          {languages.map(langItem => {
+            const isSelected = language === langItem.code;
+            return (
+              <button
+                key={langItem.code}
+                type="button"
+                onClick={async () => {
+                  setLanguage(langItem.code);
+                  const updatedProfile = {
+                    ...userProfile,
+                    language: langItem.code
+                  };
+                  setUserProfile(updatedProfile);
+                  try {
+                    await saveUserProfileRealtime(updatedProfile);
+                  } catch (_) {}
+                  setLangSuccessMsg(t('settings.language_updated', { lang: langItem.native }, `Language changed to ${langItem.native}!`));
+                  setTimeout(() => setLangSuccessMsg(''), 3000);
+                }}
+                style={{
+                  background: isSelected 
+                    ? 'linear-gradient(135deg, rgba(255,87,34,0.3) 0%, rgba(0,229,255,0.2) 100%)' 
+                    : 'rgba(255,255,255,0.04)',
+                  border: isSelected ? '1px solid var(--secondary)' : '1px solid rgba(255,255,255,0.08)',
+                  color: isSelected ? '#fff' : 'var(--text-secondary)',
+                  borderRadius: '10px',
+                  padding: '10px 6px',
+                  fontSize: '0.75rem',
+                  fontWeight: isSelected ? '800' : '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '3px',
+                  boxShadow: isSelected ? '0 0 12px rgba(0,229,255,0.3)' : 'none',
+                  transition: 'all 0.18s ease'
+                }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>{langItem.flag}</span>
+                <span style={{ color: isSelected ? 'var(--secondary)' : 'inherit', fontWeight: '800' }}>{langItem.native}</span>
+                <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>{langItem.name}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

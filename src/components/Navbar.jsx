@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function Navbar({ currentView, setCurrentView, walletBalance, currentUser, userProfile, cloudNotifications = [], tournaments = [] }) {
+  const { t, language, setLanguage, currentLanguageObj, languages } = useLanguage();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [readNotifIds, setReadNotifIds] = useState(() => {
     const saved = localStorage.getItem('zest_read_notif_ids');
@@ -287,7 +289,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
               }}
             >
               <span style={{ fontSize: '0.78rem' }}>🎁</span>
-              <span>REFER</span>
+              <span>{t('nav.refer', {}, 'REFER')}</span>
             </button>
 
             {/* Wallet Cash Button */}
@@ -503,7 +505,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
           }}
         >
           <span style={{ fontSize: '1.25rem' }}>🎮</span>
-          <span>ARENA</span>
+          <span>{t('nav.arena', {}, 'ARENA')}</span>
         </button>
 
         <button 
@@ -524,7 +526,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
           }}
         >
           <span style={{ fontSize: '1.25rem' }}>🎯</span>
-          <span>MY MATCHES</span>
+          <span>{t('nav.my_matches', {}, 'MY MATCHES')}</span>
         </button>
 
         <button 
@@ -545,7 +547,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
           }}
         >
           <span style={{ fontSize: '1.25rem' }}>💳</span>
-          <span>WALLET</span>
+          <span>{t('nav.wallet', {}, 'WALLET')}</span>
         </button>
 
         <button 
@@ -566,7 +568,7 @@ export default function Navbar({ currentView, setCurrentView, walletBalance, cur
           }}
         >
           <span style={{ fontSize: '1.25rem' }}>👤</span>
-          <span>PROFILE</span>
+          <span>{t('nav.profile', {}, 'PROFILE')}</span>
         </button>
 
         {/* HOST OPTION - STRICTLY RESTRICTED TO MASTER HOST ID (9084311275) */}

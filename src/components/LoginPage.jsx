@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { sendToMakeWebhook, updateLiveWebhookUrl } from '../services/webhookService';
 import { 
   resetUserPasswordRealtime, 
@@ -14,6 +15,7 @@ import { dispatchRealOtp } from '../services/otpService';
 import { updateLiveResendConfig } from '../services/resendService';
 
 export default function LoginPage({ onLoginSuccess }) {
+  const { language, setLanguage, t, languages, currentLanguageObj } = useLanguage();
   const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'otp_verify' | 'forgot'
   const [welcomeBonus, setWelcomeBonus] = useState(0);
   const [referralRewardAmount, setReferralRewardAmount] = useState(0);
@@ -175,6 +177,7 @@ export default function LoginPage({ onLoginSuccess }) {
       phone: phone.trim(),
       password: password,
       role: 'player',
+      language: language || 'en',
       wallet: bonusAmount,
       depositBalance: bonusAmount,
       winningBalance: 0,
@@ -407,6 +410,9 @@ export default function LoginPage({ onLoginSuccess }) {
       });
 
       setLoading(false);
+      if (authRes.user?.language) {
+        setLanguage(authRes.user.language);
+      }
       onLoginSuccess(authRes.user);
     } else {
       setErrorMsg(authRes.error || 'Invalid Free Fire UID/Email or Password.');
@@ -629,6 +635,53 @@ export default function LoginPage({ onLoginSuccess }) {
           position: 'relative'
         }}
       >
+        {/* Language Quick Selector Bar */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '10px',
+          padding: '6px 10px',
+          marginBottom: '14px',
+          gap: '6px'
+        }}>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '700' }}>
+            <span>🌐</span> {t('auth.change_language', {}, 'Language')}:
+          </span>
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {languages.map(l => {
+              const isSelected = language === l.code;
+              return (
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => setLanguage(l.code)}
+                  style={{
+                    background: isSelected ? 'linear-gradient(135deg, var(--primary) 0%, #ff1744 100%)' : 'rgba(255, 255, 255, 0.05)',
+                    border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    color: isSelected ? '#fff' : 'var(--text-secondary)',
+                    borderRadius: '12px',
+                    padding: '2px 8px',
+                    fontSize: '0.68rem',
+                    fontWeight: isSelected ? '800' : '600',
+                    cursor: 'pointer',
+                    boxShadow: isSelected ? 'var(--glow-primary)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>{l.flag}</span>
+                  <span>{l.native}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Mode Selector Tabs (Sign In, Register) */}
         <div style={{
           display: 'flex',
@@ -657,7 +710,7 @@ export default function LoginPage({ onLoginSuccess }) {
               transition: 'all 0.2s ease'
             }}
           >
-            SIGN IN
+            {t('auth.signin', {}, 'SIGN IN')}
           </button>
           
           <button
@@ -678,7 +731,7 @@ export default function LoginPage({ onLoginSuccess }) {
               transition: 'all 0.2s ease'
             }}
           >
-            REGISTER
+            {t('auth.register', {}, 'REGISTER')}
           </button>
         </div>
 
@@ -1114,6 +1167,56 @@ export default function LoginPage({ onLoginSuccess }) {
               />
             </div>
 
+            {/* Preferred Language Selection in Sign Up Form */}
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{ margin: 0, fontSize: '0.8rem', fontWeight: '700' }}>
+                  {t('auth.preferred_language', {}, 'Preferred App Language')} <span style={{ color: 'var(--primary)' }}>*</span>
+                </label>
+                <span style={{ fontSize: '0.72rem', color: 'var(--secondary)', fontWeight: '800' }}>
+                  🌐 {currentLanguageObj.native}
+                </span>
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '6px'
+              }}>
+                {languages.map(langItem => {
+                  const isSelected = language === langItem.code;
+                  return (
+                    <button
+                      key={langItem.code}
+                      type="button"
+                      onClick={() => setLanguage(langItem.code)}
+                      style={{
+                        background: isSelected 
+                          ? 'linear-gradient(135deg, rgba(255,87,34,0.3) 0%, rgba(0,229,255,0.2) 100%)' 
+                          : 'rgba(255,255,255,0.04)',
+                        border: isSelected ? '1px solid var(--secondary)' : '1px solid rgba(255,255,255,0.08)',
+                        color: isSelected ? '#fff' : 'var(--text-secondary)',
+                        borderRadius: '8px',
+                        padding: '6px 4px',
+                        fontSize: '0.72rem',
+                        fontWeight: isSelected ? '800' : '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '2px',
+                        boxShadow: isSelected ? '0 0 10px rgba(0,229,255,0.25)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span style={{ fontSize: '1rem' }}>{langItem.flag}</span>
+                      <span style={{ color: isSelected ? 'var(--secondary)' : 'inherit', fontWeight: '800' }}>{langItem.native}</span>
+                      <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>{langItem.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div style={{
               background: 'rgba(0, 229, 255, 0.06)',
               border: '1px solid rgba(0, 229, 255, 0.2)',
@@ -1126,7 +1229,7 @@ export default function LoginPage({ onLoginSuccess }) {
               color: 'var(--secondary)'
             }}>
               <span>📩</span>
-              <span>A 6-digit verification OTP will be sent directly to your registered email address.</span>
+              <span>{t('auth.otp_email_notice', {}, 'A 6-digit verification OTP will be sent directly to your registered email address.')}</span>
             </div>
 
             <button
