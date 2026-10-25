@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { formatMatchDate, sortTournamentsByTime } from '../services/dateUtils';
 import { subscribeToAppSettingsRealtime } from '../services/firebase';
 
@@ -64,6 +65,7 @@ const HALL_OF_FAME_DATA = [
 ];
 
 export default function Dashboard({ tournaments, onSelectTournament, setCurrentView, userProfile }) {
+  const { t } = useLanguage();
   const isHostOrAdmin = String(userProfile?.uid || '').trim() === '9084311275' || 
                         String(userProfile?.phone || '').trim() === '9084311275' ||
                         userProfile?.role === 'admin' || 
@@ -212,7 +214,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             transition: 'all 0.2s ease'
           }}
         >
-          🎮 ARENA
+          🎮 {t('dashboard.arena_tab', {}, 'ARENA')}
         </button>
 
         <button
@@ -236,7 +238,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             gap: '4px'
           }}
         >
-          <span>🎯 MY MATCHES</span>
+          <span>🎯 {t('dashboard.my_matches_tab', {}, 'MY MATCHES')}</span>
           {joinedCount > 0 && (
             <span style={{
               background: 'var(--secondary)',
@@ -269,7 +271,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             transition: 'all 0.2s ease'
           }}
         >
-          🏆 HALL OF FAME
+          🏆 {t('dashboard.hall_of_fame_tab', {}, 'HALL OF FAME')}
         </button>
       </div>
 
@@ -385,7 +387,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
             <input 
               type="text" 
-              placeholder="🔍 Search matches by type, map, mode..." 
+              placeholder={t('dashboard.search_placeholder', {}, '🔍 Search matches by type, map, mode...')} 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="form-input"
@@ -440,12 +442,12 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             <div className="glass-panel" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🎮</div>
               <h3 style={{ fontSize: '1.05rem', color: '#fff', margin: '0 0 6px 0' }}>
-                {joinedCount > 0 ? 'All Joined Matches Moved to "My Matches"!' : 'No open tournament matches available right now.'}
+                {joinedCount > 0 ? t('dashboard.my_matches_tab', {}, 'My Matches') : t('dashboard.no_matches_title', {}, 'No open tournament matches available right now.')}
               </h3>
               <p style={{ fontSize: '0.8rem', maxWidth: '360px', margin: '0 auto 16px auto', lineHeight: '1.4' }}>
                 {joinedCount > 0 
                   ? 'Matches you have registered for and matches where Room IDs have dropped are shown under your My Matches tab.' 
-                  : 'Host new matches from the Admin panel or check back shortly for new tournaments!'}
+                  : t('dashboard.no_matches_desc', {}, 'Check back shortly for new tournaments or view matches you already joined!')}
               </p>
               {joinedCount > 0 && (
                 <button
@@ -453,7 +455,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                   className="btn btn-secondary"
                   style={{ padding: '10px 20px', fontSize: '0.85rem', fontWeight: '700' }}
                 >
-                  🎯 View My Matches ({joinedCount}) ➔
+                  🎯 {t('dashboard.view_my_matches', {}, 'View My Matches →')} ({joinedCount})
                 </button>
               )}
             </div>
@@ -516,12 +518,12 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                             boxShadow: '0 0 10px rgba(255, 214, 0, 0.5)',
                             letterSpacing: '0.5px'
                           }}>
-                            📌 PINNED MATCH
+                            {t('dashboard.pinned_match', {}, '📌 PINNED MATCH')}
                           </span>
                         )}
                         {isMatchFull ? (
                           <span className="badge" style={{ background: '#ff1744', color: '#fff', fontWeight: '900', fontSize: '0.65rem', boxShadow: '0 0 10px rgba(255,23,68,0.5)' }}>
-                            🔴 HOUSEFULL
+                            {t('dashboard.housefull', {}, '🔴 HOUSEFULL')}
                           </span>
                         ) : (
                           <span className={`badge ${
@@ -572,10 +574,10 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                         {t.title}
                       </h3>
                       <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        <span>🗺️ Map: <strong>{t.map}</strong></span>
-                        <span>{t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash') ? '🏆 Prize Type: ' : '💰 Bounty: '}
+                        <span>🗺️ {t('dashboard.map', {}, 'Map')}: <strong>{t.map}</strong></span>
+                        <span>{t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash') ? '🏆 ' : '💰 '}
                           <strong style={{ color: (t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash')) ? 'var(--accent)' : 'inherit' }}>
-                            {(t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash')) ? 'Winner Takes All' : `₹${t.perKillPrize !== undefined && t.perKillPrize !== null && t.perKillPrize !== '' ? t.perKillPrize : 25}/Kill`}
+                            {(t.type?.toLowerCase().includes('lone wolf') && !t.type?.toLowerCase().includes('clash')) ? t('dashboard.winner_takes_all', {}, 'Winner Takes All') : `₹${t.perKillPrize !== undefined && t.perKillPrize !== null && t.perKillPrize !== '' ? t.perKillPrize : 25}${t('dashboard.per_kill', {}, '/Kill')}`}
                           </strong>
                         </span>
                       </div>
@@ -595,21 +597,23 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                     >
                       <div>
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                          {t.type?.toLowerCase().includes('lone wolf') ? 'Winning Prize' : 'Prize Pool'}
+                          {t.type?.toLowerCase().includes('lone wolf') ? t('dashboard.winning_prize', {}, 'Winning Prize') : t('dashboard.prize_pool', {}, 'Prize Pool')}
                         </div>
                         <div style={{ fontSize: '0.95rem', color: 'var(--accent)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
                           ₹{t.prizePool}
                         </div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Entry Fee</div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          {t('dashboard.entry_fee', {}, 'Entry Fee')}
+                        </div>
                         <div style={{ fontSize: '0.95rem', color: '#fff', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
                           ₹{t.entryFee}
                         </div>
                       </div>
                       <div>
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                          {t.type?.includes('1v1') ? '1v1 Slots' : (t.type?.includes('2v2') || t.type?.includes('Lone Wolf')) ? '2v2 Slots' : t.type?.includes('Clash') ? '4v4 Slots' : 'Slots'}
+                          {t.type?.includes('1v1') ? '1v1 Slots' : (t.type?.includes('2v2') || t.type?.includes('Lone Wolf')) ? '2v2 Slots' : t.type?.includes('Clash') ? '4v4 Slots' : t('dashboard.slots', {}, 'Slots')}
                         </div>
                         <div style={{ fontSize: '0.95rem', color: isMatchFull ? '#ff1744' : 'var(--secondary)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
                           {joinedSlots}/{totalSlots} {isMatchFull && '🔥'}

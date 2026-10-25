@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { formatMatchDate, sortTournamentsByTime } from '../services/dateUtils';
 
 // Countdown Timer Component
@@ -57,6 +58,7 @@ export default function MyMatchesPage({
   onSelectTournament, 
   setCurrentView 
 }) {
+  const { t } = useLanguage();
   const [filter, setFilter] = useState('all'); // 'all' | 'upcoming' | 'completed'
   const [copiedId, setCopiedId] = useState(null);
 
@@ -107,13 +109,13 @@ export default function MyMatchesPage({
       >
         <div>
           <span style={{ fontSize: '0.75rem', color: 'var(--secondary)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '900' }}>
-            ESPORTS DASHBOARD
+            {t('matches.dashboard_badge', {}, 'ESPORTS DASHBOARD')}
           </span>
           <h2 style={{ fontFamily: 'var(--font-heading)', margin: '2px 0 0 0', fontSize: '1.35rem', color: '#fff' }}>
-            🎯 MY JOINED MATCHES
+            🎯 {t('matches.title', {}, 'MY JOINED MATCHES')}
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-            View your upcoming match schedules, live Custom Room credentials, and submitted results.
+            {t('matches.desc', {}, 'View your upcoming match schedules, live Custom Room credentials, and match details.')}
           </p>
         </div>
 
@@ -124,7 +126,9 @@ export default function MyMatchesPage({
           borderRadius: '12px',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Joined Matches</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            {t('matches.joined_count', {}, 'Joined Matches')}
+          </div>
           <div style={{ fontSize: '1.4rem', fontFamily: 'var(--font-heading)', fontWeight: '900', color: 'var(--secondary)' }}>
             {joinedTournaments.length}
           </div>
@@ -134,9 +138,9 @@ export default function MyMatchesPage({
       {/* Filter Tabs */}
       <div style={{ display: 'flex', gap: '8px' }}>
         {[
-          { id: 'all', label: `All Joined (${joinedTournaments.length})` },
-          { id: 'upcoming', label: '🔴 Live & Upcoming' },
-          { id: 'completed', label: '🏁 Completed' }
+          { id: 'all', label: t('matches.tab_all', { count: joinedTournaments.length }, `All Joined (${joinedTournaments.length})`) },
+          { id: 'upcoming', label: t('matches.tab_upcoming', {}, '🔴 Live & Upcoming') },
+          { id: 'completed', label: t('matches.tab_completed', {}, '🏁 Completed') }
         ].map(tab => (
           <button
             key={tab.id}
@@ -166,12 +170,14 @@ export default function MyMatchesPage({
         <div className="glass-panel" style={{ padding: '40px 20px', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎮</div>
           <h3 style={{ fontSize: '1.1rem', color: '#fff', margin: '0 0 6px 0' }}>
-            {joinedTournaments.length === 0 ? 'No Matches Joined Yet!' : 'No matches found in this category.'}
+            {joinedTournaments.length === 0 
+              ? t('matches.empty_title', {}, 'No Matches Joined Yet!') 
+              : t('matches.empty_filtered', {}, 'No matches found in this category.')}
           </h3>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: '360px', margin: '0 auto 18px auto', lineHeight: '1.4' }}>
             {joinedTournaments.length === 0 
-              ? 'Join Free Fire tournament matches in the Arena to compete for real cash prizes, kill bounties, and climb the leaderboard!'
-              : 'Switch to All Joined tab to view your complete match history.'}
+              ? t('matches.empty_desc', {}, 'Join Free Fire tournament matches in the Arena to compete for real cash prizes, kill bounties, and climb the leaderboard!')
+              : t('matches.switch_all', {}, 'Switch to All Joined tab to view your complete match history.')}
           </p>
 
           <button 
@@ -179,7 +185,7 @@ export default function MyMatchesPage({
             className="btn btn-primary"
             style={{ padding: '12px 24px', fontSize: '0.9rem', fontWeight: '700' }}
           >
-            🔥 Browse Live Arena Matches ➔
+            {t('matches.browse_btn', {}, '🔥 Browse Live Arena Matches ➔')}
           </button>
         </div>
       ) : (
@@ -223,18 +229,18 @@ export default function MyMatchesPage({
                         fontSize: '0.68rem',
                         boxShadow: '0 0 10px rgba(255, 214, 0, 0.4)'
                       }}>
-                        📌 PINNED MATCH
+                        {t('matches.badge_pinned', {}, '📌 PINNED MATCH')}
                       </span>
                     )}
                     <span className="badge badge-live" style={{ background: 'rgba(0, 230, 118, 0.15)', color: 'var(--success)', border: '1px solid var(--success)' }}>
-                      ✓ REGISTERED
+                      {t('matches.badge_registered', {}, '✓ REGISTERED')}
                     </span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       {t.mode} • {t.type}
                     </span>
                     {playerSlot?.squadCode && (
                       <span className="badge" style={{ background: 'rgba(255,214,0,0.15)', color: 'var(--accent)', fontSize: '0.68rem' }}>
-                        Squad: {playerSlot.squadCode}
+                        {t('matches.squad_label', {}, 'Squad')}: {playerSlot.squadCode}
                       </span>
                     )}
                   </div>
@@ -308,13 +314,13 @@ export default function MyMatchesPage({
                             cursor: 'pointer'
                           }}
                         >
-                          {copiedId === `room_${t.id}` ? '✓' : 'Copy'}
+                          {copiedId === `room_${t.id}` ? '✓' : t('matches.copy_btn', {}, 'Copy')}
                         </button>
                       </div>
 
                       <div style={{ background: 'rgba(0,0,0,0.5)', padding: '8px 12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>PASSWORD:</div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('matches.pass_label', {}, 'PASSWORD')}:</div>
                           <div style={{ fontFamily: 'monospace', fontSize: '1rem', fontWeight: '900', color: 'var(--accent)' }}>
                             {t.roomPassword || 'None'}
                           </div>
@@ -332,14 +338,14 @@ export default function MyMatchesPage({
                               cursor: 'pointer'
                             }}
                           >
-                            {copiedId === `pass_${t.id}` ? '✓' : 'Copy'}
+                            {copiedId === `pass_${t.id}` ? '✓' : t('matches.copy_btn', {}, 'Copy')}
                           </button>
                         )}
                       </div>
                     </div>
                   ) : (
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                      ⏳ Room ID & Password will be dropped here 15 minutes before start.
+                      ⏳ {t('matches.waiting_creds', {}, 'Room ID and Password will be dropped here before match starts.')}
                     </p>
                   )}
                 </div>
@@ -351,7 +357,7 @@ export default function MyMatchesPage({
                     className="btn btn-primary" 
                     style={{ width: '100%', padding: '12px', fontSize: '0.88rem', fontWeight: '700' }}
                   >
-                    🎮 Enter Match Lobby ➔
+                    {t('matches.view_details', {}, '🎮 Enter Match Lobby ➔')}
                   </button>
                 </div>
 
