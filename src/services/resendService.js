@@ -195,13 +195,16 @@ export const sendResendOtpEmail = async ({
   // 2. Web Browser: Try Vite proxy / Netlify proxy, Vercel Serverless proxy, or direct fetch
   const webEndpoints = [];
   if (typeof window !== 'undefined') {
-    // 1. Vite proxy / Netlify rewrite proxy (bypasses browser CORS)
+    // 1. Vite proxy / Netlify rewrite proxy (bypasses browser CORS on local dev or Netlify)
     webEndpoints.push('/api/resend/emails');
-    // 2. Vercel serverless function proxy (bypasses browser CORS)
+    // 2. Relative Vercel serverless function (if deployed on Vercel)
     webEndpoints.push('/api/send-otp');
-    // 3. Direct Resend endpoint
+    // 3. Global Cloud Proxy on Vercel (bypasses CORS from any browser / domain / localhost)
+    webEndpoints.push('https://zest-tournament.vercel.app/api/send-otp');
+    // 4. Direct Resend endpoint (fallback)
     webEndpoints.push('https://api.resend.com/emails');
   } else {
+    webEndpoints.push('https://zest-tournament.vercel.app/api/send-otp');
     webEndpoints.push('https://api.resend.com/emails');
   }
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Vercel Serverless Function to proxy email dispatch to Resend.com
  * Solves browser CORS errors when using the web app on Vercel
  */
@@ -22,7 +22,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    let payload = req.body;
+    if (typeof payload === 'string') {
+      try {
+        payload = JSON.parse(payload);
+      } catch (jsonErr) {
+        // Keep as is if parsing fails
+      }
+    }
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -33,7 +40,7 @@ export default async function handler(req, res) {
       body: JSON.stringify(payload)
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     return res.status(response.status).json(data);
   } catch (err) {
     console.error('[Vercel API Proxy Error]:', err);
