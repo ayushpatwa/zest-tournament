@@ -192,13 +192,14 @@ export const sendResendOtpEmail = async ({
     }
   }
 
-  // 2. Web Browser: Try Vite proxy, Vercel Serverless proxy, or direct fetch
+  // 2. Web Browser: Try Vite proxy / Netlify proxy, Vercel Serverless proxy, or direct fetch
   const webEndpoints = [];
   if (typeof window !== 'undefined') {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      webEndpoints.push('/api/resend/emails');
-    }
+    // 1. Vite proxy / Netlify rewrite proxy (bypasses browser CORS)
+    webEndpoints.push('/api/resend/emails');
+    // 2. Vercel serverless function proxy (bypasses browser CORS)
     webEndpoints.push('/api/send-otp');
+    // 3. Direct Resend endpoint
     webEndpoints.push('https://api.resend.com/emails');
   } else {
     webEndpoints.push('https://api.resend.com/emails');
@@ -230,10 +231,17 @@ export const sendResendOtpEmail = async ({
     }
   }
 
+  let friendlyError = lastError || 'Failed to dispatch email';
+  if (lastError === 'Failed to fetch') {
+    friendlyError = 'Browser CORS blocked direct request. In the Android APK app, this works 100% natively without CORS! On web, please deploy on Netlify/Vercel or test directly inside the Android APK.';
+  } else if (String(friendlyError).toLowerCase().includes('api key is invalid')) {
+    friendlyError = 'Resend API Key is invalid or expired. Please generate a new key in your Resend.com dashboard.';
+  } else if (String(friendlyError).toLowerCase().includes('domain') && String(friendlyError).toLowerCase().includes('not verified')) {
+    friendlyError = 'Domain not verified. Verify your domain at resend.com/domains or use onboarding@resend.dev for test sending.';
+  }
+
   return { 
     success: false, 
-    error: lastError === 'Failed to fetch' 
-      ? 'Browser CORS blocked direct request. In the Android APK app, this works 100% natively without CORS! On web, please deploy on Vercel or test in APK.' 
-      : (lastError || 'Failed to dispatch email') 
+    error: friendlyError
   };
 };

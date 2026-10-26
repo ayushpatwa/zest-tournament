@@ -16,5 +16,15 @@ export default defineConfig({
     watch: {
       ignored: ['**/android/**', '**/ios/**', '**/dist/**']
     }
+  },
+  preview: {
+    proxy: {
+      '/api/resend': {
+        target: 'https://api.resend.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/resend/, '')
+      }
+    }
   }
 })
