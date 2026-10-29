@@ -52,8 +52,8 @@ export default function WalletPage({
     setDepositSuccessMsg('');
 
     const amt = parseFloat(depositAmount);
-    if (isNaN(amt) || amt < 50) {
-      setDepositErrorMsg('Minimum deposit amount is ₹50.');
+    if (isNaN(amt) || amt < 100) {
+      setDepositErrorMsg('Minimum deposit amount is ₹100.');
       return;
     }
 
@@ -260,7 +260,7 @@ export default function WalletPage({
 
         <div style={{ display: 'flex', width: '100%', gap: '12px', marginTop: '6px' }}>
           <button 
-            onClick={() => { setShowAddModal(true); setDepositErrorMsg(''); setDepositSuccessMsg(''); }}
+            onClick={() => { setShowAddModal(true); setDepositAmount('100'); setDepositErrorMsg(''); setDepositSuccessMsg(''); }}
             className="btn btn-secondary" 
             style={{ flex: 1, padding: '12px', fontSize: '0.85rem', fontWeight: '900', background: 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)', color: '#000' }}
           >
@@ -593,22 +593,22 @@ export default function WalletPage({
             <form onSubmit={handleProceedDeposit}>
               
               <div className="form-group" style={{ marginBottom: '10px' }}>
-                <label>Deposit Amount (Min. ₹50) <span style={{ color: 'var(--primary)' }}>*</span></label>
+                <label>Deposit Amount (Min. ₹100) <span style={{ color: 'var(--primary)' }}>*</span></label>
                 <input 
                   type="number" 
                   value={depositAmount}
                   onChange={(e) => setDepositAmount(e.target.value)}
-                  placeholder="Enter amount (Min ₹50)"
+                  placeholder="Enter amount (Min ₹100)"
                   className="form-input"
                   required
-                  min="50"
+                  min="100"
                   max="10000"
                 />
               </div>
 
               {/* Quick selection chips */}
               <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                {['50', '100', '200', '500'].map(val => (
+                {['100', '200', '500', '1000'].map(val => (
                   <button
                     key={val}
                     type="button"
