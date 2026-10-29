@@ -52,8 +52,8 @@ export default function WalletPage({
     setDepositSuccessMsg('');
 
     const amt = parseFloat(depositAmount);
-    if (isNaN(amt) || amt < 10) {
-      setDepositErrorMsg('Minimum deposit amount is ₹10.');
+    if (isNaN(amt) || amt < 50) {
+      setDepositErrorMsg('Minimum deposit amount is ₹50.');
       return;
     }
 
@@ -593,22 +593,22 @@ export default function WalletPage({
             <form onSubmit={handleProceedDeposit}>
               
               <div className="form-group" style={{ marginBottom: '10px' }}>
-                <label>Deposit Amount (₹) <span style={{ color: 'var(--primary)' }}>*</span></label>
+                <label>Deposit Amount (Min. ₹50) <span style={{ color: 'var(--primary)' }}>*</span></label>
                 <input 
                   type="number" 
                   value={depositAmount}
                   onChange={(e) => setDepositAmount(e.target.value)}
-                  placeholder="Enter amount (Min ₹10)"
+                  placeholder="Enter amount (Min ₹50)"
                   className="form-input"
                   required
-                  min="10"
+                  min="50"
                   max="10000"
                 />
               </div>
 
               {/* Quick selection chips */}
               <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                {['10', '50', '100', '200', '500'].map(val => (
+                {['50', '100', '200', '500'].map(val => (
                   <button
                     key={val}
                     type="button"
