@@ -3030,10 +3030,10 @@ export default function AdminHostPanel({
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {[
                 { 
-                  label: '⚠️ 50rs Topup Rule', 
-                  title: 'Jab tk tum 50rs topup ni kroge tb tk deposit rqst accept ni hogi', 
-                  msg: 'Sabhi players dhyan de: Pehle kam se kam ₹50 ka topup / deposit complete karo. Bina ₹50 topup ke deposit request approve nahi ki jayegi.',
-                  tag: '⚠️ DEPOSIT RULE'
+                  label: '💳 Deposit Guidance', 
+                  title: 'Instant Wallet Deposit Process', 
+                  msg: 'Sabhi players dhyan de: Deposit submit karne ke baad correct payment UTR / reference number enter karein for instant verification.',
+                  tag: '💳 DEPOSIT'
                 },
                 { 
                   label: '🚫 Fair Play / Anti-Hack', 
@@ -3100,7 +3100,7 @@ export default function AdminHostPanel({
                   type="text" 
                   value={annTitle} 
                   onChange={(e) => setAnnTitle(e.target.value)} 
-                  placeholder="e.g. Jab tk tum 50rs topup ni kroge..."
+                  placeholder="e.g. Important Tournament Update..."
                   className="form-input"
                   required
                 />
