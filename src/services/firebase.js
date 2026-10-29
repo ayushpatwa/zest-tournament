@@ -860,6 +860,8 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
  * Deducts / penalizes coins from a user's wallet in Firestore in real-time.
  * deductMode options:
  * - 'withdrawal': Strictly checks winningBalance; only winning amount can be withdrawn.
+ * - 'winning': Explicitly deducts from winningBalance (Winnings Cash).
+ * - 'deposit': Explicitly deducts from depositBalance (Deposit Cash).
  * - 'match_entry': Deducts from depositBalance first, remainder from winningBalance.
  * - 'penalty': Standard penalty or admin adjustment.
  */
@@ -927,6 +929,34 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
         txType = 'withdrawal';
         txTitle = `Withdrawal: ${reason}`;
         txDetailReason = reason;
+      } else if (deductMode === 'winning') {
+        // Enforce: Deduct specifically from winningBalance
+        if (numAmount > balances.winningBalance) {
+          return {
+            success: false,
+            error: `Cannot deduct ₹${numAmount} from Winnings Cash. Player only has ₹${balances.winningBalance} in Winnings (Deposit: ₹${balances.depositBalance}, Total: ₹${balances.totalBalance}).`
+          };
+        }
+        newWinning = Math.max(0, Number((balances.winningBalance - numAmount).toFixed(2)));
+        newDeposit = balances.depositBalance;
+        newTotal = Number((newDeposit + newWinning).toFixed(2));
+        txType = 'penalty';
+        txTitle = `Deduction from Winnings: ${reason || 'Admin Adjustment'}`;
+        txDetailReason = reason ? `${reason} (Deducted from Winnings Cash)` : 'Deducted from Winnings Cash';
+      } else if (deductMode === 'deposit') {
+        // Enforce: Deduct specifically from depositBalance
+        if (numAmount > balances.depositBalance) {
+          return {
+            success: false,
+            error: `Cannot deduct ₹${numAmount} from Deposit Cash. Player only has ₹${balances.depositBalance} in Deposit (Winnings: ₹${balances.winningBalance}, Total: ₹${balances.totalBalance}).`
+          };
+        }
+        newDeposit = Math.max(0, Number((balances.depositBalance - numAmount).toFixed(2)));
+        newWinning = balances.winningBalance;
+        newTotal = Number((newDeposit + newWinning).toFixed(2));
+        txType = 'penalty';
+        txTitle = `Deduction from Deposit: ${reason || 'Admin Adjustment'}`;
+        txDetailReason = reason ? `${reason} (Deducted from Deposit Cash)` : 'Deducted from Deposit Cash';
       } else if (deductMode === 'match_entry') {
         // Deduct from deposit balance first, remainder from winning balance
         const split = calculateMatchEntrySplit(balances.depositBalance, balances.winningBalance, numAmount);
@@ -973,7 +1003,7 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
         transactions: arrayUnion(txRecord),
         lastDeduction: {
           amount: numAmount,
-          reason: reason,
+          reason: txDetailReason,
           deductMode: deductMode,
           deductedAt: new Date().toISOString()
         },
@@ -990,6 +1020,8 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
           winningBalance: newWinning 
         }, 
         newBalance: newTotal,
+        newDeposit: newDeposit,
+        newWinning: newWinning,
         balances: { totalBalance: newTotal, depositBalance: newDeposit, winningBalance: newWinning }
       };
     }

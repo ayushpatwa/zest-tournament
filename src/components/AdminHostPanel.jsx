@@ -112,6 +112,7 @@ export default function AdminHostPanel({
   // Prize & Wallet Manager states
   const [walletAction, setWalletAction] = useState('credit'); // 'credit' | 'deduct'
   const [creditCategory, setCreditCategory] = useState('winning'); // 'winning' | 'deposit'
+  const [deductCategory, setDeductCategory] = useState('winning'); // 'winning' | 'deposit'
   const [payoutPlayerIdentifier, setPayoutPlayerIdentifier] = useState('');
   const [payoutAmount, setPayoutAmount] = useState('500');
   const [payoutReason, setPayoutReason] = useState('1st Place Tournament Winner 🏆');
@@ -1033,16 +1034,21 @@ export default function AdminHostPanel({
       }
     } else {
       // Deduct mode
-      const res = await deductUserWalletRealtime(payoutPlayerIdentifier.trim(), amt, payoutReason.trim(), 'penalty');
+      const res = await deductUserWalletRealtime(
+        payoutPlayerIdentifier.trim(), 
+        amt, 
+        payoutReason.trim(), 
+        deductCategory
+      );
       if (res.success) {
-        setPayoutStatus(`✅ Successfully deducted ₹${amt} coins from player (${payoutPlayerIdentifier})! New Balance: ₹${res.newBalance}`);
+        setPayoutStatus(`✅ Successfully deducted ₹${amt} ${deductCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} from player (${payoutPlayerIdentifier})! New Total: ₹${res.newBalance} (Dep: ₹${res.balances?.depositBalance ?? res.newDeposit ?? 0}, Win: ₹${res.balances?.winningBalance ?? res.newWinning ?? 0})`);
         await sendToMakeWebhook({
           eventType: 'WALLET_DEDUCTION',
           nickname: res.user?.nickname || payoutPlayerIdentifier,
           ffUid: res.user?.uid || payoutPlayerIdentifier,
           email: res.user?.email || 'N/A',
           phone: res.user?.phone || 'N/A',
-          details: `Admin Deducted Coins: -₹${amt} (${payoutReason})`
+          details: `Admin Deducted Coins: -₹${amt} (${deductCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'}) (${payoutReason})`
         });
         setPayoutPlayerIdentifier('');
       } else {
@@ -2251,6 +2257,51 @@ export default function AdminHostPanel({
             </div>
           )}
 
+          {/* Category Selector for Deduct: Winnings vs Deposit */}
+          {walletAction === 'deduct' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Deduct Source Wallet Category: <span style={{ color: 'var(--primary)' }}>*</span></label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setDeductCategory('winning')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: deductCategory === 'winning' ? '1px solid #ffd600' : '1px solid var(--border-color)',
+                    background: deductCategory === 'winning' ? 'rgba(255, 214, 0, 0.15)' : 'rgba(255,255,255,0.03)',
+                    color: deductCategory === 'winning' ? '#ffd600' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.78rem',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🏆 Winnings Cash (Withdrawable)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeductCategory('deposit')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: deductCategory === 'deposit' ? '1px solid #00e5ff' : '1px solid var(--border-color)',
+                    background: deductCategory === 'deposit' ? 'rgba(0, 229, 255, 0.15)' : 'rgba(255,255,255,0.03)',
+                    color: deductCategory === 'deposit' ? '#00e5ff' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.78rem',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  💳 Deposit Cash (For Matches Only)
+                </button>
+              </div>
+            </div>
+          )}
+
           {payoutStatus && (
             <div style={{ 
               color: payoutStatus.includes('✅') ? 'var(--success)' : 'var(--danger)', 
@@ -2390,7 +2441,9 @@ export default function AdminHostPanel({
           >
             {payoutLoading 
               ? '⚡ Processing Cloud Update...' 
-              : (walletAction === 'credit' ? `⚡ Credit ₹${payoutAmount || 0} Coins to Player Wallet` : `🔻 Deduct ₹${payoutAmount || 0} Coins from Player Wallet`)}
+              : (walletAction === 'credit' 
+                  ? `⚡ Credit ₹${payoutAmount || 0} (${creditCategory === 'deposit' ? 'Deposit' : 'Winning'} Cash) to Player Wallet` 
+                  : `🔻 Deduct ₹${payoutAmount || 0} (${deductCategory === 'deposit' ? 'Deposit' : 'Winning'} Cash) from Player Wallet`)}
           </button>
 
             {/* Live Player Directory */}
