@@ -75,6 +75,7 @@ export default function AdminHostPanel({
   const [rosterPrizeAmount, setRosterPrizeAmount] = useState('');
   const [rosterPrizeReason, setRosterPrizeReason] = useState('');
   const [rosterPrizeCustomMsg, setRosterPrizeCustomMsg] = useState('');
+  const [rosterPrizeCategory, setRosterPrizeCategory] = useState('winning'); // 'winning' | 'deposit'
   const [rosterPrizeLoading, setRosterPrizeLoading] = useState(false);
   const [rosterPrizeStatus, setRosterPrizeStatus] = useState('');
   const [title, setTitle] = useState('');
@@ -1068,6 +1069,7 @@ export default function AdminHostPanel({
     setRosterPrizeAmount(String(defaultAmt));
     setRosterPrizeReason(`1st Place Winner - ${tourney.title}`);
     setRosterPrizeCustomMsg(`Congratulations ${player.nickname || 'Champion'}! Excellent match performance. Your winning prize has been credited!`);
+    setRosterPrizeCategory('winning');
     setRosterPrizeStatus('');
   };
 
@@ -1094,13 +1096,13 @@ export default function AdminHostPanel({
       const res = await creditUserWalletRealtime(
         targetIdentifier, 
         amt, 
-        '🏆 Tournament Prize Winnings', 
+        rosterPrizeCategory === 'deposit' ? '💳 Tournament Match Refund / Deposit' : '🏆 Tournament Prize Winnings', 
         txReason,
-        'winning'
+        rosterPrizeCategory
       );
 
       if (res.success) {
-        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} prize money to ${player.nickname || player.uid}'s wallet!`);
+        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to ${player.nickname || player.uid}'s wallet!`);
 
         // Send Make.com webhook logging
         await sendToMakeWebhook({
@@ -1109,13 +1111,14 @@ export default function AdminHostPanel({
           ffUid: player.uid || targetIdentifier,
           email: player.email || 'N/A',
           phone: player.phone || 'N/A',
-          details: `Match Roster Direct Prize: ₹${amt} (${finalReason}) [Match: ${tourney.title}]${customMsg ? ` | Msg: "${customMsg}"` : ''}`
+          details: `Match Roster Direct Prize: ₹${amt} (${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'}) (${finalReason}) [Match: ${tourney.title}]${customMsg ? ` | Msg: "${customMsg}"` : ''}`
         });
 
         // Send in-app notification & closed-app push notification to the winner
+        const notifCategoryLabel = rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winning Prize';
         const notifMessage = customMsg
-          ? `${customMsg}\n\n🏆 ₹${amt} winning coins credited for "${tourney.title}".`
-          : `Congratulations ${player.nickname || 'Player'}! You have won ₹${amt} in "${tourney.title}". The prize has been added directly to your wallet balance!`;
+          ? `${customMsg}\n\n🏆 ₹${amt} ${notifCategoryLabel} credited for "${tourney.title}".`
+          : `Congratulations ${player.nickname || 'Player'}! You have received ₹${amt} ${notifCategoryLabel} for "${tourney.title}". The amount has been added to your wallet!`;
 
         const playerUids = [
           String(player.uid || '').trim().toLowerCase(),
@@ -1124,11 +1127,11 @@ export default function AdminHostPanel({
 
         try {
           await sendNotificationRealtime({
-            title: `🏆 Prize Money Credited: ₹${amt}!`,
+            title: `🏆 ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Prize Money'} Credited: ₹${amt}!`,
             message: notifMessage,
             type: 'prize',
-            category: 'WINNINGS',
-            badgeText: 'PRIZE',
+            category: rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'WINNINGS',
+            badgeText: rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'PRIZE',
             targetTournamentId: tourney.id,
             targetUids: playerUids,
             tournamentTitle: tourney.title
@@ -4716,6 +4719,51 @@ export default function AdminHostPanel({
               </div>
             </div>
 
+            {/* Category Selector: Winnings vs Deposit */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-muted)', margin: 0 }}>
+                Credit Destination Wallet Category: <span style={{ color: '#ff1744' }}>*</span>
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setRosterPrizeCategory('winning')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: rosterPrizeCategory === 'winning' ? '1px solid #ffd600' : '1px solid rgba(255,255,255,0.1)',
+                    background: rosterPrizeCategory === 'winning' ? 'rgba(255, 214, 0, 0.15)' : 'rgba(255,255,255,0.03)',
+                    color: rosterPrizeCategory === 'winning' ? '#ffd600' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.78rem',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🏆 Winnings Cash (Withdrawable)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRosterPrizeCategory('deposit')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: rosterPrizeCategory === 'deposit' ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.1)',
+                    background: rosterPrizeCategory === 'deposit' ? 'rgba(0, 229, 255, 0.15)' : 'rgba(255,255,255,0.03)',
+                    color: rosterPrizeCategory === 'deposit' ? '#00e5ff' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.78rem',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  💳 Deposit Cash (For Matches Only)
+                </button>
+              </div>
+            </div>
+
             {/* Prize Amount Input & Quick Chips */}
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px' }}>
@@ -4950,7 +4998,7 @@ export default function AdminHostPanel({
                   '⚡ Crediting Wallet...'
                 ) : (
                   <>
-                    <span>⚡</span> Send ₹{rosterPrizeAmount || 0} Prize to Wallet
+                    <span>{rosterPrizeCategory === 'deposit' ? '💳' : '🏆'}</span> Send ₹{rosterPrizeAmount || 0} ({rosterPrizeCategory === 'deposit' ? 'Deposit' : 'Winning'} Cash) to Wallet
                   </>
                 )}
               </button>
