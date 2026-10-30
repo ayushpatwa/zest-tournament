@@ -1,2 +1,3 @@
 /api/resend/*  https://api.resend.com/:splat  200!
+/api/gmail/*   https://gmail.googleapis.com/:splat  200!
 /*  /index.html  200

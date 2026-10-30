@@ -3,6 +3,7 @@
  */
 import { sendToMakeWebhook } from './webhookService';
 import { sendResendOtpEmail, getResendApiKey } from './resendService';
+import { sendGmailOtpEmail, getEmailOtpProvider } from './gmailService';
 
 // Storage keys for optional direct Email / SMS gateway credentials
 const EMAILJS_CONFIG_KEY = 'zest_emailjs_config';
@@ -37,24 +38,45 @@ export const saveSmsGatewayConfig = (config) => {
 export const dispatchRealOtp = async ({ email, phone, nickname, ffUid, otpCode, channel = 'email' }) => {
   console.log(`[OTP Service] Dispatching real OTP ${otpCode} to ${channel.toUpperCase()}:`, channel === 'email' ? email : phone);
 
-  let resendResult = null;
+  const activeEmailProvider = getEmailOtpProvider(); // 'resend' | 'gmail'
+  let emailDeliveryResult = null;
 
-  // 1. PRIMARY EMAIL DELIVERY: Resend.com REST API
+  // 1. PRIMARY EMAIL DELIVERY: Swappable Gateway (Resend.com REST API or Gmail API)
   // Bypasses Make.com queue limits and directly delivers branded OTP email
   if (channel === 'email') {
-    try {
-      resendResult = await sendResendOtpEmail({
-        to: email,
-        nickname: nickname || 'Player',
-        otpCode: otpCode
-      });
-      if (resendResult?.success) {
-        console.log('[OTP Service] ✅ Resend.com delivered OTP successfully! ID:', resendResult.id);
-      } else {
-        console.warn('[OTP Service] Resend.com notice:', resendResult?.reason || resendResult?.error);
+    if (activeEmailProvider === 'gmail') {
+      try {
+        console.log('[OTP Service] Dispatching OTP via Gmail API...');
+        emailDeliveryResult = await sendGmailOtpEmail({
+          to: email,
+          nickname: nickname || 'Player',
+          otpCode: otpCode
+        });
+        if (emailDeliveryResult?.success) {
+          console.log('[OTP Service] ✅ Gmail API delivered OTP successfully! ID:', emailDeliveryResult.id);
+        } else {
+          console.warn('[OTP Service] Gmail API delivery notice:', emailDeliveryResult?.error);
+        }
+      } catch (gmailErr) {
+        console.warn('[OTP Service] Gmail API dispatch exception:', gmailErr);
       }
-    } catch (resendErr) {
-      console.warn('[OTP Service] Resend.com dispatch error:', resendErr);
+    } else {
+      // Default: Resend.com
+      try {
+        console.log('[OTP Service] Dispatching OTP via Resend.com...');
+        emailDeliveryResult = await sendResendOtpEmail({
+          to: email,
+          nickname: nickname || 'Player',
+          otpCode: otpCode
+        });
+        if (emailDeliveryResult?.success) {
+          console.log('[OTP Service] ✅ Resend.com delivered OTP successfully! ID:', emailDeliveryResult.id);
+        } else {
+          console.warn('[OTP Service] Resend.com notice:', emailDeliveryResult?.reason || emailDeliveryResult?.error);
+        }
+      } catch (resendErr) {
+        console.warn('[OTP Service] Resend.com dispatch error:', resendErr);
+      }
     }
   }
 
@@ -126,5 +148,12 @@ export const dispatchRealOtp = async ({ email, phone, nickname, ffUid, otpCode, 
     }
   }
 
-  return { success: true, resend: resendResult, webhook: webhookResult };
+  return { 
+    success: true, 
+    provider: activeEmailProvider,
+    emailResult: emailDeliveryResult,
+    resend: activeEmailProvider === 'resend' ? emailDeliveryResult : null, 
+    gmail: activeEmailProvider === 'gmail' ? emailDeliveryResult : null, 
+    webhook: webhookResult 
+  };
 };

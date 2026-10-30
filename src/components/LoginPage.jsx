@@ -13,6 +13,7 @@ import {
 } from '../services/firebase';
 import { dispatchRealOtp } from '../services/otpService';
 import { updateLiveResendConfig } from '../services/resendService';
+import { updateLiveEmailOtpProvider, updateLiveGmailConfig } from '../services/gmailService';
 
 export default function LoginPage({ onLoginSuccess }) {
   const { language, setLanguage, t, languages, currentLanguageObj } = useLanguage();
@@ -32,6 +33,12 @@ export default function LoginPage({ onLoginSuccess }) {
             apiKey: settings.resendApiKey,
             fromEmail: settings.resendFromEmail
           });
+        }
+        if (settings.emailOtpProvider) {
+          updateLiveEmailOtpProvider(settings.emailOtpProvider);
+        }
+        if (settings.gmailConfig) {
+          updateLiveGmailConfig(settings.gmailConfig);
         }
         if (typeof settings.welcomeBonus === 'number') {
           setWelcomeBonus(settings.welcomeBonus);
@@ -213,10 +220,11 @@ export default function LoginPage({ onLoginSuccess }) {
 
     setResendTimer(25);
     setAuthMode('otp_verify');
-    if (otpRes?.resend?.success) {
+    const emailRes = otpRes?.emailResult || otpRes?.resend || otpRes?.gmail;
+    if (emailRes?.success) {
       setOtpSuccessMsg(`✅ 6-digit OTP code sent to ${targetUser.email}! Please check your Inbox and Spam/Junk folder.`);
-    } else if (otpRes?.resend?.error) {
-      setOtpSuccessMsg(`⚠️ Notice: ${otpRes.resend.error}`);
+    } else if (emailRes?.error) {
+      setOtpSuccessMsg(`⚠️ Notice: ${emailRes.error}`);
     }
 
     setLoading(false);

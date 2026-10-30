@@ -11,6 +11,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/resend/, '')
+      },
+      '/api/gmail': {
+        target: 'https://gmail.googleapis.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/gmail/, '')
       }
     },
     watch: {
@@ -24,6 +30,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/resend/, '')
+      },
+      '/api/gmail': {
+        target: 'https://gmail.googleapis.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/gmail/, '')
       }
     }
   }

@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { getWebhookUrl, setWebhookUrl, sendToMakeWebhook } from '../services/webhookService';
 import { getResendApiKey, getResendFromEmail, saveResendConfig, sendResendOtpEmail } from '../services/resendService';
+import { 
+  getEmailOtpProvider, 
+  setEmailOtpProvider, 
+  updateLiveEmailOtpProvider, 
+  getGmailConfig, 
+  saveGmailConfig, 
+  updateLiveGmailConfig, 
+  sendGmailOtpEmail,
+  GMAIL_APPS_SCRIPT_TEMPLATE 
+} from '../services/gmailService';
 import { dispatchPushNotification, showSystemNotification, getLiveFcmConfig, updateLiveFcmConfig } from '../services/notificationService';
 import { 
   saveAppSettingsRealtime, 
@@ -147,6 +157,27 @@ export default function AdminHostPanel({
   const [testResendStatus, setTestResendStatus] = useState('');
   const [isTestingResend, setIsTestingResend] = useState(false);
 
+  // Swappable Email OTP Provider & Gateway states ('resend' | 'gmail')
+  const [emailOtpProvider, setEmailOtpProviderState] = useState(() => getEmailOtpProvider());
+  const [providerToggleStatus, setProviderToggleStatus] = useState('');
+
+  // Gmail API Gateway states
+  const initialGmailConfig = getGmailConfig();
+  const [gmailMode, setGmailMode] = useState(initialGmailConfig?.mode || 'appscript');
+  const [gmailScriptUrlInput, setGmailScriptUrlInput] = useState(initialGmailConfig?.scriptUrl || '');
+  const [gmailUserEmailInput, setGmailUserEmailInput] = useState(initialGmailConfig?.userEmail || '');
+  const [gmailAccessTokenInput, setGmailAccessTokenInput] = useState(initialGmailConfig?.accessToken || '');
+  const [gmailClientIdInput, setGmailClientIdInput] = useState(initialGmailConfig?.clientId || '');
+  const [gmailClientSecretInput, setGmailClientSecretInput] = useState(initialGmailConfig?.clientSecret || '');
+  const [gmailRefreshTokenInput, setGmailRefreshTokenInput] = useState(initialGmailConfig?.refreshToken || '');
+  const [gmailSaveStatus, setGmailSaveStatus] = useState('');
+  const [isSavingGmail, setIsSavingGmail] = useState(false);
+  const [testGmailEmail, setTestGmailEmail] = useState('');
+  const [testGmailStatus, setTestGmailStatus] = useState('');
+  const [isTestingGmail, setIsTestingGmail] = useState(false);
+  const [copiedScriptTemplate, setCopiedScriptTemplate] = useState(false);
+  const [showScriptCodeBox, setShowScriptCodeBox] = useState(false);
+
   // Firebase Cloud Messaging (FCM) Closed-App Push states
   const [fcmServiceAccountInput, setFcmServiceAccountInput] = useState(() => getLiveFcmConfig() || '');
   const [fcmSaveStatus, setFcmSaveStatus] = useState('');
@@ -194,6 +225,21 @@ export default function AdminHostPanel({
         if (typeof settings.welcomeBonus === 'number') setWelcomeBonusSetting(settings.welcomeBonus);
         if (settings.resendApiKey) setResendApiKeyInput(settings.resendApiKey);
         if (settings.resendFromEmail) setResendFromEmailInput(settings.resendFromEmail);
+        if (settings.emailOtpProvider) {
+          setEmailOtpProviderState(settings.emailOtpProvider);
+          updateLiveEmailOtpProvider(settings.emailOtpProvider);
+        }
+        if (settings.gmailConfig) {
+          updateLiveGmailConfig(settings.gmailConfig);
+          const cfg = settings.gmailConfig;
+          if (cfg.mode) setGmailMode(cfg.mode);
+          if (cfg.scriptUrl !== undefined) setGmailScriptUrlInput(cfg.scriptUrl);
+          if (cfg.userEmail !== undefined) setGmailUserEmailInput(cfg.userEmail);
+          if (cfg.accessToken !== undefined) setGmailAccessTokenInput(cfg.accessToken);
+          if (cfg.clientId !== undefined) setGmailClientIdInput(cfg.clientId);
+          if (cfg.clientSecret !== undefined) setGmailClientSecretInput(cfg.clientSecret);
+          if (cfg.refreshToken !== undefined) setGmailRefreshTokenInput(cfg.refreshToken);
+        }
         if (settings.fcmServiceAccount) {
           setFcmServiceAccountInput(settings.fcmServiceAccount);
           updateLiveFcmConfig(settings.fcmServiceAccount);
@@ -882,6 +928,91 @@ export default function AdminHostPanel({
     } finally {
       setIsTestingResend(false);
     }
+  };
+
+  const handleToggleEmailProvider = async (provider) => {
+    const cleanProvider = provider === 'gmail' ? 'gmail' : 'resend';
+    setEmailOtpProviderState(cleanProvider);
+    setEmailOtpProvider(cleanProvider);
+    updateLiveEmailOtpProvider(cleanProvider);
+    setProviderToggleStatus(`⏳ Switching active gateway to ${cleanProvider === 'gmail' ? 'Gmail API' : 'Resend.com'}...`);
+    try {
+      await saveAppSettingsRealtime({ emailOtpProvider: cleanProvider });
+      setProviderToggleStatus(`✅ Active Email Provider switched to ${cleanProvider === 'gmail' ? 'Gmail API' : 'Resend.com'} across all devices!`);
+    } catch (err) {
+      setProviderToggleStatus(`⚠️ Provider switched locally, cloud sync notice: ${err.message}`);
+    }
+    setTimeout(() => setProviderToggleStatus(''), 4000);
+  };
+
+  const handleSaveGmailConfig = async (e) => {
+    e.preventDefault();
+    setGmailSaveStatus('');
+    setIsSavingGmail(true);
+    try {
+      const cfg = {
+        mode: gmailMode,
+        scriptUrl: gmailScriptUrlInput.trim(),
+        userEmail: gmailUserEmailInput.trim(),
+        accessToken: gmailAccessTokenInput.trim(),
+        clientId: gmailClientIdInput.trim(),
+        clientSecret: gmailClientSecretInput.trim(),
+        refreshToken: gmailRefreshTokenInput.trim()
+      };
+      saveGmailConfig(cfg);
+      await saveAppSettingsRealtime({ gmailConfig: cfg });
+      setGmailSaveStatus('✅ Gmail API settings saved and synced to cloud in real-time!');
+    } catch (err) {
+      setGmailSaveStatus(`❌ Failed to save: ${err.message}`);
+    } finally {
+      setIsSavingGmail(false);
+      setTimeout(() => setGmailSaveStatus(''), 4500);
+    }
+  };
+
+  const handleTestGmailEmail = async () => {
+    if (!testGmailEmail || !testGmailEmail.includes('@')) {
+      setTestGmailStatus('⚠️ Please enter a valid test email address.');
+      return;
+    }
+    setTestGmailStatus('⏳ Dispatching test OTP via Gmail API...');
+    setIsTestingGmail(true);
+    try {
+      const testCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const res = await sendGmailOtpEmail({
+        to: testGmailEmail.trim(),
+        nickname: 'Admin Tester',
+        otpCode: testCode,
+        subject: `[TEST] Zest Tournament Verification Code: ${testCode}`,
+        configOverride: {
+          mode: gmailMode,
+          scriptUrl: gmailScriptUrlInput.trim(),
+          userEmail: gmailUserEmailInput.trim(),
+          accessToken: gmailAccessTokenInput.trim(),
+          clientId: gmailClientIdInput.trim(),
+          clientSecret: gmailClientSecretInput.trim(),
+          refreshToken: gmailRefreshTokenInput.trim()
+        }
+      });
+
+      if (res?.success) {
+        setTestGmailStatus(`🎉 Success! Test OTP (${testCode}) delivered to ${testGmailEmail} via Gmail API!`);
+      } else {
+        setTestGmailStatus(`❌ Error sending test email: ${res?.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      setTestGmailStatus(`❌ Test exception: ${err.message}`);
+    } finally {
+      setIsTestingGmail(false);
+    }
+  };
+
+  const handleCopyScriptTemplate = () => {
+    try {
+      navigator.clipboard.writeText(GMAIL_APPS_SCRIPT_TEMPLATE);
+      setCopiedScriptTemplate(true);
+      setTimeout(() => setCopiedScriptTemplate(false), 3000);
+    } catch (_) {}
   };
 
   const handleSaveWebhook = async (e) => {
@@ -3941,114 +4072,462 @@ export default function AdminHostPanel({
       {activeTab === 'webhook' && (
         <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
           
-          {/* SECTION 1: RESEND.COM EMAIL OTP DELIVERY GATEWAY */}
+          {/* SECTION 1: EMAIL OTP DELIVERY GATEWAY (RESEND.COM vs GMAIL API TOGGLE) */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.06) 0%, rgba(124, 77, 255, 0.06) 100%)',
+            background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.05) 0%, rgba(234, 67, 53, 0.05) 100%)',
             border: '1px solid rgba(0, 229, 255, 0.3)',
             borderRadius: '12px',
             padding: '18px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '14px'
+            gap: '16px'
           }}>
+            {/* Header & Active Badge */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
               <div>
                 <h3 style={{ fontSize: '1.05rem', color: '#00e5ff', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⚡</span> Resend.com Email Delivery Gateway (Primary OTP)
+                  <span>📧</span> Email OTP Delivery Gateway (Swappable Provider)
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-                  Ultra-fast direct Email OTP delivery. Bypasses Make.com queue limits and delivers branded OTPs directly to player inboxes in under 2 seconds!
+                  Choose your active email gateway for sending 6-digit registration & password reset codes. Toggle between <strong>Resend.com</strong> and <strong>Gmail API</strong> with 1 click!
                 </p>
               </div>
-              <span className="badge" style={{ background: 'rgba(0, 229, 255, 0.2)', color: '#00e5ff', fontSize: '0.7rem' }}>
-                🚀 ULTRA FAST
+              <span className="badge" style={{ 
+                background: emailOtpProvider === 'gmail' ? 'rgba(234, 67, 53, 0.2)' : 'rgba(0, 229, 255, 0.2)', 
+                color: emailOtpProvider === 'gmail' ? '#ff5252' : '#00e5ff', 
+                fontSize: '0.72rem',
+                border: `1px solid ${emailOtpProvider === 'gmail' ? 'rgba(234, 67, 53, 0.4)' : 'rgba(0, 229, 255, 0.4)'}`
+              }}>
+                🟢 ACTIVE: {emailOtpProvider === 'gmail' ? 'GMAIL API' : 'RESEND.COM'}
               </span>
             </div>
 
-            <form onSubmit={handleSaveResendConfig} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Resend.com API Key <span style={{ color: 'var(--primary)' }}>* (Format: re_xxxxxxxx)</span></label>
-                <input 
-                  type="text" 
-                  value={resendApiKeyInput} 
-                  onChange={(e) => setResendApiKeyInput(e.target.value)} 
-                  placeholder="re_123456789_abcdefg..." 
-                  className="form-input"
-                  style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
-                  required
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Sender "From" Email / Domain</label>
-                <input 
-                  type="text" 
-                  value={resendFromEmailInput} 
-                  onChange={(e) => setResendFromEmailInput(e.target.value)} 
-                  placeholder="Zest Tournament <onboarding@resend.dev> or Zest Tournament <otp@yourdomain.com>" 
-                  className="form-input"
-                  style={{ fontSize: '0.85rem' }}
-                  required
-                />
-                <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
-                  💡 Default testing sender: <code style={{ color: '#00e5ff' }}>Zest Tournament &lt;onboarding@resend.dev&gt;</code>. Add your verified domain in <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff' }}>resend.com/domains</a> to send to any player.
-                </small>
-              </div>
-
-              {resendSaveStatus && (
-                <div style={{ color: resendSaveStatus.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontSize: '0.85rem' }}>
-                  {resendSaveStatus}
-                </div>
-              )}
-
-              <button 
-                type="submit" 
-                disabled={isSavingResend}
-                className="btn btn-primary"
-                style={{ height: '42px', fontWeight: '800' }}
-              >
-                {isSavingResend ? 'Saving & Syncing...' : '💾 Save & Sync Resend.com Settings'}
-              </button>
-            </form>
-
-            {/* Test Send Box */}
-            <div style={{
-              background: 'rgba(0,0,0,0.25)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '8px',
-              padding: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}>
-              <label style={{ fontSize: '0.78rem', color: '#fff', fontWeight: '700' }}>
-                🧪 Send Live Test OTP Email via Resend.com:
+            {/* TOGGLE SELECTOR: RESEND vs GMAIL API */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: '800', color: 'var(--text-muted)' }}>
+                ⚡ ACTIVE OTP GATEWAY SELECTOR (CLICK TO TOGGLE):
               </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input 
-                  type="email" 
-                  value={testResendEmail} 
-                  onChange={(e) => setTestResendEmail(e.target.value)} 
-                  placeholder="Enter your email to receive test OTP" 
-                  className="form-input"
-                  style={{ flex: 1, height: '38px', fontSize: '0.8rem' }}
-                />
-                <button 
-                  type="button" 
-                  onClick={handleTestResendEmail}
-                  disabled={isTestingResend}
-                  className="btn btn-secondary"
-                  style={{ padding: '0 16px', height: '38px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                background: 'rgba(0, 0, 0, 0.45)',
+                padding: '6px',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => handleToggleEmailProvider('resend')}
+                  style={{
+                    flex: 1,
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    border: emailOtpProvider === 'resend' ? '2px solid #00e5ff' : '1px solid transparent',
+                    background: emailOtpProvider === 'resend' ? 'rgba(0, 229, 255, 0.2)' : 'transparent',
+                    color: emailOtpProvider === 'resend' ? '#00e5ff' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontWeight: '900',
+                    fontSize: '0.88rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: emailOtpProvider === 'resend' ? '0 0 16px rgba(0, 229, 255, 0.35)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
-                  {isTestingResend ? 'Sending...' : '⚡ Send Test OTP'}
+                  <span>⚡</span> Resend.com {emailOtpProvider === 'resend' ? '✓ (ACTIVE)' : ''}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleEmailProvider('gmail')}
+                  style={{
+                    flex: 1,
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    border: emailOtpProvider === 'gmail' ? '2px solid #ea4335' : '1px solid transparent',
+                    background: emailOtpProvider === 'gmail' ? 'rgba(234, 67, 53, 0.2)' : 'transparent',
+                    color: emailOtpProvider === 'gmail' ? '#ff5252' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontWeight: '900',
+                    fontSize: '0.88rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: emailOtpProvider === 'gmail' ? '0 0 16px rgba(234, 67, 53, 0.35)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <span>✉️</span> Gmail API {emailOtpProvider === 'gmail' ? '✓ (ACTIVE)' : ''}
                 </button>
               </div>
-              {testResendStatus && (
-                <div style={{ fontSize: '0.78rem', color: testResendStatus.startsWith('🎉') ? 'var(--success)' : testResendStatus.startsWith('⏳') ? '#00e5ff' : 'var(--danger)' }}>
-                  {testResendStatus}
+
+              {providerToggleStatus && (
+                <div style={{ color: providerToggleStatus.includes('✅') ? 'var(--success)' : '#00e5ff', fontSize: '0.82rem', fontWeight: '700' }}>
+                  {providerToggleStatus}
                 </div>
               )}
             </div>
+
+            {/* PROVIDER 1: RESEND.COM CONFIGURATION */}
+            {emailOtpProvider === 'resend' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <form onSubmit={handleSaveResendConfig} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Resend.com API Key <span style={{ color: 'var(--primary)' }}>* (Format: re_xxxxxxxx)</span></label>
+                    <input 
+                      type="text" 
+                      value={resendApiKeyInput} 
+                      onChange={(e) => setResendApiKeyInput(e.target.value)} 
+                      placeholder="re_123456789_abcdefg..." 
+                      className="form-input"
+                      style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Sender "From" Email / Domain</label>
+                    <input 
+                      type="text" 
+                      value={resendFromEmailInput} 
+                      onChange={(e) => setResendFromEmailInput(e.target.value)} 
+                      placeholder="Zest Tournament <onboarding@resend.dev> or Zest Tournament <otp@yourdomain.com>" 
+                      className="form-input"
+                      style={{ fontSize: '0.85rem' }}
+                      required
+                    />
+                    <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
+                      💡 Default testing sender: <code style={{ color: '#00e5ff' }}>Zest Tournament &lt;onboarding@resend.dev&gt;</code>. Add your verified domain in <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff' }}>resend.com/domains</a> to send to any player.
+                    </small>
+                  </div>
+
+                  {resendSaveStatus && (
+                    <div style={{ color: resendSaveStatus.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontSize: '0.85rem' }}>
+                      {resendSaveStatus}
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit" 
+                    disabled={isSavingResend}
+                    className="btn btn-primary"
+                    style={{ height: '42px', fontWeight: '800' }}
+                  >
+                    {isSavingResend ? 'Saving & Syncing...' : '💾 Save & Sync Resend.com Settings'}
+                  </button>
+                </form>
+
+                {/* Test Send Box for Resend */}
+                <div style={{
+                  background: 'rgba(0,0,0,0.25)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <label style={{ fontSize: '0.78rem', color: '#fff', fontWeight: '700' }}>
+                    🧪 Send Live Test OTP Email via Resend.com:
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      type="email" 
+                      value={testResendEmail} 
+                      onChange={(e) => setTestResendEmail(e.target.value)} 
+                      placeholder="Enter your email to receive test OTP" 
+                      className="form-input"
+                      style={{ flex: 1, height: '38px', fontSize: '0.8rem' }}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={handleTestResendEmail}
+                      disabled={isTestingResend}
+                      className="btn btn-secondary"
+                      style={{ padding: '0 16px', height: '38px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                    >
+                      {isTestingResend ? 'Sending...' : '⚡ Send Test OTP'}
+                    </button>
+                  </div>
+                  {testResendStatus && (
+                    <div style={{ fontSize: '0.78rem', color: testResendStatus.startsWith('🎉') ? 'var(--success)' : testResendStatus.startsWith('⏳') ? '#00e5ff' : 'var(--danger)' }}>
+                      {testResendStatus}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* PROVIDER 2: GMAIL API CONFIGURATION */}
+            {emailOtpProvider === 'gmail' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Integration Mode Switcher */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: '700' }}>
+                    Gmail Integration Mode:
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setGmailMode('appscript')}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: gmailMode === 'appscript' ? '1px solid #ea4335' : '1px solid rgba(255,255,255,0.1)',
+                        background: gmailMode === 'appscript' ? 'rgba(234, 67, 53, 0.15)' : 'rgba(255,255,255,0.03)',
+                        color: gmailMode === 'appscript' ? '#ff5252' : 'var(--text-muted)',
+                        fontSize: '0.78rem',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ⚡ Google Apps Script Web App (Recommended - Free personal @gmail)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGmailMode('rest')}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: gmailMode === 'rest' ? '1px solid #00e5ff' : '1px solid rgba(255,255,255,0.1)',
+                        background: gmailMode === 'rest' ? 'rgba(0, 229, 255, 0.15)' : 'rgba(255,255,255,0.03)',
+                        color: gmailMode === 'rest' ? '#00e5ff' : 'var(--text-muted)',
+                        fontSize: '0.78rem',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🔑 Gmail REST API (OAuth2 / Access Token)
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveGmailConfig} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {gmailMode === 'appscript' ? (
+                    <>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Google Apps Script Web App URL <span style={{ color: 'var(--primary)' }}>*</span></label>
+                        <input 
+                          type="url" 
+                          value={gmailScriptUrlInput} 
+                          onChange={(e) => setGmailScriptUrlInput(e.target.value)} 
+                          placeholder="https://script.google.com/macros/s/AKfycb.../exec" 
+                          className="form-input"
+                          style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}
+                          required
+                        />
+                      </div>
+
+                      {/* 1-Click Code Box & Instructions */}
+                      <div style={{
+                        background: 'rgba(0,0,0,0.35)',
+                        border: '1px solid rgba(234, 67, 53, 0.25)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.76rem', color: '#ffb300', fontWeight: '800' }}>
+                            📋 1-Click Google Apps Script Code:
+                          </span>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={handleCopyScriptTemplate}
+                              style={{
+                                background: copiedScriptTemplate ? 'var(--success)' : 'rgba(255,255,255,0.1)',
+                                border: 'none',
+                                color: copiedScriptTemplate ? '#000' : '#fff',
+                                padding: '4px 10px',
+                                borderRadius: '4px',
+                                fontSize: '0.72rem',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {copiedScriptTemplate ? '✓ Copied Script!' : '📋 Copy Code'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowScriptCodeBox(prev => !prev)}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                color: 'var(--text-muted)',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.72rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {showScriptCodeBox ? 'Hide Code' : 'View Code'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {showScriptCodeBox && (
+                          <pre style={{
+                            background: '#0d1117',
+                            padding: '10px',
+                            borderRadius: '6px',
+                            color: '#00e5ff',
+                            fontSize: '0.7rem',
+                            overflowX: 'auto',
+                            margin: 0
+                          }}>
+                            {GMAIL_APPS_SCRIPT_TEMPLATE}
+                          </pre>
+                        )}
+
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                          <strong>How to set up in 30 seconds:</strong><br />
+                          1. Open <a href="https://script.google.com" target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff' }}>script.google.com</a> and click <strong>New Project</strong>.<br />
+                          2. Paste the copied code and click <strong>Deploy ➔ New Deployment</strong>.<br />
+                          3. Select <strong>Web App</strong>, set <em>Execute as: Me</em>, <em>Who has access: Anyone</em>, click Deploy, and copy the Web App URL here!
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Your Gmail Address <span style={{ color: 'var(--primary)' }}>*</span></label>
+                        <input 
+                          type="email" 
+                          value={gmailUserEmailInput} 
+                          onChange={(e) => setGmailUserEmailInput(e.target.value)} 
+                          placeholder="e.g. yourname@gmail.com" 
+                          className="form-input"
+                          style={{ fontSize: '0.85rem' }}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>OAuth2 Access Token (Format: ya29...)</label>
+                        <input 
+                          type="text" 
+                          value={gmailAccessTokenInput} 
+                          onChange={(e) => setGmailAccessTokenInput(e.target.value)} 
+                          placeholder="ya29.a0AfH6SM..." 
+                          className="form-input"
+                          style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}
+                        />
+                      </div>
+
+                      <div className="grid-2" style={{ gap: '10px' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Google OAuth Client ID</label>
+                          <input 
+                            type="text" 
+                            value={gmailClientIdInput} 
+                            onChange={(e) => setGmailClientIdInput(e.target.value)} 
+                            placeholder="xxxxxx.apps.googleusercontent.com" 
+                            className="form-input"
+                            style={{ fontSize: '0.8rem' }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Google OAuth Client Secret</label>
+                          <input 
+                            type="password" 
+                            value={gmailClientSecretInput} 
+                            onChange={(e) => setGmailClientSecretInput(e.target.value)} 
+                            placeholder="GOCSPX-xxxxxx" 
+                            className="form-input"
+                            style={{ fontSize: '0.8rem' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>OAuth Refresh Token (for automatic access token renewal)</label>
+                        <input 
+                          type="text" 
+                          value={gmailRefreshTokenInput} 
+                          onChange={(e) => setGmailRefreshTokenInput(e.target.value)} 
+                          placeholder="1//04xxxxxx..." 
+                          className="form-input"
+                          style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {gmailSaveStatus && (
+                    <div style={{ color: gmailSaveStatus.startsWith('✅') ? 'var(--success)' : 'var(--danger)', fontSize: '0.85rem' }}>
+                      {gmailSaveStatus}
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit" 
+                    disabled={isSavingGmail}
+                    className="btn btn-primary"
+                    style={{ 
+                      height: '42px', 
+                      fontWeight: '800',
+                      background: 'linear-gradient(135deg, #ea4335 0%, #ff5252 100%)',
+                      color: '#fff'
+                    }}
+                  >
+                    {isSavingGmail ? 'Saving & Syncing...' : '💾 Save & Sync Gmail API Settings'}
+                  </button>
+                </form>
+
+                {/* Test Send Box for Gmail */}
+                <div style={{
+                  background: 'rgba(0,0,0,0.25)',
+                  border: '1px solid rgba(234, 67, 53, 0.25)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <label style={{ fontSize: '0.78rem', color: '#fff', fontWeight: '700' }}>
+                    🧪 Send Live Test OTP Email via Gmail API:
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      type="email" 
+                      value={testGmailEmail} 
+                      onChange={(e) => setTestGmailEmail(e.target.value)} 
+                      placeholder="Enter your email to receive test OTP" 
+                      className="form-input"
+                      style={{ flex: 1, height: '38px', fontSize: '0.8rem' }}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={handleTestGmailEmail}
+                      disabled={isTestingGmail}
+                      className="btn btn-secondary"
+                      style={{ 
+                        padding: '0 16px', 
+                        height: '38px', 
+                        fontSize: '0.78rem', 
+                        whiteSpace: 'nowrap',
+                        borderColor: '#ea4335',
+                        color: '#ff5252'
+                      }}
+                    >
+                      {isTestingGmail ? 'Sending...' : '⚡ Send Test OTP'}
+                    </button>
+                  </div>
+                  {testGmailStatus && (
+                    <div style={{ fontSize: '0.78rem', color: testGmailStatus.startsWith('🎉') ? 'var(--success)' : testGmailStatus.startsWith('⏳') ? '#00e5ff' : 'var(--danger)' }}>
+                      {testGmailStatus}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* SECTION 2: MAKE.COM & GOOGLE SHEETS */}
