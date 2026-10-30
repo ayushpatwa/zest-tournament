@@ -913,7 +913,7 @@ export default function AdminHostPanel({
         to: testResendEmail.trim(),
         nickname: 'Admin Tester',
         otpCode: testCode,
-        subject: `[TEST] Zest Tournament Verification Code: ${testCode}`,
+        subject: `${testCode} is your Zest verification code`,
         apiKey: resendApiKeyInput.trim(),
         fromEmail: resendFromEmailInput.trim()
       });
@@ -983,7 +983,7 @@ export default function AdminHostPanel({
         to: testGmailEmail.trim(),
         nickname: 'Admin Tester',
         otpCode: testCode,
-        subject: `[TEST] Zest Tournament Verification Code: ${testCode}`,
+        subject: `${testCode} is your Zest verification code`,
         configOverride: {
           mode: gmailMode,
           scriptUrl: gmailScriptUrlInput.trim(),

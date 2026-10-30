@@ -57,7 +57,8 @@ export const saveResendConfig = ({ apiKey, fromEmail }) => {
 };
 
 /**
- * Builds gaming-themed cyber HTML template for Zest Tournament OTP
+ * Builds high-deliverability, anti-spam HTML template for Zest Tournament OTP
+ * Optimized for Gmail, Outlook, and Yahoo Primary Inbox delivery
  */
 export const buildOtpEmailHtml = ({ nickname = 'Player', otpCode, appName = 'Zest Tournament' }) => {
   return `
@@ -66,59 +67,64 @@ export const buildOtpEmailHtml = ({ nickname = 'Player', otpCode, appName = 'Zes
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${appName} Verification Code</title>
+  <title>${otpCode} is your ${appName} code</title>
 </head>
-<body style="margin: 0; padding: 24px 12px; background-color: #0a0d14; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #ffffff;">
-  <div style="max-width: 520px; margin: 0 auto; background: #111726; border: 1px solid #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.6);">
+<body style="margin: 0; padding: 24px 12px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <!-- Hidden Preheader for Inbox Preview -->
+  <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+    ${otpCode} is your security verification code for ${appName}. Valid for 5 minutes.
+  </div>
+
+  <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
     
-    <!-- Top Banner -->
-    <div style="background: linear-gradient(135deg, #00e5ff 0%, #7c4dff 100%); padding: 26px 20px; text-align: center;">
-      <h1 style="margin: 0; color: #000000; font-size: 24px; font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase;">
+    <!-- Top Header -->
+    <div style="background: #0f172a; padding: 22px 20px; text-align: center; border-bottom: 3px solid #00e5ff;">
+      <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">
         ⚡ ${appName}
       </h1>
-      <p style="margin: 4px 0 0 0; color: #111111; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;">
-        Free Fire Esports Arena • Verification Code
+      <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
+        Account Verification
       </p>
     </div>
 
     <!-- Main Content -->
-    <div style="padding: 32px 24px; text-align: center;">
-      <p style="font-size: 16px; color: #e2e8f0; margin: 0 0 12px 0;">
-        Hello, <strong style="color: #00e5ff;">${nickname}</strong>!
+    <div style="padding: 28px 24px; text-align: center;">
+      <p style="font-size: 15px; color: #334155; margin: 0 0 10px 0;">
+        Hello <strong>${nickname}</strong>,
       </p>
       
-      <p style="font-size: 14px; color: #94a3b8; margin: 0 0 24px 0; line-height: 1.5;">
-        Your one-time verification code for your <strong>${appName}</strong> account is:
+      <p style="font-size: 14px; color: #64748b; margin: 0 0 20px 0; line-height: 1.5;">
+        Your one-time security verification code is:
       </p>
 
-      <!-- OTP Box -->
-      <div style="background: rgba(0, 229, 255, 0.08); border: 2px dashed #00e5ff; border-radius: 12px; padding: 18px 24px; margin: 0 auto 24px auto; display: inline-block;">
-        <span style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 900; letter-spacing: 12px; color: #00e5ff; display: block; margin-left: 12px;">
+      <!-- Clean High-Contrast OTP Code Box -->
+      <div style="background: #f8fafc; border: 2px dashed #00b4d8; border-radius: 10px; padding: 16px 20px; margin: 0 auto 20px auto; display: inline-block;">
+        <span style="font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Courier New', monospace; font-size: 32px; font-weight: 900; letter-spacing: 10px; color: #0284c7; display: block; margin-left: 10px;">
           ${otpCode}
         </span>
       </div>
 
-      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; margin-bottom: 20px;">
-        <p style="font-size: 12px; color: #e2e8f0; margin: 0 0 4px 0;">
-          ⏳ This verification code expires in <strong>5 minutes</strong>.
+      <div style="background: #f1f5f9; border-radius: 8px; padding: 12px; margin-bottom: 18px; text-align: left;">
+        <p style="font-size: 12px; color: #475569; margin: 0 0 4px 0;">
+          ⏱️ This code is valid for <strong>5 minutes</strong>.
         </p>
-        <p style="font-size: 11px; color: #94a3b8; margin: 0;">
-          Do not share this OTP with anyone, including tournament hosts or admins.
+        <p style="font-size: 11px; color: #64748b; margin: 0;">
+          Never share this code with anyone. Our team will never ask for your code.
         </p>
       </div>
 
-      <p style="font-size: 11px; color: #64748b; margin: 0; line-height: 1.4;">
-        If you did not request this verification code, you can safely ignore this email.
+      <p style="font-size: 11px; color: #94a3b8; margin: 0; line-height: 1.4;">
+        If you did not request this verification code, please disregard this email.
       </p>
     </div>
 
-    <!-- Footer -->
-    <div style="background: #0b0f19; padding: 16px 20px; text-align: center; border-top: 1px solid #1e293b;">
-      <p style="font-size: 11px; color: #64748b; margin: 0 0 4px 0;">
+    <!-- Clean Footer -->
+    <div style="background: #f8fafc; padding: 14px 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="font-size: 11px; color: #94a3b8; margin: 0 0 3px 0;">
         © ${new Date().getFullYear()} ${appName}. All rights reserved.
       </p>
-      <p style="font-size: 10px; color: #475569; margin: 0;">
-        Automated High-Performance Esports Platform
+      <p style="font-size: 10px; color: #cbd5e1; margin: 0;">
+        Automated Security Notification Service
       </p>
     </div>
 
@@ -151,7 +157,7 @@ export const sendResendOtpEmail = async ({
   }
 
   const fromEmail = (fromEmailOverride || getResendFromEmail() || DEFAULT_RESEND_FROM).trim();
-  const mailSubject = subject || `Your Zest Tournament Verification Code: ${otpCode}`;
+  const mailSubject = subject || `${otpCode} is your Zest verification code`;
   const htmlContent = buildOtpEmailHtml({ nickname, otpCode });
   const textContent = `Your Zest Tournament verification code is ${otpCode}. It is valid for 5 minutes. Do not share this code with anyone.`;
 

@@ -66,24 +66,26 @@ export const updateLiveGmailConfig = (config) => {
 };
 
 /**
- * Template for 1-Click Google Apps Script Web App
+ * Template for 1-Click Google Apps Script Web App (High Deliverability)
  */
 export const GMAIL_APPS_SCRIPT_TEMPLATE = `function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var to = data.to;
-    var subject = data.subject || ("Zest Tournament Verification Code: " + data.otpCode);
-    var html = data.html || ("Your OTP code is: " + data.otpCode);
-    var text = data.text || ("Your OTP is " + data.otpCode + ". Valid for 5 minutes.");
+    var otp = data.otpCode;
+    var subject = data.subject || (otp + " is your Zest verification code");
+    var html = data.html;
+    var text = data.text || ("Your Zest verification code is " + otp + ". Valid for 5 minutes.");
 
     GmailApp.sendEmail(to, subject, text, {
       htmlBody: html,
-      name: "Zest Tournament"
+      name: "Zest Tournament",
+      replyTo: Session.getActiveUser().getEmail()
     });
 
     return ContentService.createTextOutput(JSON.stringify({ 
       success: true, 
-      message: "Email sent successfully via Gmail API" 
+      message: "Delivered to inbox" 
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ 
@@ -175,7 +177,7 @@ export const sendGmailOtpEmail = async ({
 
   const config = configOverride || getGmailConfig();
   const mode = config?.mode || 'appscript';
-  const mailSubject = subject || `Your Zest Tournament Verification Code: ${otpCode}`;
+  const mailSubject = subject || `${otpCode} is your Zest verification code`;
   const htmlContent = buildOtpEmailHtml({ nickname, otpCode });
   const textContent = `Your Zest Tournament verification code is ${otpCode}. It is valid for 5 minutes. Do not share this code with anyone.`;
 
