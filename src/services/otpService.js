@@ -56,9 +56,31 @@ export const dispatchRealOtp = async ({ email, phone, nickname, ffUid, otpCode, 
           console.log('[OTP Service] ✅ Gmail API delivered OTP successfully! ID:', emailDeliveryResult.id);
         } else {
           console.warn('[OTP Service] Gmail API delivery notice:', emailDeliveryResult?.error);
+          // Automatic failover to Resend.com if Gmail daily quota is exhausted
+          console.log('[OTP Service] 🔄 Attempting seamless backup delivery via Resend.com...');
+          const fallbackRes = await sendResendOtpEmail({
+            to: email,
+            nickname: nickname || 'Player',
+            otpCode: otpCode
+          });
+          if (fallbackRes?.success) {
+            console.log('[OTP Service] ✅ Resend backup delivered successfully!');
+            emailDeliveryResult = { ...fallbackRes, provider: 'resend_failover' };
+          }
         }
       } catch (gmailErr) {
         console.warn('[OTP Service] Gmail API dispatch exception:', gmailErr);
+        // Automatic failover on exception
+        try {
+          const fallbackRes = await sendResendOtpEmail({
+            to: email,
+            nickname: nickname || 'Player',
+            otpCode: otpCode
+          });
+          if (fallbackRes?.success) {
+            emailDeliveryResult = { ...fallbackRes, provider: 'resend_failover' };
+          }
+        } catch (_) {}
       }
     } else {
       // Default: Resend.com
