@@ -67,11 +67,11 @@ export default function MyMatchesPage({
   // (Merges live tournaments, permanent Firestore history, and verified transaction logs)
   const allJoinedMatches = getUserAllJoinedMatches(tournaments, userProfile);
 
-  const upcomingMatches = allJoinedMatches.filter(t => !isMatchCompleted(t));
-  const completedMatches = allJoinedMatches.filter(t => isMatchCompleted(t));
+  const upcomingMatches = allJoinedMatches.filter(t => !isMatchCompleted(t, tournaments));
+  const completedMatches = allJoinedMatches.filter(t => isMatchCompleted(t, tournaments));
 
   const filteredMatches = allJoinedMatches.filter(tourney => {
-    const isComp = isMatchCompleted(tourney);
+    const isComp = isMatchCompleted(tourney, tournaments);
     if (filter === 'upcoming') return !isComp;
     if (filter === 'completed') return isComp;
     return true;
@@ -191,7 +191,7 @@ export default function MyMatchesPage({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {sortedMatches.map(tourney => {
-            const completed = isMatchCompleted(tourney);
+            const completed = isMatchCompleted(tourney, tournaments);
             const playerSlot = tourney.joinedPlayers?.find(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
             const slotIndex = tourney.joinedPlayers?.findIndex(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
 

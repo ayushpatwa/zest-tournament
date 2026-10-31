@@ -126,6 +126,14 @@ export const getTournamentSortTimestamp = (t) => {
   const tomorrowStr = getTomorrowDateString();
   let datePart = String(t.matchDate || '').trim();
 
+  // If matchDate is 'today' or missing, check if joinedAt specifies the exact calendar date
+  if ((!datePart || datePart.toLowerCase() === 'today') && t.joinedAt) {
+    const joinedDateMatch = String(t.joinedAt).match(/(\d{4}-\d{2}-\d{2})/);
+    if (joinedDateMatch) {
+      datePart = joinedDateMatch[1];
+    }
+  }
+
   if (!datePart || datePart.toLowerCase() === 'today') {
     datePart = todayStr;
   } else if (datePart.toLowerCase() === 'tomorrow') {

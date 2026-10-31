@@ -3,18 +3,58 @@ import { getTournamentSortTimestamp, formatMatchDate, getTodayDateString } from 
 /**
  * Checks whether a tournament match has been completed.
  * A match is completed if:
- * 1. Its status is explicitly 'completed'
+ * 1. Its status is explicitly 'completed', 'ended', 'finished', or 'closed'
  * 2. It has an explicit isCompleted flag
- * 3. Its scheduled start time has passed by more than 30 minutes
+ * 3. A prize was credited for this match (prizeWon > 0)
+ * 4. Its scheduled start time has passed by more than 25 minutes
+ * 5. It was joined > 40 minutes ago and not in the future
+ * 6. It was in history but has been removed from the active arena list by the host
  */
-export const isMatchCompleted = (tourney) => {
+export const isMatchCompleted = (tourney, activeTournamentsList = null) => {
   if (!tourney) return false;
-  if (tourney.status === 'completed' || tourney.isCompleted) return true;
 
+  // 1. Explicit completion flags or statuses
+  if (
+    tourney.status === 'completed' || 
+    tourney.status === 'ended' || 
+    tourney.status === 'finished' || 
+    tourney.status === 'closed' || 
+    tourney.isCompleted === true || 
+    tourney.isHistory === true
+  ) {
+    return true;
+  }
+
+  // 2. If a prize was already credited/won for this match, it is definitively completed
+  if (tourney.prizeWon && Number(tourney.prizeWon) > 0) {
+    return true;
+  }
+
+  // 3. Check joinedAt timestamp: if joined more than 40 minutes ago (Free Fire match lasts ~15-20 min)
+  if (tourney.joinedAt) {
+    const joinedTime = new Date(tourney.joinedAt).getTime();
+    if (!isNaN(joinedTime) && joinedTime > 0) {
+      if (Date.now() > joinedTime + 40 * 60 * 1000) {
+        const matchTimestamp = getTournamentSortTimestamp(tourney);
+        if (!matchTimestamp || Date.now() > matchTimestamp + 20 * 60 * 1000) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // 4. Check scheduled match date & time: if start time was more than 25 minutes ago
   const matchTimestamp = getTournamentSortTimestamp(tourney);
   if (matchTimestamp && typeof matchTimestamp === 'number' && matchTimestamp > 0) {
-    // If the match start time was more than 30 minutes ago, consider it completed
-    if (Date.now() > matchTimestamp + 30 * 60 * 1000) {
+    if (Date.now() > matchTimestamp + 25 * 60 * 1000) {
+      return true;
+    }
+  }
+
+  // 5. If the tournament was in history and is no longer an active tournament in Arena
+  if (activeTournamentsList && Array.isArray(activeTournamentsList) && activeTournamentsList.length > 0) {
+    const isStillActiveInArena = activeTournamentsList.some(t => t.id === tourney.id);
+    if (!isStillActiveInArena) {
       return true;
     }
   }
@@ -105,6 +145,8 @@ export const extractCompletedMatchesFromTransactions = (userProfile = {}) => {
 
   // Find all entry fee / registration transactions
   transactions.forEach((tx) => {
+    if (tx.hideFromMatchHistory) return;
+
     const isEntry = tx.type === 'entry_fee' || 
                     tx.type === 'registration' || 
                     String(tx.title || '').toLowerCase().includes('entry fee') ||
@@ -157,6 +199,7 @@ export const extractCompletedMatchesFromTransactions = (userProfile = {}) => {
 export const getUserAllJoinedMatches = (tournaments = [], userProfile = {}) => {
   const cleanUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
   const cleanEmail = String(userProfile?.email || '').trim().toLowerCase();
+  const cleanNick = String(userProfile?.nickname || '').trim().toLowerCase();
 
   const allMap = new Map();
 
@@ -167,14 +210,18 @@ export const getUserAllJoinedMatches = (tournaments = [], userProfile = {}) => {
       const isJoined = tourney.joinedPlayers.some((p) => {
         const pUid = String(p.uid || '').trim().toLowerCase();
         const pEmail = String(p.email || '').trim().toLowerCase();
-        return (cleanUid && pUid === cleanUid) || (cleanEmail && pEmail === cleanEmail);
+        const pNick = String(p.nickname || '').trim().toLowerCase();
+        return (cleanUid && pUid === cleanUid) || 
+               (cleanEmail && pEmail === cleanEmail) || 
+               (cleanNick && pNick === cleanNick);
       });
 
       if (isJoined) {
+        const completed = isMatchCompleted(tourney, tournaments);
         allMap.set(tourney.id, {
           ...tourney,
-          isCompleted: isMatchCompleted(tourney),
-          status: isMatchCompleted(tourney) ? 'completed' : (tourney.status || 'upcoming')
+          isCompleted: completed,
+          status: completed ? 'completed' : (tourney.status || 'upcoming')
         });
       }
     });
@@ -184,45 +231,53 @@ export const getUserAllJoinedMatches = (tournaments = [], userProfile = {}) => {
   const permanentHistory = Array.isArray(userProfile?.joinedMatchesHistory) ? userProfile.joinedMatchesHistory : [];
   permanentHistory.forEach((histMatch) => {
     if (!histMatch || !histMatch.id) return;
+    const completed = isMatchCompleted(histMatch, tournaments);
     if (!allMap.has(histMatch.id)) {
       allMap.set(histMatch.id, {
         ...histMatch,
-        isCompleted: isMatchCompleted(histMatch),
-        status: isMatchCompleted(histMatch) ? 'completed' : (histMatch.status || 'upcoming'),
+        isCompleted: completed,
+        status: completed ? 'completed' : (histMatch.status || 'upcoming'),
         isHistory: true
       });
     } else {
       // Merge permanent record with active record to ensure joinedAt and details are preserved
       const existing = allMap.get(histMatch.id);
+      const isComp = completed || isMatchCompleted(existing, tournaments);
       allMap.set(histMatch.id, {
         ...histMatch,
         ...existing,
-        isCompleted: isMatchCompleted(existing) || isMatchCompleted(histMatch)
+        isCompleted: isComp,
+        status: isComp ? 'completed' : existing.status
       });
     }
   });
 
-  // 3. Reconstruct matches from transactions (for older matches before permanent history)
-  const fromTransactions = extractCompletedMatchesFromTransactions(userProfile);
-  fromTransactions.forEach((txMatch) => {
-    if (!allMap.has(txMatch.id)) {
-      allMap.set(txMatch.id, txMatch);
-    } else {
-      // If active match found, attach prizeWon if any
-      const existing = allMap.get(txMatch.id);
-      if (txMatch.prizeWon && !existing.prizeWon) {
-        existing.prizeWon = txMatch.prizeWon;
-        existing.prizeReason = txMatch.prizeReason;
+  // 3. Reconstruct matches from transactions (if not explicitly cleared by user)
+  if (!userProfile?.matchHistoryCleared) {
+    const fromTransactions = extractCompletedMatchesFromTransactions(userProfile);
+    fromTransactions.forEach((txMatch) => {
+      if (!allMap.has(txMatch.id)) {
+        allMap.set(txMatch.id, {
+          ...txMatch,
+          isCompleted: true,
+          status: 'completed'
+        });
+      } else {
+        const existing = allMap.get(txMatch.id);
+        if (txMatch.prizeWon && !existing.prizeWon) {
+          existing.prizeWon = txMatch.prizeWon;
+          existing.prizeReason = txMatch.prizeReason;
+        }
       }
-    }
-  });
+    });
+  }
 
   const mergedList = Array.from(allMap.values());
 
   // Sort: upcoming matches by start time, completed matches by most recent first
   mergedList.sort((a, b) => {
-    const aComp = isMatchCompleted(a);
-    const bComp = isMatchCompleted(b);
+    const aComp = isMatchCompleted(a, tournaments);
+    const bComp = isMatchCompleted(b, tournaments);
 
     // If one is completed and one is upcoming, keep upcoming first in 'all' view
     if (!aComp && bComp) return -1;
