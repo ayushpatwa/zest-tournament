@@ -3841,6 +3841,34 @@ export default function AdminHostPanel({
                     <button
                       type="button"
                       onClick={async () => {
+                        const newStatus = t.status === 'completed' ? 'upcoming' : 'completed';
+                        const confirmMsg = t.status === 'completed' 
+                          ? `Re-open "${t.title}" to Upcoming?`
+                          : `Mark "${t.title}" as Completed? All joined players will see this in their Completed tab.`;
+                        if (window.confirm(confirmMsg)) {
+                          await saveTournamentRealtime({ ...t, status: newStatus, isCompleted: newStatus === 'completed' });
+                        }
+                      }}
+                      className="btn"
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '0.75rem',
+                        background: t.status === 'completed' 
+                          ? 'rgba(0, 229, 255, 0.15)' 
+                          : 'rgba(255, 255, 255, 0.08)',
+                        color: t.status === 'completed' ? 'var(--secondary)' : '#fff',
+                        border: t.status === 'completed' ? '1px solid var(--secondary)' : '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '8px',
+                        fontWeight: '800',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {t.status === 'completed' ? '✓ Completed' : '🏁 End Match'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
                         const currentJoined = t.joinedPlayers?.length || 0;
                         const maxSlots = t.slotsTotal || t.maxSlots || 48;
                         const availableSlots = Math.max(0, maxSlots - currentJoined);

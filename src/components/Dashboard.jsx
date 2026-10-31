@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { formatMatchDate, sortTournamentsByTime } from '../services/dateUtils';
 import { subscribeToAppSettingsRealtime } from '../services/firebase';
+import { isMatchCompleted } from '../services/matchHistoryService';
 
 // Countdown Timer Component
 function CountdownTimer({ startTime }) {
@@ -521,7 +522,11 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                             {t('dashboard.pinned_match', {}, '📌 PINNED MATCH')}
                           </span>
                         )}
-                        {isMatchFull ? (
+                        {isMatchCompleted(tourney) ? (
+                          <span className="badge badge-completed" style={{ background: 'rgba(0, 229, 255, 0.15)', color: 'var(--secondary)', border: '1px solid rgba(0, 229, 255, 0.4)', fontWeight: '900', fontSize: '0.65rem' }}>
+                            🏁 COMPLETED
+                          </span>
+                        ) : isMatchFull ? (
                           <span className="badge" style={{ background: '#ff1744', color: '#fff', fontWeight: '900', fontSize: '0.65rem', boxShadow: '0 0 10px rgba(255,23,68,0.5)' }}>
                             {t('dashboard.housefull', {}, '🔴 HOUSEFULL')}
                           </span>

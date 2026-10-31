@@ -221,6 +221,57 @@ export const joinTournamentRealtime = async (tournamentId, participantData) => {
 };
 
 /**
+ * Permanently records a joined tournament match to the user's document
+ * This guarantees the match is preserved in the player's 'Completed' section
+ * even if the active tournament is cleared or deleted later by hosts.
+ */
+export const recordJoinedMatchToUserRealtime = async (userId, matchSummary) => {
+  try {
+    if (!userId || !matchSummary) return { success: false };
+    const cleanUid = String(userId).trim();
+    const userRef = doc(db, "users", cleanUid);
+    
+    // Clean matchSummary to avoid undefined keys
+    const cleanSummary = {};
+    Object.keys(matchSummary).forEach(k => {
+      if (matchSummary[k] !== undefined) cleanSummary[k] = matchSummary[k];
+    });
+
+    await setDoc(userRef, {
+      joinedMatchesHistory: arrayUnion(cleanSummary),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    console.log(`[Firebase] Successfully recorded match ${cleanSummary.id || ''} into permanent history for user ${cleanUid}`);
+    return { success: true };
+  } catch (err) {
+    console.warn("[Firebase] Could not record joined match to user history:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Marks a tournament as completed in Firestore real-time
+ */
+export const markTournamentCompletedRealtime = async (tournamentId) => {
+  try {
+    if (!tournamentId) return { success: false };
+    const tourneyRef = doc(db, "tournaments", tournamentId);
+    await updateDoc(tourneyRef, {
+      status: 'completed',
+      isCompleted: true,
+      completedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    console.log(`[Firebase] Tournament ${tournamentId} marked completed.`);
+    return { success: true };
+  } catch (err) {
+    console.error("[Firebase] Error marking tournament completed:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
  * Removes / kicks a player from a tournament in Firestore in real-time
  */
 export const removePlayerFromTournamentRealtime = async (tournamentId, playerUidOrEmail) => {

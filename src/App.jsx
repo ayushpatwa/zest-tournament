@@ -30,9 +30,11 @@ import {
   removePlayerFromTournamentRealtime,
   updateRoomCredentialsRealtime,
   saveUserProfileRealtime,
-  deductUserWalletRealtime
+  deductUserWalletRealtime,
+  recordJoinedMatchToUserRealtime
 } from './services/firebase';
 import { sortTournamentsByTime } from './services/dateUtils';
+import { getUserAllJoinedMatches } from './services/matchHistoryService';
 import './App.css';
 
 export default function App() {
@@ -445,16 +447,45 @@ export default function App() {
     };
     setTransactions(prev => [newTx, ...prev]);
 
-    // 3. Update User Profile
-    setUserProfile(prev => ({
-      ...prev,
-      uid: String(uid).trim(),
-      nickname: String(nickname).trim(),
-      stats: {
-        ...prev.stats,
-        matches: (prev.stats?.matches || 0) + 1
+    // 3. Construct match summary for permanent history & update User Profile
+    const matchRecord = {
+      id: targetTourney?.id || tournamentId,
+      title: targetTourney?.title || `Tournament Match #${tournamentId}`,
+      mode: targetTourney?.mode || 'Battle Royale',
+      type: targetTourney?.type || 'Solo',
+      map: targetTourney?.map || 'Bermuda',
+      matchDate: targetTourney?.matchDate || '',
+      startTime: targetTourney?.startTime || targetTourney?.time || '10:00 AM',
+      entryFee: numFee,
+      prizePool: targetTourney?.prizePool || targetTourney?.prize || 0,
+      perKill: targetTourney?.perKill || 0,
+      joinedAt: new Date().toISOString(),
+      status: targetTourney?.status || 'upcoming'
+    };
+
+    setUserProfile(prev => {
+      const existingHist = Array.isArray(prev.joinedMatchesHistory) ? prev.joinedMatchesHistory : [];
+      const updatedHist = [matchRecord, ...existingHist.filter(m => m.id !== matchRecord.id)];
+      const updatedProfile = {
+        ...prev,
+        uid: String(uid).trim(),
+        nickname: String(nickname).trim(),
+        joinedMatchesHistory: updatedHist,
+        stats: {
+          ...prev.stats,
+          matches: (prev.stats?.matches || 0) + 1
+        }
+      };
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('zest_user_profile', JSON.stringify(updatedProfile));
+        } catch (_) {}
       }
-    }));
+      return updatedProfile;
+    });
+
+    // Record permanently in Firestore Cloud so match is never lost from history
+    recordJoinedMatchToUserRealtime(targetUserId, matchRecord);
 
     // Specific participant record strictly tied to this player's UID
     const userParticipant = { 
@@ -602,7 +633,8 @@ export default function App() {
     );
   }
 
-  const selectedTournament = tournaments.find(t => t.id === selectedTournamentId);
+  const selectedTournament = tournaments.find(t => t.id === selectedTournamentId) ||
+    getUserAllJoinedMatches(tournaments, userProfile).find(t => t.id === selectedTournamentId);
 
   const isMasterHost = 
     String(currentUser?.uid || userProfile?.uid || '').trim() === '9084311275';
