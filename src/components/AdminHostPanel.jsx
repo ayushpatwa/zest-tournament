@@ -219,11 +219,19 @@ export default function AdminHostPanel({
   const [isDeletingAnn, setIsDeletingAnn] = useState(false);
   const [annStatusMsg, setAnnStatusMsg] = useState('');
 
+  // Player Registration OTP Requirement Toggle
+  const [requireRegistrationOtp, setRequireRegistrationOtp] = useState(true);
+  const [otpToggleStatus, setOtpToggleStatus] = useState('');
+  const [isTogglingOtp, setIsTogglingOtp] = useState(false);
+
   useEffect(() => {
     const unsub = subscribeToAppSettingsRealtime((settings) => {
       if (settings) {
         if (typeof settings.referralReward === 'number') setReferralRewardSetting(settings.referralReward);
         if (typeof settings.welcomeBonus === 'number') setWelcomeBonusSetting(settings.welcomeBonus);
+        if (settings.requireRegistrationOtp !== undefined) {
+          setRequireRegistrationOtp(settings.requireRegistrationOtp !== false);
+        }
         if (settings.resendApiKey) setResendApiKeyInput(settings.resendApiKey);
         if (settings.resendFromEmail) setResendFromEmailInput(settings.resendFromEmail);
         if (settings.emailOtpProvider) {
@@ -944,6 +952,21 @@ export default function AdminHostPanel({
       setProviderToggleStatus(`⚠️ Provider switched locally, cloud sync notice: ${err.message}`);
     }
     setTimeout(() => setProviderToggleStatus(''), 4000);
+  };
+
+  const handleToggleRegistrationOtp = async (shouldRequireOtp) => {
+    setIsTogglingOtp(true);
+    setOtpToggleStatus(`⏳ Updating player registration mode to ${shouldRequireOtp ? 'OTP Verification Required' : 'Instant Registration (No OTP)'}...`);
+    try {
+      setRequireRegistrationOtp(shouldRequireOtp);
+      await saveAppSettingsRealtime({ requireRegistrationOtp: shouldRequireOtp });
+      setOtpToggleStatus(`✅ Player registration mode updated: ${shouldRequireOtp ? '🛡️ OTP Verification Required' : '⚡ Instant Registration (No OTP)'} active across all devices!`);
+    } catch (err) {
+      setOtpToggleStatus(`⚠️ Mode updated locally, cloud sync notice: ${err.message}`);
+    } finally {
+      setIsTogglingOtp(false);
+      setTimeout(() => setOtpToggleStatus(''), 4500);
+    }
   };
 
   const handleSaveGmailConfig = async (e) => {
@@ -4106,6 +4129,147 @@ export default function AdminHostPanel({
       {/* MODE 5: INTEGRATIONS: RESEND.COM & MAKE.COM */}
       {activeTab === 'webhook' && (
         <div className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+          
+          {/* SECTION 0: PLAYER REGISTRATION OTP TOGGLE (REGISTER WITH OTP vs REGISTER WITHOUT OTP) */}
+          <div style={{
+            background: requireRegistrationOtp 
+              ? 'linear-gradient(135deg, rgba(0, 229, 255, 0.08) 0%, rgba(103, 58, 183, 0.08) 100%)' 
+              : 'linear-gradient(135deg, rgba(0, 230, 118, 0.12) 0%, rgba(255, 214, 0, 0.08) 100%)',
+            border: requireRegistrationOtp ? '1px solid rgba(0, 229, 255, 0.4)' : '1px solid rgba(0, 230, 118, 0.5)',
+            borderRadius: '12px',
+            padding: '18px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            boxShadow: requireRegistrationOtp ? '0 0 20px rgba(0, 229, 255, 0.08)' : '0 0 20px rgba(0, 230, 118, 0.12)'
+          }}>
+            {/* Header & Status Badge */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', color: requireRegistrationOtp ? '#00e5ff' : '#00e676', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{requireRegistrationOtp ? '🛡️' : '⚡'}</span> Player Registration Mode (OTP Switch)
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                  Choose whether new players must verify email OTP to register or register instantly without OTP.
+                </p>
+              </div>
+              <span className="badge" style={{
+                background: requireRegistrationOtp ? 'rgba(0, 229, 255, 0.18)' : 'rgba(0, 230, 118, 0.22)',
+                color: requireRegistrationOtp ? '#00e5ff' : '#00e676',
+                border: `1px solid ${requireRegistrationOtp ? 'rgba(0, 229, 255, 0.5)' : 'rgba(0, 230, 118, 0.6)'}`,
+                fontSize: '0.75rem',
+                fontWeight: '900',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px'
+              }}>
+                {requireRegistrationOtp ? '🛡️ OTP REQUIRED' : '⚡ NO OTP (INSTANT)'}
+              </span>
+            </div>
+
+            {/* Toggle Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: '800', color: 'var(--text-muted)' }}>
+                👉 SELECT REGISTRATION MODE (REAL-TIME CLOUD SYNC):
+              </label>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '10px',
+                background: 'rgba(0, 0, 0, 0.45)',
+                padding: '8px',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                {/* OPTION 1: WITH OTP */}
+                <button
+                  type="button"
+                  disabled={isTogglingOtp}
+                  onClick={() => handleToggleRegistrationOtp(true)}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    border: requireRegistrationOtp ? '2px solid #00e5ff' : '1px solid rgba(255, 255, 255, 0.1)',
+                    background: requireRegistrationOtp ? 'linear-gradient(135deg, rgba(0, 229, 255, 0.25) 0%, rgba(0, 150, 255, 0.15) 100%)' : 'rgba(255, 255, 255, 0.03)',
+                    color: requireRegistrationOtp ? '#00e5ff' : 'var(--text-muted)',
+                    cursor: isTogglingOtp ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '4px',
+                    boxShadow: requireRegistrationOtp ? '0 0 16px rgba(0, 229, 255, 0.3)' : 'none',
+                    transition: 'all 0.2s ease',
+                    textAlign: 'left'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <span style={{ fontWeight: '900', fontSize: '0.92rem', color: requireRegistrationOtp ? '#00e5ff' : '#fff' }}>
+                      🛡️ Register With OTP
+                    </span>
+                    {requireRegistrationOtp && (
+                      <span style={{ fontSize: '0.7rem', background: '#00e5ff', color: '#000', padding: '2px 8px', borderRadius: '12px', fontWeight: '900' }}>
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.8, lineHeight: '1.3' }}>
+                    Players must enter 6-digit email OTP. Prevents spam and fake registrations.
+                  </span>
+                </button>
+
+                {/* OPTION 2: WITHOUT OTP */}
+                <button
+                  type="button"
+                  disabled={isTogglingOtp}
+                  onClick={() => handleToggleRegistrationOtp(false)}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    border: !requireRegistrationOtp ? '2px solid #00e676' : '1px solid rgba(255, 255, 255, 0.1)',
+                    background: !requireRegistrationOtp ? 'linear-gradient(135deg, rgba(0, 230, 118, 0.25) 0%, rgba(0, 200, 83, 0.15) 100%)' : 'rgba(255, 255, 255, 0.03)',
+                    color: !requireRegistrationOtp ? '#00e676' : 'var(--text-muted)',
+                    cursor: isTogglingOtp ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '4px',
+                    boxShadow: !requireRegistrationOtp ? '0 0 18px rgba(0, 230, 118, 0.35)' : 'none',
+                    transition: 'all 0.2s ease',
+                    textAlign: 'left'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <span style={{ fontWeight: '900', fontSize: '0.92rem', color: !requireRegistrationOtp ? '#00e676' : '#fff' }}>
+                      ⚡ Register Without OTP
+                    </span>
+                    {!requireRegistrationOtp && (
+                      <span style={{ fontSize: '0.7rem', background: '#00e676', color: '#000', padding: '2px 8px', borderRadius: '12px', fontWeight: '900' }}>
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.8, lineHeight: '1.3' }}>
+                    Instant 1-click registration. No email delivery delay or verification needed.
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Live Status Feedback */}
+            {otpToggleStatus && (
+              <div style={{
+                fontSize: '0.8rem',
+                fontWeight: '700',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                background: otpToggleStatus.includes('✅') ? 'rgba(0, 230, 118, 0.15)' : 'rgba(0, 229, 255, 0.15)',
+                color: otpToggleStatus.includes('✅') ? '#00e676' : '#00e5ff',
+                border: `1px solid ${otpToggleStatus.includes('✅') ? 'rgba(0, 230, 118, 0.3)' : 'rgba(0, 229, 255, 0.3)'}`
+              }}>
+                {otpToggleStatus}
+              </div>
+            )}
+          </div>
           
           {/* SECTION 1: EMAIL OTP DELIVERY GATEWAY (RESEND.COM vs GMAIL API TOGGLE) */}
           <div style={{

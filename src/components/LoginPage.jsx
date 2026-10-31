@@ -21,6 +21,7 @@ export default function LoginPage({ onLoginSuccess }) {
   const [welcomeBonus, setWelcomeBonus] = useState(0);
   const [referralRewardAmount, setReferralRewardAmount] = useState(0);
   const [referralCodeInput, setReferralCodeInput] = useState('');
+  const [requireRegistrationOtp, setRequireRegistrationOtp] = useState(true);
 
   useEffect(() => {
     const unsub = subscribeToAppSettingsRealtime((settings) => {
@@ -45,6 +46,9 @@ export default function LoginPage({ onLoginSuccess }) {
         }
         if (typeof settings.referralReward === 'number') {
           setReferralRewardAmount(settings.referralReward);
+        }
+        if (settings.requireRegistrationOtp !== undefined) {
+          setRequireRegistrationOtp(settings.requireRegistrationOtp !== false);
         }
       }
     });
@@ -208,7 +212,78 @@ export default function LoginPage({ onLoginSuccess }) {
 
     setPendingUser(targetUser);
 
-    // Automated Real Dispatch: Webhook + Direct Email/SMS Gateway
+    // =========================================================================
+    // ⚡ INSTANT REGISTRATION MODE (WHEN REGISTRATION OTP IS DISABLED BY ADMIN)
+    // =========================================================================
+    if (!requireRegistrationOtp) {
+      try {
+        // 1. Save directly to Cloud Firestore in real-time
+        const saveRes = await saveUserProfileRealtime(targetUser);
+        if (!saveRes?.success) {
+          console.error("[Registration] Cloud save failed:", saveRes?.error);
+          setErrorMsg(`Cloud sync notice: ${saveRes?.error || 'Could not save account'}. Please check your connection and try again.`);
+          setLoading(false);
+          return;
+        }
+
+        // 2. Cache in local storage for fast offline launch
+        const existingUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+        const filtered = existingUsers.filter(u => u.uid !== targetUser.uid && u.email !== targetUser.email);
+        filtered.push(targetUser);
+        localStorage.setItem('zest_registered_users', JSON.stringify(filtered));
+
+        // 3. Process referral reward if signed up with code
+        if (targetUser.referredBy) {
+          try {
+            await creditReferralRewardRealtime(
+              targetUser.referredBy, 
+              referralRewardAmount, 
+              targetUser.nickname, 
+              targetUser.uid
+            );
+            
+            await sendToMakeWebhook({
+              eventType: 'USER_REFERRAL',
+              nickname: targetUser.nickname,
+              ffUid: targetUser.uid,
+              email: targetUser.email,
+              phone: targetUser.phone,
+              details: `Referred by UID ${targetUser.referredBy} (${targetUser.referredByNickname || 'Referrer'}). Reward: ₹${referralRewardAmount} coins.`
+            }).catch(() => {});
+          } catch (refErr) {
+            console.warn("[Referral] Failed to record referral:", refErr);
+          }
+        }
+
+        // 4. Webhook to Make.com -> Google Sheet
+        await sendToMakeWebhook({
+          eventType: 'USER_SIGNUP',
+          nickname: targetUser.nickname,
+          ffUid: targetUser.uid,
+          email: targetUser.email,
+          phone: targetUser.phone,
+          password: targetUser.password,
+          verifiedMethod: 'instant_direct_no_otp',
+          details: `New Player Direct Registration (Instant - No OTP Required)${targetUser.referredBy ? ` (Referred by ${targetUser.referredByNickname || targetUser.referredBy})` : ''}`
+        }).catch(() => {});
+
+        setOtpSuccessMsg('⚡ Account registered successfully! Launching arena...');
+        setTimeout(() => {
+          setLoading(false);
+          onLoginSuccess(targetUser);
+        }, 1000);
+        return;
+      } catch (directErr) {
+        console.error('[Instant Registration Error]:', directErr);
+        setErrorMsg('Error creating account. Please try again.');
+        setLoading(false);
+        return;
+      }
+    }
+
+    // =========================================================================
+    // 🛡️ OTP VERIFICATION MODE (WHEN REGISTRATION OTP IS ENABLED BY ADMIN)
+    // =========================================================================
     const otpRes = await dispatchRealOtp({
       email: targetUser.email,
       phone: targetUser.phone,
@@ -1225,20 +1300,38 @@ export default function LoginPage({ onLoginSuccess }) {
               </div>
             </div>
 
-            <div style={{
-              background: 'rgba(0, 229, 255, 0.06)',
-              border: '1px solid rgba(0, 229, 255, 0.2)',
-              borderRadius: '8px',
-              padding: '8px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '0.74rem',
-              color: 'var(--secondary)'
-            }}>
-              <span>📩</span>
-              <span>{t('auth.otp_email_notice', {}, 'A 6-digit verification OTP will be sent directly to your registered email address.')}</span>
-            </div>
+            {requireRegistrationOtp ? (
+              <div style={{
+                background: 'rgba(0, 229, 255, 0.06)',
+                border: '1px solid rgba(0, 229, 255, 0.2)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.74rem',
+                color: 'var(--secondary)'
+              }}>
+                <span>📩</span>
+                <span>{t('auth.otp_email_notice', {}, 'A 6-digit verification OTP will be sent directly to your registered email address.')}</span>
+              </div>
+            ) : (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.12) 0%, rgba(0, 229, 255, 0.1) 100%)',
+                border: '1px solid rgba(0, 230, 118, 0.4)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.75rem',
+                color: '#00e676',
+                fontWeight: '700'
+              }}>
+                <span style={{ fontSize: '1rem' }}>⚡</span>
+                <span>Instant Registration Active: No OTP verification required. Instant account activation!</span>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -1250,10 +1343,16 @@ export default function LoginPage({ onLoginSuccess }) {
                 marginTop: '4px',
                 fontSize: '0.9rem',
                 fontWeight: '900',
-                background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)'
+                background: requireRegistrationOtp 
+                  ? 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)' 
+                  : 'linear-gradient(135deg, #00e676 0%, #00e5ff 100%)',
+                color: requireRegistrationOtp ? '#fff' : '#000',
+                boxShadow: requireRegistrationOtp ? 'none' : '0 4px 15px rgba(0, 230, 118, 0.35)'
               }}
             >
-              {loading ? 'Sending Verification OTP...' : '⚡ Send Verification OTP to Email →'}
+              {loading 
+                ? (requireRegistrationOtp ? 'Sending Verification OTP...' : '⏳ Creating Account...') 
+                : (requireRegistrationOtp ? '🚀 Send Verification OTP to Email ➔' : '⚡ Register & Play Instantly ➔')}
             </button>
           </form>
         )}
