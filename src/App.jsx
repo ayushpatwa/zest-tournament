@@ -30,6 +30,7 @@ import {
   removePlayerFromTournamentRealtime,
   updateRoomCredentialsRealtime,
   saveUserProfileRealtime,
+  updateUserLastActiveRealtime,
   deductUserWalletRealtime,
   recordJoinedMatchToUserRealtime
 } from './services/firebase';
@@ -413,7 +414,8 @@ export default function App() {
       localStorage.setItem('zest_wallet_transactions', JSON.stringify(user.transactions));
     }
     localStorage.setItem('zest_current_user', JSON.stringify(user));
-    saveUserProfileRealtime(user);
+    // Update lastActive timestamp only - never overwrite cloud balances on login
+    updateUserLastActiveRealtime(user.uid || user.id);
     setCurrentView('dashboard');
   };
 

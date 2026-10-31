@@ -406,9 +406,28 @@ export const addTransactionToUserRealtime = async (userId, txRecord) => {
 };
 
 /**
- * Saves or updates a user profile in Firestore in real-time
+ * Updates only the lastActive timestamp for a user without modifying any other fields
  */
-export const saveUserProfileRealtime = async (userData) => {
+export const updateUserLastActiveRealtime = async (userId) => {
+  try {
+    if (!userId) return { success: false };
+    const cleanUid = String(userId).trim();
+    await setDoc(doc(db, "users", cleanUid), {
+      lastActive: serverTimestamp()
+    }, { merge: true });
+    return { success: true };
+  } catch (err) {
+    console.warn("[Firebase] Could not update lastActive:", err);
+    return { success: false };
+  }
+};
+
+/**
+ * Saves or updates a user profile in Firestore in real-time
+ * CRITICAL FINANCIAL SAFEGUARD: Existing user wallet, depositBalance, winningBalance,
+ * and stats.earnings are server-authoritative and CANNOT be overwritten by stale client profile updates.
+ */
+export const saveUserProfileRealtime = async (userData, options = {}) => {
   try {
     if (!userData || (!userData.uid && !userData.id)) {
       return { success: false, error: 'Missing user identification (UID or ID).' };
@@ -423,7 +442,32 @@ export const saveUserProfileRealtime = async (userData) => {
       }
     });
 
-    // CRITICAL FIX: Protect transactions and match history from being overwritten by stale/empty arrays
+    const userDocRef = doc(db, "users", userId);
+    
+    // Check if user already exists in Firestore cloud to safeguard balances
+    let existsInDb = false;
+    try {
+      const snap = await getDoc(userDocRef);
+      existsInDb = snap.exists();
+    } catch (_) {}
+
+    if (existsInDb) {
+      // PROTECT FINANCIAL FIELDS: Never allow client-side profile saves (language, avatar, nickname, etc.)
+      // to overwrite authoritative server wallet balances
+      if (!options.allowBalanceOverwrite) {
+        delete sanitizedData.wallet;
+        delete sanitizedData.depositBalance;
+        delete sanitizedData.winningBalance;
+        delete sanitizedData['stats.earnings'];
+      }
+    } else {
+      // Newly registered account: initialize balance numbers
+      sanitizedData.wallet = typeof userData.wallet === 'number' ? userData.wallet : (parseFloat(userData.wallet) || 0);
+      sanitizedData.depositBalance = typeof userData.depositBalance === 'number' ? userData.depositBalance : (parseFloat(userData.depositBalance) || 0);
+      sanitizedData.winningBalance = typeof userData.winningBalance === 'number' ? userData.winningBalance : (parseFloat(userData.winningBalance) || 0);
+    }
+
+    // Protect transactions and match history from being overwritten by stale/empty arrays
     if (sanitizedData.transactions !== undefined) {
       if (!Array.isArray(sanitizedData.transactions) || sanitizedData.transactions.length === 0) {
         delete sanitizedData.transactions;
@@ -435,10 +479,9 @@ export const saveUserProfileRealtime = async (userData) => {
       }
     }
 
-    await setDoc(doc(db, "users", userId), {
+    await setDoc(userDocRef, {
       ...sanitizedData,
       uid: String(userData.uid || userId).trim(),
-      wallet: typeof userData.wallet === 'number' ? userData.wallet : (parseFloat(userData.wallet) || 0),
       lastActive: serverTimestamp()
     }, { merge: true });
 
