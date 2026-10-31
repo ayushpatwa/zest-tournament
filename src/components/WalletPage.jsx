@@ -34,7 +34,7 @@ export default function WalletPage({
 
   // Withdrawal States
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState('50');
+  const [withdrawAmount, setWithdrawAmount] = useState('100');
   const [withdrawUpiId, setWithdrawUpiId] = useState('');
   const [withdrawSuccessMsg, setWithdrawSuccessMsg] = useState('');
   const [withdrawErrorMsg, setWithdrawErrorMsg] = useState('');
@@ -100,8 +100,8 @@ export default function WalletPage({
     setWithdrawSuccessMsg('');
 
     const amt = parseFloat(withdrawAmount);
-    if (isNaN(amt) || amt < 50) {
-      setWithdrawErrorMsg('Minimum withdrawal limit is ₹50.');
+    if (isNaN(amt) || amt < 100) {
+      setWithdrawErrorMsg('Minimum withdrawal limit is ₹100.');
       return;
     }
 
@@ -166,7 +166,7 @@ export default function WalletPage({
     setTimeout(() => {
       setShowWithdrawModal(false);
       setWithdrawSuccessMsg('');
-      setWithdrawAmount('50');
+      setWithdrawAmount('100');
       setWithdrawUpiId('');
     }, 3500);
   };
@@ -286,7 +286,7 @@ export default function WalletPage({
         </div>
         <div style={{ display: 'flex', gap: '10px', fontSize: '0.78rem', fontWeight: '700' }}>
           <span style={{ color: '#00e5ff' }}>⚡ UPI Payouts</span>
-          <span style={{ color: '#ffd600' }}>Min. ₹50</span>
+          <span style={{ color: '#ffd600' }}>Min. ₹100</span>
         </div>
       </div>
 
@@ -765,20 +765,20 @@ export default function WalletPage({
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Amount to Withdraw (Min. ₹50) <span style={{ color: 'var(--primary)' }}>*</span></label>
+                  <label>Amount to Withdraw (Min. ₹100) <span style={{ color: 'var(--primary)' }}>*</span></label>
                   <input 
                     type="number" 
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
-                    placeholder="Enter amount (Min ₹50)"
+                    placeholder="Enter amount (Min ₹100)"
                     className="form-input"
                     required
-                    min="50"
+                    min="100"
                     max={winningBalance}
                   />
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Min Limit: ₹50</span>
-                    <span style={{ color: winningBalance >= 50 ? '#00e676' : '#ff5252', fontWeight: '700' }}>
+                    <span>Min Limit: ₹100</span>
+                    <span style={{ color: winningBalance >= 100 ? '#00e676' : '#ff5252', fontWeight: '700' }}>
                       Max Withdrawable: ₹{winningBalance}
                     </span>
                   </div>
@@ -786,7 +786,7 @@ export default function WalletPage({
 
                 {/* Quick selection chips */}
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  {['50', '100', '200', '500'].map(val => (
+                  {['100', '200', '500', '1000'].map(val => (
                     <button
                       key={val}
                       type="button"
@@ -820,7 +820,7 @@ export default function WalletPage({
                   />
                 </div>
 
-                {winningBalance < 50 && (
+                {winningBalance < 100 && (
                   <div style={{ 
                     background: 'rgba(255, 23, 68, 0.1)', 
                     border: '1px solid rgba(255, 23, 68, 0.3)', 
@@ -830,7 +830,7 @@ export default function WalletPage({
                     fontSize: '0.78rem', 
                     fontWeight: '600' 
                   }}>
-                    ℹ️ You have ₹{winningBalance} in Winnings Cash. Min ₹50 winning balance is required to withdraw. Play tournaments to win withdrawable cash!
+                    ℹ️ You have ₹{winningBalance} in Winnings Cash. Min ₹100 winning balance is required to withdraw. Play tournaments to win withdrawable cash!
                   </div>
                 )}
 
@@ -842,7 +842,7 @@ export default function WalletPage({
 
                 <button 
                   type="submit" 
-                  disabled={isWithdrawing || winningBalance < 50}
+                  disabled={isWithdrawing || winningBalance < 100}
                   className="btn btn-primary"
                   style={{
                     width: '100%',
@@ -850,11 +850,11 @@ export default function WalletPage({
                     fontSize: '0.92rem',
                     fontWeight: '900',
                     marginTop: '4px',
-                    opacity: winningBalance < 50 ? 0.6 : 1,
-                    cursor: winningBalance < 50 ? 'not-allowed' : 'pointer'
+                    opacity: winningBalance < 100 ? 0.6 : 1,
+                    cursor: winningBalance < 100 ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {isWithdrawing ? 'Submitting Request...' : (winningBalance < 50 ? 'Min. ₹50 Winnings Required' : `Withdraw ₹${withdrawAmount} ➔`)}
+                  {isWithdrawing ? 'Submitting Request...' : (winningBalance < 100 ? 'Min. ₹100 Winnings Required' : `Withdraw ₹${withdrawAmount} ➔`)}
                 </button>
               </form>
             )}
