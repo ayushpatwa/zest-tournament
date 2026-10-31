@@ -51,7 +51,16 @@ export default function App() {
     return currentUser?.wallet || 0;
   });
 
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('zest_wallet_transactions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return Array.isArray(currentUser?.transactions) ? currentUser.transactions : [];
+  });
 
   // Real-time Firestore Tournaments State
   const [tournaments, setTournaments] = useState([]);

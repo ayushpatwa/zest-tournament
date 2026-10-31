@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { sendToMakeWebhook } from '../services/webhookService';
-import { deductUserWalletRealtime, getUserBalances } from '../services/firebase';
+import { deductUserWalletRealtime, getUserBalances, addTransactionToUserRealtime } from '../services/firebase';
 import paymentQrImg from '../assets/payment_qr.jpg';
 
 export default function WalletPage({ 
@@ -61,16 +61,23 @@ export default function WalletPage({
 
     const utrRef = depositUtr.trim() || 'N/A';
     const newTx = {
-      id: Date.now(),
+      id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type: 'deposit',
       amount: amt,
       title: `Deposit Request (₹${amt})`,
       reason: utrRef !== 'N/A' ? `UTR/Ref: ${utrRef}` : 'Pending Admin Verification',
-      date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: 'Processing'
+      date: new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      status: 'Processing',
+      createdAt: new Date().toISOString()
     };
 
     setTransactions(prev => [newTx, ...prev]);
+
+    // Save permanently to user document in Firestore so payment history is never lost
+    const targetUserId = userProfile?.uid || userProfile?.id;
+    if (targetUserId) {
+      addTransactionToUserRealtime(targetUserId, newTx);
+    }
 
     // Dispatch to Google Sheets via Make.com
     await sendToMakeWebhook({
@@ -342,13 +349,24 @@ export default function WalletPage({
           📜 Transaction History
         </h3>
         
-        {transactions.length === 0 ? (
-          <div className="glass-panel" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            No transaction records found.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {transactions.map(tx => {
+        {(() => {
+          const displayTransactions = (Array.isArray(transactions) && transactions.length > 0)
+            ? transactions
+            : (Array.isArray(userProfile?.transactions) && userProfile.transactions.length > 0)
+            ? userProfile.transactions
+            : [];
+
+          if (displayTransactions.length === 0) {
+            return (
+              <div className="glass-panel" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No transaction records found.
+              </div>
+            );
+          }
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {displayTransactions.map(tx => {
               const isCredit = tx.type === 'deposit' || tx.type === 'winning' || tx.type === 'credit';
               const isPenalty = tx.type === 'penalty' || tx.type === 'deduction';
               
@@ -425,7 +443,8 @@ export default function WalletPage({
               );
             })}
           </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Telegram 24/7 Support Banner */}

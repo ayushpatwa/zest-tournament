@@ -377,6 +377,37 @@ export const sendLobbyMessageRealtime = async (tournamentId, msgData) => {
 /**
  * Saves user profile to Firestore in real-time
  */
+/**
+ * Permanently adds a transaction to a user's transaction history in Firestore
+ */
+export const addTransactionToUserRealtime = async (userId, txRecord) => {
+  try {
+    if (!userId || !txRecord) return { success: false };
+    const cleanUid = String(userId).trim();
+    const userRef = doc(db, "users", cleanUid);
+    
+    // Clean record
+    const cleanRecord = {};
+    Object.keys(txRecord).forEach(k => {
+      if (txRecord[k] !== undefined) cleanRecord[k] = txRecord[k];
+    });
+
+    await setDoc(userRef, {
+      transactions: arrayUnion(cleanRecord),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    console.log(`[Firebase] Successfully added transaction ${cleanRecord.id || ''} to user ${cleanUid}`);
+    return { success: true };
+  } catch (err) {
+    console.warn("[Firebase] Could not save transaction to user:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Saves or updates a user profile in Firestore in real-time
+ */
 export const saveUserProfileRealtime = async (userData) => {
   try {
     if (!userData || (!userData.uid && !userData.id)) {
@@ -391,6 +422,18 @@ export const saveUserProfileRealtime = async (userData) => {
         sanitizedData[key] = userData[key];
       }
     });
+
+    // CRITICAL FIX: Protect transactions and match history from being overwritten by stale/empty arrays
+    if (sanitizedData.transactions !== undefined) {
+      if (!Array.isArray(sanitizedData.transactions) || sanitizedData.transactions.length === 0) {
+        delete sanitizedData.transactions;
+      }
+    }
+    if (sanitizedData.joinedMatchesHistory !== undefined) {
+      if (!Array.isArray(sanitizedData.joinedMatchesHistory) || sanitizedData.joinedMatchesHistory.length === 0) {
+        delete sanitizedData.joinedMatchesHistory;
+      }
+    }
 
     await setDoc(doc(db, "users", userId), {
       ...sanitizedData,
