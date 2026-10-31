@@ -78,6 +78,7 @@ export default function AdminHostPanel({
   // Host Form states
   const [editingTournament, setEditingTournament] = useState(null);
   const [managingPlayersTourney, setManagingPlayersTourney] = useState(null);
+  const [rosterSearchQuery, setRosterSearchQuery] = useState('');
   const [removingPlayerId, setRemovingPlayerId] = useState(null);
   
   // Direct Roster Prize Modal states
@@ -2109,7 +2110,10 @@ export default function AdminHostPanel({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setManagingPlayersTourney(t)}
+                        onClick={() => {
+                          setManagingPlayersTourney(t);
+                          setRosterSearchQuery('');
+                        }}
                         className="btn"
                         style={{
                           padding: '6px 10px',
@@ -3798,7 +3802,10 @@ export default function AdminHostPanel({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setManagingPlayersTourney(t)}
+                      onClick={() => {
+                        setManagingPlayersTourney(t);
+                        setRosterSearchQuery('');
+                      }}
                       className="btn"
                       style={{
                         padding: '8px 12px',
@@ -4920,6 +4927,18 @@ export default function AdminHostPanel({
         const playerList = latestTourney.joinedPlayers || [];
         const maxSlots = latestTourney.slotsTotal || latestTourney.maxSlots || 48;
 
+        const q = rosterSearchQuery.trim().toLowerCase();
+        const filteredPlayerList = q
+          ? playerList.filter(player => {
+              const name = (player.nickname || '').toLowerCase();
+              const uid = (player.uid || '').toString().toLowerCase();
+              const email = (player.email || '').toLowerCase();
+              const phone = (player.phone || '').toString().toLowerCase();
+              const squad = (player.squadCode || '').toLowerCase();
+              return name.includes(q) || uid.includes(q) || email.includes(q) || phone.includes(q) || squad.includes(q);
+            })
+          : playerList;
+
         return (
           <div style={{
             position: 'fixed',
@@ -5006,7 +5025,10 @@ export default function AdminHostPanel({
                   )}
                   <button
                     type="button"
-                    onClick={() => setManagingPlayersTourney(null)}
+                    onClick={() => {
+                      setManagingPlayersTourney(null);
+                      setRosterSearchQuery('');
+                    }}
                     className="btn btn-outline"
                     style={{ padding: '6px 12px', fontSize: '0.8rem' }}
                   >
@@ -5015,94 +5037,203 @@ export default function AdminHostPanel({
                 </div>
               </div>
 
+              {/* Live Player Search Input */}
+              {playerList.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <span style={{
+                      position: 'absolute',
+                      left: '12px',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-muted)',
+                      pointerEvents: 'none',
+                      userSelect: 'none'
+                    }}>
+                      🔍
+                    </span>
+                    <input
+                      type="text"
+                      value={rosterSearchQuery}
+                      onChange={(e) => setRosterSearchQuery(e.target.value)}
+                      placeholder="Search player by Nickname, UID, Email, Phone..."
+                      style={{
+                        width: '100%',
+                        padding: '10px 38px 10px 36px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(0, 229, 255, 0.35)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = 'var(--secondary)'}
+                      onBlur={(e) => e.target.style.borderColor = 'rgba(0, 229, 255, 0.35)'}
+                    />
+                    {rosterSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setRosterSearchQuery('')}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          background: 'rgba(255, 255, 255, 0.12)',
+                          border: 'none',
+                          color: '#fff',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          width: '22px',
+                          height: '22px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Clear search"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  {rosterSearchQuery.trim() && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', padding: '0 4px' }}>
+                      <span>Showing <strong style={{ color: 'var(--secondary)' }}>{filteredPlayerList.length}</strong> of {playerList.length} players</span>
+                      <button
+                        type="button"
+                        onClick={() => setRosterSearchQuery('')}
+                        style={{ background: 'none', border: 'none', color: '#ff5252', fontSize: '0.75rem', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                      >
+                        Clear filter
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Player list */}
               {playerList.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {playerList.map((player, idx) => (
-                    <div
-                      key={idx}
-                      className="flex-between glass-panel"
-                      style={{
-                        padding: '12px 14px',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        borderRadius: '10px',
-                        flexWrap: 'wrap',
-                        gap: '10px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontWeight: '900', color: 'var(--secondary)', fontSize: '0.95rem' }}>
-                          #{idx + 1}
-                        </span>
-                        <div>
-                          <div style={{ fontWeight: '800', color: '#fff', fontSize: '0.92rem' }}>
-                            {player.nickname}
+                filteredPlayerList.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {filteredPlayerList.map((player) => {
+                      const originalIdx = playerList.findIndex(p => 
+                        (p.uid && player.uid && p.uid === player.uid) ||
+                        (p.email && player.email && p.email === player.email) ||
+                        p === player
+                      );
+                      const displaySlot = originalIdx >= 0 ? originalIdx + 1 : 1;
+
+                      return (
+                        <div
+                          key={player.uid || player.email || displaySlot}
+                          className="flex-between glass-panel"
+                          style={{
+                            padding: '12px 14px',
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '10px',
+                            flexWrap: 'wrap',
+                            gap: '10px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontWeight: '900', color: 'var(--secondary)', fontSize: '0.95rem', minWidth: '32px' }}>
+                              #{displaySlot}
+                            </span>
+                            <div>
+                              <div style={{ fontWeight: '800', color: '#fff', fontSize: '0.92rem' }}>
+                                {player.nickname}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '2px' }}>
+                                <span>UID: <strong style={{ color: 'var(--secondary)' }}>{player.uid}</strong></span>
+                                {player.email && player.email !== 'N/A' && <span>✉️ {player.email}</span>}
+                                {player.phone && player.phone !== 'N/A' && <span>📞 {player.phone}</span>}
+                              </div>
+                            </div>
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '2px' }}>
-                            <span>UID: <strong style={{ color: 'var(--secondary)' }}>{player.uid}</strong></span>
-                            {player.email && player.email !== 'N/A' && <span>✉️ {player.email}</span>}
-                            {player.phone && player.phone !== 'N/A' && <span>📞 {player.phone}</span>}
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            {player.squadCode && (
+                              <span className="badge" style={{ background: 'rgba(255,214,0,0.15)', color: 'var(--accent)', fontSize: '0.7rem' }}>
+                                Squad: {player.squadCode}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenRosterPrize(player, latestTourney)}
+                              className="btn"
+                              style={{
+                                padding: '6px 14px',
+                                fontSize: '0.75rem',
+                                fontWeight: '900',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                background: 'linear-gradient(135deg, #ffd600 0%, #ffab00 100%)',
+                                color: '#000',
+                                border: 'none',
+                                boxShadow: '0 2px 10px rgba(255, 214, 0, 0.35)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                letterSpacing: '0.4px'
+                              }}
+                            >
+                              <span>🏆</span> GIVE PRIZE
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const pName = player.nickname || player.uid || 'this player';
+                                if (window.confirm(`⚠️ Remove player "${pName}" (UID: ${player.uid}) from this match? This will free up 1 slot in real-time.`)) {
+                                  setRemovingPlayerId(player.uid || player.email || player.nickname);
+                                  if (onRemovePlayerFromTournament) {
+                                    await onRemovePlayerFromTournament(latestTourney.id, player.uid || player.email || player.nickname);
+                                  }
+                                  setRemovingPlayerId(null);
+                                }
+                              }}
+                              disabled={removingPlayerId === (player.uid || player.email || player.nickname)}
+                              className="btn btn-danger"
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '0.75rem',
+                                fontWeight: '800',
+                                borderRadius: '8px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {removingPlayerId === (player.uid || player.email || player.nickname) ? 'Removing...' : '🗑️ Kick Player'}
+                            </button>
                           </div>
                         </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        {player.squadCode && (
-                          <span className="badge" style={{ background: 'rgba(255,214,0,0.15)', color: 'var(--accent)', fontSize: '0.7rem' }}>
-                            Squad: {player.squadCode}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenRosterPrize(player, latestTourney)}
-                          className="btn"
-                          style={{
-                            padding: '6px 14px',
-                            fontSize: '0.75rem',
-                            fontWeight: '900',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            background: 'linear-gradient(135deg, #ffd600 0%, #ffab00 100%)',
-                            color: '#000',
-                            border: 'none',
-                            boxShadow: '0 2px 10px rgba(255, 214, 0, 0.35)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            letterSpacing: '0.4px'
-                          }}
-                        >
-                          <span>🏆</span> GIVE PRIZE
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const pName = player.nickname || player.uid || 'this player';
-                            if (window.confirm(`⚠️ Remove player "${pName}" (UID: ${player.uid}) from this match? This will free up 1 slot in real-time.`)) {
-                              setRemovingPlayerId(player.uid || player.email || player.nickname);
-                              if (onRemovePlayerFromTournament) {
-                                await onRemovePlayerFromTournament(latestTourney.id, player.uid || player.email || player.nickname);
-                              }
-                              setRemovingPlayerId(null);
-                            }
-                          }}
-                          disabled={removingPlayerId === (player.uid || player.email || player.nickname)}
-                          className="btn btn-danger"
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '0.75rem',
-                            fontWeight: '800',
-                            borderRadius: '8px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {removingPlayerId === (player.uid || player.email || player.nickname) ? 'Removing...' : '🗑️ Kick Player'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{
+                    textAlign: 'center',
+                    color: 'var(--text-muted)',
+                    padding: '36px 16px',
+                    fontSize: '0.9rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '10px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    borderRadius: '12px',
+                    border: '1px dashed rgba(255, 255, 255, 0.1)'
+                  }}>
+                    <span style={{ fontSize: '2rem' }}>🔍</span>
+                    <div>No players match "<strong style={{ color: '#fff' }}>{rosterSearchQuery}</strong>"</div>
+                    <button
+                      type="button"
+                      onClick={() => setRosterSearchQuery('')}
+                      className="btn btn-outline"
+                      style={{ padding: '6px 16px', fontSize: '0.78rem', marginTop: '4px' }}
+                    >
+                      Clear Search
+                    </button>
+                  </div>
+                )
               ) : (
                 <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '36px 0', fontSize: '0.9rem' }}>
                   No players currently registered in this match.
