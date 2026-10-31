@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { saveUserProfileRealtime } from '../services/firebase';
 import { sendToMakeWebhook } from '../services/webhookService';
+import { CURRENT_APP_VERSION } from '../services/appUpdateService';
 
 export default function ProfilePage({ userProfile, setUserProfile, onLogout, currentUser, setCurrentView }) {
   const { language, setLanguage, t, languages, currentLanguageObj } = useLanguage();
@@ -636,6 +637,13 @@ export default function ProfilePage({ userProfile, setUserProfile, onLogout, cur
         >
           🚪 Sign Out / Switch Account
         </button>
+      </div>
+
+      {/* App Version Info */}
+      <div style={{ textAlign: 'center', marginTop: '4px', paddingBottom: '12px' }}>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <span>🎮</span> App Version: <strong style={{ color: 'var(--secondary)' }}>v{CURRENT_APP_VERSION}</strong> (Build 14) • Zest Esports
+        </span>
       </div>
 
     </div>

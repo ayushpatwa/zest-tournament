@@ -188,8 +188,8 @@ export default function AdminHostPanel({
 
   // App Update Publisher states
   const [updateVersion, setUpdateVersion] = useState('1.5.2');
-  const [updateTitle, setUpdateTitle] = useState('⚡ Gmail API Gateway & ₹100 Wallet Limits (v1.5.2)!');
-  const [updateNotes, setUpdateNotes] = useState('• Swappable Email OTP Gateways: Resend.com & Gmail API with 1-Click Toggle\n• Automatic Zero-Downtime Failover for OTP Delivery\n• Updated Minimum Deposit & Withdrawal Limits to ₹100\n• Winning Cash & Deposit Cash Controls for Deductions & Prize Awards\n• High-Deliverability Inbox Email Templates & Performance Fixes');
+  const [updateTitle, setUpdateTitle] = useState('⚡ Match Roster Search, Gmail API & ₹100 Wallet Limits (v1.5.2)!');
+  const [updateNotes, setUpdateNotes] = useState('• Real-Time Match Roster Search (Filter by Nickname, UID, Email, Phone)\n• Swappable Email OTP Gateways: Resend.com & Gmail API with 1-Click Toggle\n• Automatic Zero-Downtime Failover for OTP Delivery\n• Updated Minimum Deposit & Withdrawal Limits to ₹100\n• Winning Cash & Deposit Cash Controls for Deductions & Prize Awards\n• High-Deliverability Inbox Email Delivery & Performance Optimizations');
   const [updateDownloadUrl, setUpdateDownloadUrl] = useState('');
   const [forceUpdate, setForceUpdate] = useState(false);
   const [updatePublishStatus, setUpdatePublishStatus] = useState('');
