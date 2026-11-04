@@ -1331,6 +1331,166 @@ export default function AdminHostPanel({
     }
   };
 
+  // Open Bulk Refund All Players Modal
+  const handleOpenRefundModal = (tourney) => {
+    if (!tourney) return;
+    setRefundTourney(tourney);
+    const feeVal = tourney.entryFee !== undefined && tourney.entryFee !== null ? String(tourney.entryFee) : '10';
+    setRefundAmount(feeVal);
+    setRefundCategory('deposit');
+    setRefundReason(`Match Refund: ${tourney.title} (Match Cancelled / Rescheduled)`);
+    setRefundClearRoster(true);
+    setRefundLoading(false);
+    setRefundProgress('');
+    setRefundStatus('');
+  };
+
+  // Execute Bulk Refund All Players
+  const handleExecuteRefundAll = async () => {
+    if (!refundTourney) return;
+
+    const amt = parseFloat(refundAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setRefundStatus('⚠️ Please enter a valid positive refund amount.');
+      return;
+    }
+
+    const allPlayers = Array.isArray(refundTourney.joinedPlayers) ? refundTourney.joinedPlayers : [];
+    if (allPlayers.length === 0) {
+      setRefundStatus('⚠️ No players found in this tournament roster.');
+      return;
+    }
+
+    const realPlayers = allPlayers.filter(p => !p.isBot && !p.isDemo);
+    const totalPayout = amt * realPlayers.length;
+    const confirmMsg = `Are you sure you want to refund ₹${amt} each to ${realPlayers.length} real player(s) for "${refundTourney.title}"?\n\n` +
+      `Total refund payout: ₹${totalPayout.toFixed(0)}\n` +
+      `Wallet balance category: ${refundCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'}\n` +
+      `Clear tournament roster: ${refundClearRoster ? 'YES' : 'NO'}`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setRefundLoading(true);
+    setRefundStatus('');
+    setRefundProgress(`Initiating bulk refund for ${realPlayers.length} player(s)...`);
+
+    try {
+      const res = await refundAllTournamentPlayersRealtime(refundTourney.id, {
+        refundAmount: amt,
+        walletCategory: refundCategory,
+        reason: refundReason.trim() || `Refund for ${refundTourney.title}`,
+        clearRoster: refundClearRoster
+      });
+
+      if (res.success) {
+        setRefundProgress('');
+        setRefundStatus(`✅ Successfully refunded ₹${amt} each to ${res.refundedCount} player(s)! Total: ₹${res.totalRefunded}`);
+
+        // Update local tournament state
+        if (onUpdateTournament) {
+          const updatedTourneyData = {
+            ...refundTourney,
+            isRefunded: true,
+            lastRefundAmount: amt,
+            lastRefundReason: refundReason.trim(),
+            ...(refundClearRoster ? { joinedPlayers: [], slotsJoined: 0 } : {})
+          };
+          onUpdateTournament(updatedTourneyData);
+        }
+
+        // If managingPlayersTourney was open, update it
+        if (managingPlayersTourney && managingPlayersTourney.id === refundTourney.id) {
+          setManagingPlayersTourney(prev => prev ? {
+            ...prev,
+            isRefunded: true,
+            lastRefundAmount: amt,
+            ...(refundClearRoster ? { joinedPlayers: [], slotsJoined: 0 } : {})
+          } : null);
+        }
+
+        // Send Make.com webhook summary
+        sendToMakeWebhook({
+          eventType: 'MATCH_BULK_REFUND',
+          details: `Bulk Refund Completed: ₹${amt} each to ${res.refundedCount} players (Total: ₹${res.totalRefunded}) for "${refundTourney.title}"`
+        });
+
+        // Automatically close after 3 seconds
+        setTimeout(() => {
+          setRefundTourney(null);
+          setRefundStatus('');
+          setRefundProgress('');
+        }, 3000);
+      } else {
+        setRefundProgress('');
+        setRefundStatus(`⚠️ ${res.error || 'Failed to complete refunds'}`);
+      }
+    } catch (err) {
+      console.error('Error executing bulk refund:', err);
+      setRefundProgress('');
+      setRefundStatus(`⚠️ Error: ${err.message}`);
+    } finally {
+      setRefundLoading(false);
+    }
+  };
+
+  // Quick single player refund from roster
+  const handleRefundSinglePlayer = async (player, tourney) => {
+    if (!player || !tourney) return;
+    const defaultAmt = tourney.entryFee !== undefined && tourney.entryFee !== null ? tourney.entryFee : 10;
+    const promptVal = window.prompt(
+      `💸 REFUND SINGLE PLAYER\n\n` +
+      `Player: ${player.nickname || player.uid}\n` +
+      `Match: ${tourney.title}\n\n` +
+      `Enter refund amount to credit back to player's wallet (₹):`,
+      String(defaultAmt)
+    );
+    if (promptVal === null) return;
+    const amt = parseFloat(promptVal);
+    if (isNaN(amt) || amt <= 0) {
+      alert("⚠️ Please enter a valid positive refund amount.");
+      return;
+    }
+
+    const playerId = player.uid || player.email || player.nickname;
+    setRefundingSinglePlayerId(playerId);
+
+    try {
+      const res = await creditUserWalletRealtime(
+        playerId,
+        amt,
+        '💳 Tournament Match Refund',
+        `Refund for ${tourney.title} (Single Player Refund)`,
+        'deposit',
+        tourney.id
+      );
+
+      if (res.success) {
+        // Send notification
+        try {
+          await sendNotificationRealtime({
+            title: '💳 Match Refund Credited',
+            message: `₹${amt} refund for "${tourney.title}" has been credited to your Deposit balance.`,
+            type: 'alert',
+            targetTournamentId: tourney.id,
+            tournamentTitle: tourney.title,
+            targetUids: [String(player.uid || '').trim(), String(playerId).trim()]
+          });
+        } catch (_) {}
+
+        const shouldKick = window.confirm(`🎉 Successfully credited ₹${amt} refund to ${player.nickname || playerId}!\n\nDo you also want to remove/kick this player from the match roster now?`);
+        if (shouldKick && onRemovePlayerFromTournament) {
+          await onRemovePlayerFromTournament(tourney.id, playerId);
+        }
+      } else {
+        alert(`⚠️ ${res.error || 'Failed to credit refund'}`);
+      }
+    } catch (err) {
+      alert(`⚠️ Error: ${err.message}`);
+    } finally {
+      setRefundingSinglePlayerId(null);
+    }
+  };
+
   return (
     <div className="animate-slide-in" style={{ paddingBottom: '32px' }}>
       
@@ -2163,46 +2323,26 @@ export default function AdminHostPanel({
                       >
                         👥 Players ({t.joinedPlayers?.length || 0})
                       </button>
-                    {(t.joinedPlayers?.length || 0) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenRefundModal(t)}
-                        className="btn"
-                        style={{
-                          padding: '6px 10px',
-                          fontSize: '0.75rem',
-                          fontWeight: '800',
-                          background: 'rgba(255, 152, 0, 0.15)',
-                          color: '#ff9800',
-                          border: '1px solid rgba(255, 152, 0, 0.4)',
-                          borderRadius: '8px',
-                          cursor: 'pointer'
-                        }}
-                        title="Refund all players in this match"
-                      >
-                        💸 Refund All
-                      </button>
-                    )}
-                    {(t.joinedPlayers?.length || 0) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenRefundModal(t)}
-                        className="btn"
-                        style={{
-                          padding: '6px 10px',
-                          fontSize: '0.75rem',
-                          fontWeight: '800',
-                          background: 'rgba(255, 152, 0, 0.15)',
-                          color: '#ff9800',
-                          border: '1px solid rgba(255, 152, 0, 0.4)',
-                          borderRadius: '8px',
-                          cursor: 'pointer'
-                        }}
-                        title="Refund all players in this match"
-                      >
-                        💸 Refund All
-                      </button>
-                    )}
+                      {(t.joinedPlayers?.length || 0) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenRefundModal(t)}
+                          className="btn"
+                          style={{
+                            padding: '6px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: '800',
+                            background: 'rgba(255, 152, 0, 0.15)',
+                            color: '#ff9800',
+                            border: '1px solid rgba(255, 152, 0, 0.4)',
+                            borderRadius: '8px',
+                            cursor: 'pointer'
+                          }}
+                          title="Refund all players in this match"
+                        >
+                          💸 Refund All
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={async () => {
@@ -3901,27 +4041,7 @@ export default function AdminHostPanel({
                         onClick={() => handleOpenRefundModal(t)}
                         className="btn"
                         style={{
-                          padding: '6px 10px',
-                          fontSize: '0.75rem',
-                          fontWeight: '800',
-                          background: 'rgba(255, 152, 0, 0.15)',
-                          color: '#ff9800',
-                          border: '1px solid rgba(255, 152, 0, 0.4)',
-                          borderRadius: '8px',
-                          cursor: 'pointer'
-                        }}
-                        title="Refund all players in this match"
-                      >
-                        💸 Refund All
-                      </button>
-                    )}
-                    {(t.joinedPlayers?.length || 0) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenRefundModal(t)}
-                        className="btn"
-                        style={{
-                          padding: '6px 10px',
+                          padding: '8px 12px',
                           fontSize: '0.75rem',
                           fontWeight: '800',
                           background: 'rgba(255, 152, 0, 0.15)',
@@ -5262,6 +5382,29 @@ export default function AdminHostPanel({
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {playerList.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenRefundModal(latestTourney)}
+                      className="btn"
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '0.78rem',
+                        fontWeight: '800',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: 'linear-gradient(135deg, rgba(255, 152, 0, 0.25) 0%, rgba(255, 87, 34, 0.25) 100%)',
+                        color: '#ff9800',
+                        border: '1px solid rgba(255, 152, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                      title="Refund all registered players in this match"
+                    >
+                      <span>💸</span> Refund All
+                    </button>
+                  )}
                   {playerList.length < maxSlots && (
                     <button
                       type="button"
@@ -5440,6 +5583,30 @@ export default function AdminHostPanel({
                               <span className="badge" style={{ background: 'rgba(255,214,0,0.15)', color: 'var(--accent)', fontSize: '0.7rem' }}>
                                 Squad: {player.squadCode}
                               </span>
+                            )}
+                            {!player.isBot && !player.isDemo && (
+                              <button
+                                type="button"
+                                onClick={() => handleRefundSinglePlayer(player, latestTourney)}
+                                disabled={refundingSinglePlayerId === (player.uid || player.email || player.nickname)}
+                                className="btn"
+                                style={{
+                                  padding: '6px 12px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '800',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  background: 'rgba(255, 152, 0, 0.15)',
+                                  color: '#ff9800',
+                                  border: '1px solid rgba(255, 152, 0, 0.4)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Refund entry fee to this player's wallet"
+                              >
+                                <span>💸</span> {refundingSinglePlayerId === (player.uid || player.email || player.nickname) ? 'Refunding...' : 'Refund'}
+                              </button>
                             )}
                             <button
                               type="button"
@@ -5901,7 +6068,7 @@ export default function AdminHostPanel({
         </div>
       )}
 
-    
+
       {/* BULK REFUND ALL PLAYERS MODAL */}
       {refundTourney && (
         <div style={{
@@ -6246,6 +6413,6 @@ export default function AdminHostPanel({
         </div>
       )}
 
-</div>
+    </div>
   );
 }
