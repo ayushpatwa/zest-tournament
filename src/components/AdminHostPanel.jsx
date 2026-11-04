@@ -31,6 +31,7 @@ import {
   seedDemoPlayersRealtime,
   addDemoPlayersToTournamentRealtime,
   addDemoPlayersToAllMatchesRealtime,
+  refundAllTournamentPlayersRealtime,
   DEMO_PLAYERS
 } from '../services/firebase';
 
@@ -89,6 +90,17 @@ export default function AdminHostPanel({
   const [rosterPrizeCategory, setRosterPrizeCategory] = useState('winning'); // 'winning' | 'deposit'
   const [rosterPrizeLoading, setRosterPrizeLoading] = useState(false);
   const [rosterPrizeStatus, setRosterPrizeStatus] = useState('');
+
+  // Bulk & Single Refund Modal states
+  const [refundTourney, setRefundTourney] = useState(null);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundCategory, setRefundCategory] = useState('deposit'); // 'deposit' | 'winning'
+  const [refundReason, setRefundReason] = useState('');
+  const [refundClearRoster, setRefundClearRoster] = useState(true);
+  const [refundLoading, setRefundLoading] = useState(false);
+  const [refundProgress, setRefundProgress] = useState('');
+  const [refundStatus, setRefundStatus] = useState('');
+  const [refundingSinglePlayerId, setRefundingSinglePlayerId] = useState(null);
   const [title, setTitle] = useState('');
   const [mode, setMode] = useState('Solo');
   const [type, setType] = useState('Classic');
@@ -2151,6 +2163,46 @@ export default function AdminHostPanel({
                       >
                         👥 Players ({t.joinedPlayers?.length || 0})
                       </button>
+                    {(t.joinedPlayers?.length || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRefundModal(t)}
+                        className="btn"
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: '800',
+                          background: 'rgba(255, 152, 0, 0.15)',
+                          color: '#ff9800',
+                          border: '1px solid rgba(255, 152, 0, 0.4)',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                        title="Refund all players in this match"
+                      >
+                        💸 Refund All
+                      </button>
+                    )}
+                    {(t.joinedPlayers?.length || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRefundModal(t)}
+                        className="btn"
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: '800',
+                          background: 'rgba(255, 152, 0, 0.15)',
+                          color: '#ff9800',
+                          border: '1px solid rgba(255, 152, 0, 0.4)',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                        title="Refund all players in this match"
+                      >
+                        💸 Refund All
+                      </button>
+                    )}
                       <button
                         type="button"
                         onClick={async () => {
@@ -3843,6 +3895,46 @@ export default function AdminHostPanel({
                     >
                       👥 Players ({t.joinedPlayers?.length || 0})
                     </button>
+                    {(t.joinedPlayers?.length || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRefundModal(t)}
+                        className="btn"
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: '800',
+                          background: 'rgba(255, 152, 0, 0.15)',
+                          color: '#ff9800',
+                          border: '1px solid rgba(255, 152, 0, 0.4)',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                        title="Refund all players in this match"
+                      >
+                        💸 Refund All
+                      </button>
+                    )}
+                    {(t.joinedPlayers?.length || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRefundModal(t)}
+                        className="btn"
+                        style={{
+                          padding: '6px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: '800',
+                          background: 'rgba(255, 152, 0, 0.15)',
+                          color: '#ff9800',
+                          border: '1px solid rgba(255, 152, 0, 0.4)',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                        title="Refund all players in this match"
+                      >
+                        💸 Refund All
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -5809,6 +5901,351 @@ export default function AdminHostPanel({
         </div>
       )}
 
-    </div>
+    
+      {/* BULK REFUND ALL PLAYERS MODAL */}
+      {refundTourney && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.88)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10001,
+          padding: '16px'
+        }}>
+          <div className="glass-panel animate-slide-in" style={{
+            width: '100%',
+            maxWidth: '520px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            border: '1.5px solid #ff9800',
+            background: '#0a0f1d',
+            borderRadius: '16px',
+            boxShadow: '0 0 35px rgba(255, 152, 0, 0.25)'
+          }}>
+            {/* Header */}
+            <div className="flex-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#ff9800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>💸</span> Refund All Players
+                </h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Match: <strong style={{ color: '#fff' }}>{refundTourney.title}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setRefundTourney(null); setRefundStatus(''); }}
+                disabled={refundLoading}
+                className="btn btn-outline"
+                style={{ padding: '4px 10px', fontSize: '0.8rem', borderRadius: '6px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {(() => {
+              const players = Array.isArray(refundTourney.joinedPlayers) ? refundTourney.joinedPlayers : [];
+              const realPlayers = players.filter(p => !p.isBot && !p.isDemo);
+              const botCount = players.length - realPlayers.length;
+              const numAmt = parseFloat(refundAmount) || 0;
+              const totalPayout = numAmt * realPlayers.length;
+              const defaultEntryFee = refundTourney.entryFee !== undefined && refundTourney.entryFee !== null ? String(refundTourney.entryFee) : '10';
+
+              return (
+                <>
+                  {/* Summary Card */}
+                  <div style={{
+                    padding: '14px',
+                    background: 'rgba(255, 152, 0, 0.08)',
+                    border: '1px solid rgba(255, 152, 0, 0.25)',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Total Joined / Real Players
+                      </div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#fff' }}>
+                        {players.length} Players <span style={{ fontSize: '0.85rem', color: 'var(--secondary)' }}>({realPlayers.length} Real{botCount > 0 ? `, ${botCount} Bots` : ''})</span>
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Total Refund Payout
+                      </div>
+                      <div style={{ fontSize: '1.35rem', fontWeight: '900', color: '#00e676', fontFamily: 'monospace' }}>
+                        ₹{totalPayout.toFixed(0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Editable Refund Amount */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '800', color: '#fff', marginBottom: '6px' }}>
+                      💰 Refund Amount Per Player (₹) <span style={{ color: '#ff9800', fontSize: '0.75rem' }}>(Editable)</span>
+                    </label>
+
+                    {/* Quick Preset Buttons */}
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setRefundAmount(defaultEntryFee)}
+                        disabled={refundLoading}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          borderRadius: '6px',
+                          border: refundAmount === defaultEntryFee ? '1px solid #ff9800' : '1px solid rgba(255,255,255,0.12)',
+                          background: refundAmount === defaultEntryFee ? 'rgba(255, 152, 0, 0.25)' : 'rgba(255,255,255,0.05)',
+                          color: refundAmount === defaultEntryFee ? '#ff9800' : '#fff',
+                          fontWeight: '800',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Match Entry Fee: ₹{defaultEntryFee}
+                      </button>
+                      {['10', '20', '30', '50', '100'].map(preset => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setRefundAmount(preset)}
+                          disabled={refundLoading}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            borderRadius: '6px',
+                            border: refundAmount === preset ? '1px solid #00e676' : '1px solid rgba(255,255,255,0.12)',
+                            background: refundAmount === preset ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255,255,255,0.05)',
+                            color: refundAmount === preset ? '#00e676' : '#fff',
+                            fontWeight: '800',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ₹{preset}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ position: 'absolute', left: '14px', fontSize: '1.1rem', color: '#ff9800', fontWeight: '900' }}>₹</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                        disabled={refundLoading}
+                        placeholder="Enter refund amount"
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px 12px 36px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1.5px solid rgba(255, 152, 0, 0.5)',
+                          borderRadius: '10px',
+                          color: '#fff',
+                          fontSize: '1.1rem',
+                          fontWeight: '800',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Wallet Category Selector */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '800', color: '#fff', marginBottom: '6px' }}>
+                      🏦 Credit Refund To:
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setRefundCategory('deposit')}
+                        disabled={refundLoading}
+                        style={{
+                          padding: '10px',
+                          borderRadius: '8px',
+                          border: refundCategory === 'deposit' ? '1.5px solid var(--secondary)' : '1px solid rgba(255,255,255,0.1)',
+                          background: refundCategory === 'deposit' ? 'rgba(0, 229, 255, 0.15)' : 'rgba(255,255,255,0.03)',
+                          color: refundCategory === 'deposit' ? 'var(--secondary)' : 'var(--text-muted)',
+                          fontSize: '0.8rem',
+                          fontWeight: '800',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        💳 Deposit Cash (Recommended)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRefundCategory('winning')}
+                        disabled={refundLoading}
+                        style={{
+                          padding: '10px',
+                          borderRadius: '8px',
+                          border: refundCategory === 'winning' ? '1.5px solid #ffd600' : '1px solid rgba(255,255,255,0.1)',
+                          background: refundCategory === 'winning' ? 'rgba(255, 214, 0, 0.15)' : 'rgba(255,255,255,0.03)',
+                          color: refundCategory === 'winning' ? '#ffd600' : 'var(--text-muted)',
+                          fontSize: '0.8rem',
+                          fontWeight: '800',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🏆 Winnings Cash
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Editable Refund Reason */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '800', color: '#fff', marginBottom: '6px' }}>
+                      📝 Refund Reason / Note <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>(Visible to players)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      disabled={refundLoading}
+                      placeholder="e.g. Match Cancelled - Entry Fee Refund"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* Clear Roster Checkbox */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px 12px',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255,255,255,0.06)'
+                  }}>
+                    <input
+                      type="checkbox"
+                      id="refundClearRosterCheck"
+                      checked={refundClearRoster}
+                      onChange={(e) => setRefundClearRoster(e.target.checked)}
+                      disabled={refundLoading}
+                      style={{ width: '18px', height: '18px', accentColor: '#ff9800', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="refundClearRosterCheck" style={{ fontSize: '0.82rem', color: '#fff', cursor: 'pointer', flex: 1 }}>
+                      <strong>Clear match roster after refund</strong>
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        Removes registered players from this match so it can be safely closed or reopened.
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Status & Progress Messages */}
+                  {refundProgress && (
+                    <div style={{
+                      padding: '10px 14px',
+                      background: 'rgba(0, 229, 255, 0.1)',
+                      border: '1px solid var(--secondary)',
+                      borderRadius: '8px',
+                      color: 'var(--secondary)',
+                      fontSize: '0.82rem',
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <span className="spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></span>
+                      {refundProgress}
+                    </div>
+                  )}
+
+                  {refundStatus && (
+                    <div style={{
+                      padding: '10px 14px',
+                      background: refundStatus.includes('✅') ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 23, 68, 0.12)',
+                      border: refundStatus.includes('✅') ? '1px solid #00e676' : '1px solid #ff1744',
+                      borderRadius: '8px',
+                      color: refundStatus.includes('✅') ? '#00e676' : '#ff5252',
+                      fontSize: '0.82rem',
+                      fontWeight: '700'
+                    }}>
+                      {refundStatus}
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => { setRefundTourney(null); setRefundStatus(''); }}
+                      disabled={refundLoading}
+                      className="btn btn-outline"
+                      style={{ flex: 1, padding: '12px', fontSize: '0.85rem' }}
+                    >
+                      ✕ Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExecuteRefundAll}
+                      disabled={refundLoading || !numAmt || numAmt <= 0}
+                      className="btn"
+                      style={{
+                        flex: 2,
+                        padding: '12px',
+                        fontSize: '0.9rem',
+                        fontWeight: '900',
+                        borderRadius: '10px',
+                        cursor: (refundLoading || !numAmt || numAmt <= 0) ? 'not-allowed' : 'pointer',
+                        background: 'linear-gradient(135deg, #ff9800 0%, #ff5722 100%)',
+                        color: '#fff',
+                        border: 'none',
+                        boxShadow: '0 0 15px rgba(255, 152, 0, 0.4)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {refundLoading ? (
+                        <>
+                          <span className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }}></span>
+                          Processing Refunds...
+                        </>
+                      ) : (
+                        <>
+                          <span>💸</span> Confirm Refund (₹{totalPayout.toFixed(0)})
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+</div>
   );
 }

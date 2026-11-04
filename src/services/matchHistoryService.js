@@ -21,14 +21,19 @@ export const isMatchCompleted = (tourney, activeTournamentsList = null) => {
     tourney.status === 'ended' || 
     tourney.status === 'finished' || 
     tourney.status === 'closed' || 
+    tourney.status === 'refunded' || 
     tourney.isCompleted === true || 
-    tourney.isHistory === true
+    tourney.isHistory === true ||
+    tourney.isRefunded === true
   ) {
     return true;
   }
 
-  // 2. If a prize was already credited/won for this match, it is definitively completed
-  if (tourney.prizeWon && Number(tourney.prizeWon) > 0) {
+  // 2. If a prize was already credited/won or refund issued for this match, it is definitively completed
+  if (
+    (tourney.prizeWon && Number(tourney.prizeWon) > 0) ||
+    (tourney.refundAmount && Number(tourney.refundAmount) > 0)
+  ) {
     return true;
   }
 

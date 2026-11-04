@@ -863,7 +863,7 @@ export { getUserBalances, calculateMatchEntrySplit } from "./walletUtils.js";
  * Credits money into a user's wallet in Firestore and updates cloud balance in real-time.
  * Supports walletCategory: 'winning' (eligible for withdrawal) or 'deposit' (non-withdrawable, for match entry).
  */
-export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tournament Prize Winnings', reason = '', walletCategory = 'winning') => {
+export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tournament Prize Winnings', reason = '', walletCategory = 'winning', matchId = null) => {
   try {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -914,6 +914,8 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       amount: numAmount,
       title: title || (isDepositCategory ? 'Deposit Balance Added' : 'Admin Prize Credit'),
       reason: finalReason,
+      matchId: matchId || undefined,
+      tournamentId: matchId || undefined,
       date: dateStr,
       status: 'Success',
       createdAt: new Date().toISOString()
@@ -1008,6 +1010,177 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
   } catch (error) {
     console.error("[Firebase] Error crediting user wallet:", error);
     return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Updates a user's permanent joined match history to mark a tournament as refunded
+ */
+export const markUserMatchRefundedRealtime = async (userId, tournamentId, refundDetails = {}) => {
+  try {
+    if (!userId || !tournamentId) return { success: false };
+    const rawUser = String(userId).trim();
+    let targetDocId = rawUser;
+    try {
+      const matched = await findUserInFirestoreAcrossDevices(rawUser);
+      if (matched && !matched.isNetworkError) {
+        targetDocId = matched.docId || matched.id || rawUser;
+      }
+    } catch (_) {}
+
+    const userRef = doc(db, "users", targetDocId);
+    const snap = await getDoc(userRef);
+    if (!snap.exists()) return { success: false };
+
+    const data = snap.data();
+    const existingHist = Array.isArray(data.joinedMatchesHistory) ? data.joinedMatchesHistory : [];
+    
+    const targetMatchId = String(tournamentId).trim();
+    let found = false;
+    const updatedHist = existingHist.map(m => {
+      if (String(m?.id || '').trim() === targetMatchId) {
+        found = true;
+        return {
+          ...m,
+          status: 'refunded',
+          isRefunded: true,
+          refundAmount: refundDetails.refundAmount || m.entryFee || 0,
+          refundReason: refundDetails.refundReason || 'Match Refund',
+          refundedAt: refundDetails.refundedAt || new Date().toISOString()
+        };
+      }
+      return m;
+    });
+
+    if (found) {
+      await updateDoc(userRef, {
+        joinedMatchesHistory: updatedHist,
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.warn("[Firebase] Error marking match refunded in user profile:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Refunds all registered real players in a tournament with an editable refund amount.
+ * Credits each player's wallet, records transaction, updates match history,
+ * sends notifications, and clears/resets tournament roster in real-time.
+ */
+export const refundAllTournamentPlayersRealtime = async (tournamentId, {
+  refundAmount,
+  walletCategory = 'deposit',
+  reason = 'Tournament Match Refund',
+  clearRoster = true
+} = {}) => {
+  try {
+    if (!tournamentId) return { success: false, error: 'Tournament ID is required.' };
+    const numAmt = parseFloat(refundAmount);
+    if (isNaN(numAmt) || numAmt <= 0) {
+      return { success: false, error: 'Please enter a valid positive refund amount.' };
+    }
+
+    const tourneyRef = doc(db, "tournaments", tournamentId);
+    const tourneySnap = await getDoc(tourneyRef);
+    if (!tourneySnap.exists()) {
+      return { success: false, error: 'Tournament not found.' };
+    }
+
+    const tData = tourneySnap.data();
+    const joined = Array.isArray(tData.joinedPlayers) ? tData.joinedPlayers : [];
+
+    // Filter real players from bots
+    const realPlayers = joined.filter(p => !p.isBot && !p.isDemo);
+    const results = {
+      totalJoined: joined.length,
+      realPlayersCount: realPlayers.length,
+      botsCount: joined.length - realPlayers.length,
+      refundedCount: 0,
+      failedCount: 0,
+      refundAmountPerPlayer: numAmt,
+      totalRefunded: 0,
+      failedPlayers: []
+    };
+
+    const finalReason = (reason && reason.trim()) || `Refund for ${tData.title || 'Tournament Match'}`;
+
+    // Credit each real player in real-time
+    for (const player of realPlayers) {
+      const identifier = player.uid || player.email || player.phone || player.nickname;
+      try {
+        const creditRes = await creditUserWalletRealtime(
+          identifier,
+          numAmt,
+          '💳 Tournament Match Refund',
+          finalReason,
+          walletCategory,
+          tournamentId
+        );
+
+        if (creditRes.success) {
+          results.refundedCount++;
+          results.totalRefunded += numAmt;
+
+          // Update user's permanent joinedMatchesHistory to mark match as refunded
+          try {
+            await markUserMatchRefundedRealtime(identifier, tournamentId, {
+              refundAmount: numAmt,
+              refundReason: finalReason,
+              refundedAt: new Date().toISOString()
+            });
+          } catch (_) {}
+
+          // Send in-app notification
+          try {
+            const cleanTargets = [
+              String(player.uid || '').trim().toLowerCase(),
+              String(identifier).trim().toLowerCase()
+            ].filter(Boolean);
+
+            await sendNotificationRealtime({
+              title: '💳 Match Refund Credited',
+              message: `₹${numAmt} refund for "${tData.title || 'Tournament'}" has been credited to your ${walletCategory === 'deposit' ? 'Deposit' : 'Winning'} balance. Reason: ${finalReason}`,
+              type: 'alert',
+              targetTournamentId: tournamentId,
+              tournamentTitle: tData.title || '',
+              targetUids: cleanTargets
+            });
+          } catch (_) {}
+        } else {
+          results.failedCount++;
+          results.failedPlayers.push(player.nickname || player.uid || identifier);
+        }
+      } catch (e) {
+        results.failedCount++;
+        results.failedPlayers.push(player.nickname || player.uid || identifier);
+      }
+    }
+
+    // Update tournament document in Firestore
+    const tourneyUpdate = {
+      isRefunded: true,
+      lastRefundAt: serverTimestamp(),
+      lastRefundAmount: numAmt,
+      lastRefundReason: finalReason,
+      updatedAt: serverTimestamp()
+    };
+
+    if (clearRoster) {
+      tourneyUpdate.joinedPlayers = [];
+      tourneyUpdate.slotsJoined = 0;
+    }
+
+    await updateDoc(tourneyRef, tourneyUpdate);
+
+    console.log(`[Firebase] Bulk refund completed for tournament ${tournamentId}: ${results.refundedCount} players refunded, total ₹${results.totalRefunded}`);
+    return { success: true, ...results };
+  } catch (err) {
+    console.error("[Firebase] Error in refundAllTournamentPlayersRealtime:", err);
+    return { success: false, error: err.message };
   }
 };
 

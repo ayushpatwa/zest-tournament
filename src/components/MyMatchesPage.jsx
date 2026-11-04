@@ -287,7 +287,18 @@ export default function MyMatchesPage({
                         {t('matches.badge_pinned', {}, '📌 PINNED MATCH')}
                       </span>
                     )}
-                    {completed ? (
+                    {tourney.isRefunded || tourney.status === 'refunded' ? (
+                      <span className="badge" style={{ 
+                        background: 'linear-gradient(135deg, #ff9800 0%, #ff5722 100%)', 
+                        color: '#000', 
+                        border: '1px solid #ff9800', 
+                        fontWeight: '900', 
+                        fontSize: '0.68rem',
+                        boxShadow: '0 0 10px rgba(255, 152, 0, 0.4)'
+                      }}>
+                        💳 REFUNDED
+                      </span>
+                    ) : completed ? (
                       <span className="badge" style={{ 
                         background: 'rgba(0, 229, 255, 0.15)', 
                         color: 'var(--secondary)', 
@@ -302,7 +313,17 @@ export default function MyMatchesPage({
                         {t('matches.badge_registered', {}, '✓ REGISTERED')}
                       </span>
                     )}
-                    {tourney.prizeWon ? (
+                    {tourney.refundAmount ? (
+                      <span className="badge" style={{ 
+                        background: 'rgba(255, 152, 0, 0.15)', 
+                        color: '#ff9800', 
+                        border: '1px solid #ff9800',
+                        fontWeight: '900', 
+                        fontSize: '0.68rem'
+                      }}>
+                        💳 REFUND: ₹{tourney.refundAmount}
+                      </span>
+                    ) : tourney.prizeWon ? (
                       <span className="badge" style={{ 
                         background: 'linear-gradient(135deg, #ffd600 0%, #ffab00 100%)', 
                         color: '#000', 
@@ -372,14 +393,19 @@ export default function MyMatchesPage({
                   }}>
                     <div>
                       <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>🏁</span> Match Concluded
+                        <span>{tourney.isRefunded || tourney.status === 'refunded' ? '💳' : '🏁'}</span> 
+                        {tourney.isRefunded || tourney.status === 'refunded' ? 'Match Refunded' : 'Match Concluded'}
                         {tourney.entryFee ? <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 'normal' }}>• Entry Fee: ₹{tourney.entryFee}</span> : ''}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {tourney.prizeReason || (tourney.prizeWon ? 'Winning prize credited to your wallet!' : 'Official match concluded.')}
+                        {tourney.refundReason || tourney.prizeReason || (tourney.isRefunded ? 'Entry fee has been refunded back to your wallet!' : (tourney.prizeWon ? 'Winning prize credited to your wallet!' : 'Official match concluded.'))}
                       </div>
                     </div>
-                    {tourney.prizeWon ? (
+                    {tourney.refundAmount ? (
+                      <span className="badge" style={{ background: 'rgba(255, 152, 0, 0.15)', color: '#ff9800', border: '1px solid #ff9800', fontWeight: '900', fontSize: '0.75rem', padding: '4px 10px' }}>
+                        ✓ Refunded to Wallet: +₹{tourney.refundAmount}
+                      </span>
+                    ) : tourney.prizeWon ? (
                       <span className="badge" style={{ background: 'rgba(0, 230, 118, 0.15)', color: '#00e676', border: '1px solid #00e676', fontWeight: '900', fontSize: '0.75rem', padding: '4px 10px' }}>
                         ✓ Paid to Wallet: +₹{tourney.prizeWon}
                       </span>
