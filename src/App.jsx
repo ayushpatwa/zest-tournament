@@ -514,10 +514,12 @@ export default function App() {
     // Record permanently in Firestore Cloud so match is never lost from history
     await recordJoinedMatchToUserRealtime(targetUserId, matchRecord);
 
-    // Specific participant record strictly tied to this player's UID
+    // Specific participant record strictly tied to this player's UID & Cloud Document ID
     const userParticipant = { 
       nickname: String(nickname).trim(), 
       uid: String(uid).trim(), 
+      userId: userProfile.uid || userProfile.id || userProfile.docId || currentUser?.uid || currentUser?.id || '',
+      docId: userProfile.docId || userProfile.id || currentUser?.id || currentUser?.uid || '',
       email: userProfile.email || 'N/A',
       phone: userProfile.phone || 'N/A',
       joinedAt: new Date().toISOString()

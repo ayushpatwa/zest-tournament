@@ -1252,7 +1252,7 @@ export default function AdminHostPanel({
         creditCategory
       );
       if (res.success) {
-        setPayoutStatus(`✅ Successfully credited ₹${amt} ${creditCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to player (${payoutPlayerIdentifier})!`);
+        setPayoutStatus(`✅ Successfully credited ₹${amt} ${creditCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to ${res.user?.nickname || payoutPlayerIdentifier}! New Total: ₹${res.newBalance} (Dep: ₹${res.balances?.depositBalance ?? 0}, Win: ₹${res.balances?.winningBalance ?? 0})`);
         await sendToMakeWebhook({
           eventType: 'PRIZE_PAYOUT',
           nickname: res.user?.nickname || payoutPlayerIdentifier,
@@ -1320,29 +1320,56 @@ export default function AdminHostPanel({
     setRosterPrizeStatus('');
 
     try {
-      const targetIdentifier = player.uid || player.email || player.nickname;
+      const playerCandidate = {
+        uid: player.uid,
+        phone: player.phone,
+        email: player.email,
+        nickname: player.nickname,
+        id: player.id || player.docId,
+        docId: player.docId || player.id
+      };
       const finalReason = rosterPrizeReason.trim() || `Prize Winnings - ${tourney.title}`;
       const customMsg = rosterPrizeCustomMsg.trim();
       const txReason = customMsg ? `${finalReason} • "${customMsg}"` : finalReason;
       
       const res = await creditUserWalletRealtime(
-        targetIdentifier, 
+        playerCandidate, 
         amt, 
         rosterPrizeCategory === 'deposit' ? '💳 Tournament Match Refund / Deposit' : '🏆 Tournament Prize Winnings', 
         txReason,
-        rosterPrizeCategory
+        rosterPrizeCategory,
+        tourney.id
       );
 
       if (res.success) {
-        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to ${player.nickname || player.uid}'s wallet!`);
+        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to ${player.nickname || player.uid}'s wallet! (New Total: ₹${res.newBalance})`);
+
+        // Automatically update the tournament to record winner and match completion
+        if (typeof onUpdateTournament === 'function') {
+          try {
+            await onUpdateTournament({
+              ...tourney,
+              status: 'completed',
+              isCompleted: true,
+              prizeWon: amt,
+              prizeWinner: player.nickname || player.uid,
+              prizeWinnerUid: player.uid || '',
+              prizeCategory: rosterPrizeCategory,
+              prizeDistributed: true,
+              prizeDistributedAt: new Date().toISOString()
+            });
+          } catch (tErr) {
+            console.warn('Notice updating tournament status on prize award:', tErr?.message);
+          }
+        }
 
         // Send Make.com webhook logging
         await sendToMakeWebhook({
           eventType: 'PRIZE_PAYOUT',
-          nickname: player.nickname || targetIdentifier,
-          ffUid: player.uid || targetIdentifier,
-          email: player.email || 'N/A',
-          phone: player.phone || 'N/A',
+          nickname: player.nickname || res.user?.nickname || player.uid,
+          ffUid: player.uid || res.user?.uid || 'N/A',
+          email: player.email || res.user?.email || 'N/A',
+          phone: player.phone || res.user?.phone || 'N/A',
           details: `Match Roster Direct Prize: ₹${amt} (${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'}) (${finalReason}) [Match: ${tourney.title}]${customMsg ? ` | Msg: "${customMsg}"` : ''}`
         });
 
@@ -1352,10 +1379,15 @@ export default function AdminHostPanel({
           ? `${customMsg}\n\n🏆 ₹${amt} ${notifCategoryLabel} credited for "${tourney.title}".`
           : `Congratulations ${player.nickname || 'Player'}! You have received ₹${amt} ${notifCategoryLabel} for "${tourney.title}". The amount has been added to your wallet!`;
 
-        const playerUids = [
+        const playerUids = Array.from(new Set([
           String(player.uid || '').trim().toLowerCase(),
-          String(targetIdentifier).trim().toLowerCase()
-        ].filter(Boolean);
+          String(player.phone || '').trim().toLowerCase(),
+          String(player.email || '').trim().toLowerCase(),
+          String(player.id || '').trim().toLowerCase(),
+          String(res.user?.id || '').trim().toLowerCase(),
+          String(res.user?.uid || '').trim().toLowerCase(),
+          String(res.user?.docId || '').trim().toLowerCase()
+        ].filter(Boolean)));
 
         try {
           await sendNotificationRealtime({
@@ -1516,12 +1548,20 @@ export default function AdminHostPanel({
       return;
     }
 
+    const playerCandidate = {
+      uid: player.uid,
+      phone: player.phone,
+      email: player.email,
+      nickname: player.nickname,
+      id: player.id || player.docId,
+      docId: player.docId || player.id
+    };
     const playerId = player.uid || player.email || player.nickname;
     setRefundingSinglePlayerId(playerId);
 
     try {
       const res = await creditUserWalletRealtime(
-        playerId,
+        playerCandidate,
         amt,
         '💳 Tournament Match Refund',
         `Refund for ${tourney.title} (Single Player Refund)`,
@@ -1530,15 +1570,25 @@ export default function AdminHostPanel({
       );
 
       if (res.success) {
-        // Send notification
+        // Send notification targeting all identifiers
         try {
+          const notifUids = Array.from(new Set([
+            String(player.uid || '').trim().toLowerCase(),
+            String(player.phone || '').trim().toLowerCase(),
+            String(player.email || '').trim().toLowerCase(),
+            String(player.id || '').trim().toLowerCase(),
+            String(res.user?.id || '').trim().toLowerCase(),
+            String(res.user?.uid || '').trim().toLowerCase(),
+            String(res.user?.docId || '').trim().toLowerCase()
+          ].filter(Boolean)));
+
           await sendNotificationRealtime({
             title: '💳 Match Refund Credited',
             message: `₹${amt} refund for "${tourney.title}" has been credited to your Deposit balance.`,
             type: 'alert',
             targetTournamentId: tourney.id,
             tournamentTitle: tourney.title,
-            targetUids: [String(player.uid || '').trim(), String(playerId).trim()]
+            targetUids: notifUids
           });
         } catch (_) {}
 

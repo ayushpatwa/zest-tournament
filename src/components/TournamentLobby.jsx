@@ -95,37 +95,55 @@ export default function TournamentLobby({
     setRosterPrizeStatus('');
 
     try {
-      const targetIdentifier = player.uid || player.email || player.nickname;
+      const playerCandidate = {
+        uid: player.uid,
+        phone: player.phone,
+        email: player.email,
+        nickname: player.nickname,
+        id: player.id || player.docId,
+        docId: player.docId || player.id
+      };
       const finalReason = rosterPrizeReason.trim() || `Prize Winnings - ${tournament.title}`;
       
       const res = await creditUserWalletRealtime(
-        targetIdentifier, 
+        playerCandidate, 
         amt, 
         rosterPrizeCategory === 'deposit' ? '💳 Tournament Match Refund / Deposit' : '🏆 Tournament Prize Winnings', 
         finalReason,
-        rosterPrizeCategory
+        rosterPrizeCategory,
+        tournament.id
       );
 
       if (res.success) {
-        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to ${player.nickname || player.uid}'s wallet!`);
+        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to ${player.nickname || player.uid}'s wallet! (New Total: ₹${res.newBalance})`);
 
         await sendToMakeWebhook({
           eventType: 'PRIZE_PAYOUT',
-          nickname: player.nickname || targetIdentifier,
-          ffUid: player.uid || targetIdentifier,
-          email: player.email || 'N/A',
-          phone: player.phone || 'N/A',
+          nickname: player.nickname || res.user?.nickname || player.uid,
+          ffUid: player.uid || res.user?.uid || 'N/A',
+          email: player.email || res.user?.email || 'N/A',
+          phone: player.phone || res.user?.phone || 'N/A',
           details: `Lobby Direct Prize: ₹${amt} (${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'}) (${finalReason}) [Match: ${tournament.title}]`
         });
 
         try {
+          const notifUids = Array.from(new Set([
+            String(player.uid || '').trim().toLowerCase(),
+            String(player.phone || '').trim().toLowerCase(),
+            String(player.email || '').trim().toLowerCase(),
+            String(player.id || '').trim().toLowerCase(),
+            String(res.user?.id || '').trim().toLowerCase(),
+            String(res.user?.uid || '').trim().toLowerCase(),
+            String(res.user?.docId || '').trim().toLowerCase()
+          ].filter(Boolean)));
+
           await sendNotificationRealtime({
             title: `🏆 ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Prize Money'} Credited: ₹${amt}!`,
             message: `Congratulations ${player.nickname || 'Player'}! You have received ₹${amt} ${rosterPrizeCategory === 'deposit' ? 'deposit cash' : 'winnings cash'} in "${tournament.title}". The amount has been added to your wallet!`,
             type: 'prize',
             category: rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'WINNINGS',
             badgeText: rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'PRIZE',
-            targetUid: player.uid
+            targetUids: notifUids
           });
         } catch (notifErr) {
           console.warn('Failed to dispatch prize notification:', notifErr);

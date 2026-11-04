@@ -519,11 +519,37 @@ export const saveUserProfileRealtime = async (userData, options = {}) => {
 export const findUserInFirestoreAcrossDevices = async (identifier) => {
   if (!identifier) return null;
 
+  // Support candidate object: { uid, phone, email, nickname, id, docId, userId, freeFireUid, ffUid }
+  if (typeof identifier === 'object') {
+    const candidateList = [
+      identifier.docId,
+      identifier.id,
+      identifier.userId,
+      identifier.uid,
+      identifier.freeFireUid,
+      identifier.ffUid,
+      identifier.playerUid,
+      identifier.phone,
+      identifier.email,
+      identifier.nickname
+    ].filter(v => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim().toUpperCase() !== 'N/A');
+
+    const uniqueCandidates = Array.from(new Set(candidateList.map(c => String(c).trim())));
+    for (const cand of uniqueCandidates) {
+      const match = await findUserInFirestoreAcrossDevices(cand);
+      if (match && !match.isNetworkError) {
+        return match;
+      }
+    }
+    return null;
+  }
+
   const rawQuery = String(identifier || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
   if (!rawQuery) return null;
 
   const queryLower = rawQuery.toLowerCase();
   const cleanDigits = rawQuery.replace(/\D/g, '');
+  const last10Digits = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : (cleanDigits.length >= 8 ? cleanDigits : '');
 
   const matchesUser = (u) => {
     if (!u) return false;
@@ -532,23 +558,25 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
     const rawId = String(u.id || '').trim().toLowerCase();
     const email = String(u.email || '').trim().toLowerCase();
     const nick = String(u.nickname || '').trim().toLowerCase();
-    const phone = String(u.phone || '').trim();
+    const ffUid = String(u.freeFireUid || u.ffUid || u.playerUid || u.inGameUid || '').trim().toLowerCase();
+    const phone = String(u.phone || u.phoneNumber || '').trim();
     const phoneDigits = phone.replace(/\D/g, '');
 
-    const docIdMatch = docId && docId === queryLower;
-    const uidMatch = uid && uid === queryLower;
-    const rawIdMatch = rawId && rawId === queryLower;
+    const docIdMatch = docId && (docId === queryLower || (cleanDigits && docId === cleanDigits));
+    const uidMatch = uid && (uid === queryLower || (cleanDigits && uid === cleanDigits));
+    const rawIdMatch = rawId && (rawId === queryLower || (cleanDigits && rawId === cleanDigits));
+    const ffUidMatch = ffUid && (ffUid === queryLower || (cleanDigits && ffUid === cleanDigits));
     const emailMatch = email && email === queryLower;
     const nickMatch = nick && nick === queryLower;
     const phoneMatch = Boolean(
       phone && cleanDigits && cleanDigits.length >= 6 && (
         phone === rawQuery ||
         phoneDigits === cleanDigits ||
-        (cleanDigits.length >= 8 && phoneDigits.endsWith(cleanDigits.slice(-10))) ||
-        (phoneDigits.length >= 8 && cleanDigits.endsWith(phoneDigits.slice(-10)))
+        (last10Digits && phoneDigits.endsWith(last10Digits)) ||
+        (phoneDigits.length >= 10 && cleanDigits.endsWith(phoneDigits.slice(-10)))
       )
     );
-    return docIdMatch || uidMatch || rawIdMatch || emailMatch || nickMatch || phoneMatch;
+    return docIdMatch || uidMatch || rawIdMatch || ffUidMatch || emailMatch || nickMatch || phoneMatch;
   };
 
   // 1. Instant check in live memory cache (populated by onSnapshot)
@@ -575,11 +603,17 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
 
   let networkErrorCaught = null;
 
-  // 2. Direct document getDoc lookup (if user typed Free Fire UID or Doc ID)
+  // 2. Direct document getDoc lookup (Doc ID / UID)
   try {
     const directDoc = await getDoc(doc(db, "users", rawQuery));
     if (directDoc && directDoc.exists()) {
       return { ...directDoc.data(), id: directDoc.id, docId: directDoc.id };
+    }
+    if (cleanDigits && cleanDigits !== rawQuery) {
+      const digitDoc = await getDoc(doc(db, "users", cleanDigits));
+      if (digitDoc && digitDoc.exists()) {
+        return { ...digitDoc.data(), id: digitDoc.id, docId: digitDoc.id };
+      }
     }
   } catch (e) {
     console.warn("[Auth] Direct getDoc lookup notice:", e?.message);
@@ -603,7 +637,7 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
     }
   }
 
-  // 4. Direct targeted query by UID
+  // 4. Direct targeted query by UID or Free Fire UID
   try {
     const qUid = query(collection(db, "users"), where("uid", "==", rawQuery));
     const snapUid = await getDocs(qUid);
@@ -611,17 +645,44 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
       const d = snapUid.docs[0];
       return { ...d.data(), id: d.id, docId: d.id };
     }
+    if (cleanDigits && cleanDigits !== rawQuery) {
+      const snapUidDigits = await getDocs(query(collection(db, "users"), where("uid", "==", cleanDigits)));
+      if (!snapUidDigits.empty) {
+        const d = snapUidDigits.docs[0];
+        return { ...d.data(), id: d.id, docId: d.id };
+      }
+    }
+    // Also check freeFireUid and ffUid fields
+    const snapFf = await getDocs(query(collection(db, "users"), where("freeFireUid", "==", rawQuery)));
+    if (!snapFf.empty) {
+      const d = snapFf.docs[0];
+      return { ...d.data(), id: d.id, docId: d.id };
+    }
+    const snapFfShort = await getDocs(query(collection(db, "users"), where("ffUid", "==", rawQuery)));
+    if (!snapFfShort.empty) {
+      const d = snapFfShort.docs[0];
+      return { ...d.data(), id: d.id, docId: d.id };
+    }
   } catch (e) {
     console.warn("[Auth] Direct UID query notice:", e?.message);
     networkErrorCaught = e;
   }
 
-  // 5. Direct targeted query by Phone
+  // 5. Direct targeted query by Phone (all Indian formats)
   if (cleanDigits.length >= 8) {
     try {
       let snapPhone = await getDocs(query(collection(db, "users"), where("phone", "==", rawQuery)));
       if (snapPhone.empty && cleanDigits !== rawQuery) {
         snapPhone = await getDocs(query(collection(db, "users"), where("phone", "==", cleanDigits)));
+      }
+      if (snapPhone.empty && last10Digits) {
+        snapPhone = await getDocs(query(collection(db, "users"), where("phone", "==", last10Digits)));
+      }
+      if (snapPhone.empty && last10Digits) {
+        snapPhone = await getDocs(query(collection(db, "users"), where("phone", "==", "+91" + last10Digits)));
+      }
+      if (snapPhone.empty && last10Digits) {
+        snapPhone = await getDocs(query(collection(db, "users"), where("phone", "==", "+91 " + last10Digits)));
       }
       if (!snapPhone.empty) {
         const d = snapPhone.docs[0];
@@ -633,7 +694,18 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
     }
   }
 
-  // 6. Full collection query fallback
+  // 6. Direct targeted query by Nickname
+  try {
+    const snapNick = await getDocs(query(collection(db, "users"), where("nickname", "==", rawQuery)));
+    if (!snapNick.empty) {
+      const d = snapNick.docs[0];
+      return { ...d.data(), id: d.id, docId: d.id };
+    }
+  } catch (e) {
+    networkErrorCaught = e;
+  }
+
+  // 7. Full collection query fallback
   try {
     const usersRef = collection(db, "users");
     const snap = await getDocs(usersRef);
@@ -651,7 +723,7 @@ export const findUserInFirestoreAcrossDevices = async (identifier) => {
     networkErrorCaught = e;
   }
 
-  // 7. LocalStorage fallback
+  // 8. LocalStorage fallback
   if (typeof localStorage !== 'undefined') {
     try {
       const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
@@ -870,44 +942,72 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       return { success: false, error: 'Please enter a valid positive prize amount.' };
     }
 
-    const queryStr = String(uidOrEmail).trim().toLowerCase();
-    const rawQuery = String(uidOrEmail).trim();
-    
+    if (!uidOrEmail) {
+      return { success: false, error: 'Missing player identifier or profile data.' };
+    }
+
     let targetDocId = null;
     let targetUserData = null;
 
-    // 1. Fast universal lookup via live memory cache / direct getDoc
+    // 1. Universal multi-key lookup (supports string or candidate identity object)
     try {
-      const fastMatched = await findUserInFirestoreAcrossDevices(rawQuery);
-      if (fastMatched && !fastMatched.isNetworkError) {
-        targetDocId = fastMatched.docId || fastMatched.id || rawQuery;
-        targetUserData = fastMatched;
+      const matched = await findUserInFirestoreAcrossDevices(uidOrEmail);
+      if (matched && !matched.isNetworkError) {
+        targetDocId = matched.docId || matched.id;
+        targetUserData = matched;
       }
     } catch (e) {
-      console.warn("[Credit] Fast lookup notice:", e);
+      console.warn("[Credit] Multi-key lookup notice:", e);
     }
 
-    // 2. Fallback search through cloud Firestore users if not yet found
-    if (!targetDocId) {
-      const usersCollection = collection(db, "users");
-      const snapshot = await getDocs(usersCollection);
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
-        const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
-        const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
-        const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
-
-        if (docIdMatch || uidMatch || emailMatch || nickMatch) {
-          targetDocId = docSnap.id;
-          targetUserData = data;
+    // 2. Direct getDoc if string and not yet matched
+    if (!targetDocId && typeof uidOrEmail === 'string' && uidOrEmail.trim()) {
+      const trimmed = uidOrEmail.trim();
+      try {
+        const directDoc = await getDoc(doc(db, "users", trimmed));
+        if (directDoc.exists()) {
+          targetDocId = directDoc.id;
+          targetUserData = { ...directDoc.data(), id: directDoc.id, docId: directDoc.id };
         }
-      });
+      } catch (_) {}
     }
+
+    // Safeguard: Never create an orphaned ghost document if player does not exist!
+    if (!targetDocId) {
+      const displayKey = typeof uidOrEmail === 'object' 
+        ? (uidOrEmail.uid || uidOrEmail.phone || uidOrEmail.email || uidOrEmail.nickname || 'Unknown Player')
+        : String(uidOrEmail);
+      console.warn(`[Credit] Player not found in Firestore for: ${displayKey}`);
+      return { 
+        success: false, 
+        error: `Player account not found in database for "${displayKey}". Please check their registered Free Fire UID, phone number, or email.` 
+      };
+    }
+
+    // 3. FETCH FRESH DOCUMENT DIRECTLY FROM FIRESTORE to eliminate stale balance calculation bugs!
+    const targetRef = doc(db, "users", targetDocId);
+    let latestUserData = targetUserData;
+    try {
+      const freshSnap = await getDoc(targetRef);
+      if (freshSnap.exists()) {
+        latestUserData = { ...freshSnap.data(), id: freshSnap.id, docId: freshSnap.id };
+      }
+    } catch (fErr) {
+      console.warn("[Credit] Fresh doc fetch notice, using cached data:", fErr?.message);
+    }
+
+    const currentBalances = getUserBalances(latestUserData);
+    const isDepositCategory = walletCategory === 'deposit';
+    const newDeposit = isDepositCategory 
+      ? Number((currentBalances.depositBalance + numAmount).toFixed(2)) 
+      : currentBalances.depositBalance;
+    const newWinning = !isDepositCategory 
+      ? Number((currentBalances.winningBalance + numAmount).toFixed(2)) 
+      : currentBalances.winningBalance;
+    const newTotal = Number((newDeposit + newWinning).toFixed(2));
 
     const dateStr = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    const finalReason = reason || title || (walletCategory === 'deposit' ? 'Deposit Credit' : 'Tournament Prize / Winning');
-    const isDepositCategory = walletCategory === 'deposit';
+    const finalReason = reason || title || (isDepositCategory ? 'Deposit Credit' : 'Tournament Prize / Winning');
     const txRecord = {
       id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type: isDepositCategory ? 'deposit' : 'winning',
@@ -921,70 +1021,11 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       createdAt: new Date().toISOString()
     };
 
-    // 3. If doc exists in Firestore, atomically update wallet, depositBalance & winningBalance
-    if (targetDocId) {
-      const currentBalances = getUserBalances(targetUserData);
-      const newDeposit = isDepositCategory 
-        ? Number((currentBalances.depositBalance + numAmount).toFixed(2)) 
-        : currentBalances.depositBalance;
-      const newWinning = !isDepositCategory 
-        ? Number((currentBalances.winningBalance + numAmount).toFixed(2)) 
-        : currentBalances.winningBalance;
-      const newTotal = Number((newDeposit + newWinning).toFixed(2));
-
-      const targetRef = doc(db, "users", targetDocId);
-      const updateData = {
-        wallet: newTotal,
-        depositBalance: newDeposit,
-        winningBalance: newWinning,
-        transactions: arrayUnion(txRecord),
-        lastPrize: {
-          amount: numAmount,
-          title: title,
-          reason: finalReason,
-          category: walletCategory,
-          creditedAt: new Date().toISOString()
-        },
-        updatedAt: serverTimestamp()
-      };
-
-      if (!isDepositCategory) {
-        updateData["stats.earnings"] = increment(numAmount);
-      }
-
-      await setDoc(targetRef, updateData, { merge: true });
-
-      console.log(`[Firebase Realtime] Successfully credited ₹${numAmount} (${walletCategory}) to user ${targetDocId}. New Balances: Total=₹${newTotal}, Dep=₹${newDeposit}, Win=₹${newWinning}`);
-      return { 
-        success: true, 
-        user: { 
-          ...targetUserData, 
-          wallet: newTotal, 
-          depositBalance: newDeposit, 
-          winningBalance: newWinning 
-        },
-        newBalance: newTotal,
-        balances: { totalBalance: newTotal, depositBalance: newDeposit, winningBalance: newWinning }
-      };
-    }
-
-    // 4. If doc does not exist yet by query, create new user doc directly with the identifier as UID
-    const newDocRef = doc(db, "users", rawQuery);
-    const initialDeposit = isDepositCategory ? numAmount : 0;
-    const initialWinning = !isDepositCategory ? numAmount : 0;
-    await setDoc(newDocRef, {
-      uid: rawQuery,
-      nickname: rawQuery,
-      wallet: numAmount,
-      depositBalance: initialDeposit,
-      winningBalance: initialWinning,
-      transactions: [txRecord],
-      stats: {
-        matches: 1,
-        wins: isDepositCategory ? 0 : 1,
-        kills: 0,
-        earnings: isDepositCategory ? 0 : numAmount
-      },
+    const updateData = {
+      wallet: newTotal,
+      depositBalance: newDeposit,
+      winningBalance: newWinning,
+      transactions: arrayUnion(txRecord),
       lastPrize: {
         amount: numAmount,
         title: title,
@@ -993,19 +1034,40 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
         creditedAt: new Date().toISOString()
       },
       updatedAt: serverTimestamp()
-    }, { merge: true });
+    };
 
+    if (!isDepositCategory) {
+      updateData["stats.earnings"] = increment(numAmount);
+      updateData["stats.wins"] = increment(1);
+    }
+
+    await setDoc(targetRef, updateData, { merge: true });
+
+    // Update in-memory live users cache immediately
+    if (Array.isArray(liveUsersCache)) {
+      const idx = liveUsersCache.findIndex(u => (u.id || u.docId) === targetDocId);
+      if (idx !== -1) {
+        liveUsersCache[idx] = {
+          ...liveUsersCache[idx],
+          wallet: newTotal,
+          depositBalance: newDeposit,
+          winningBalance: newWinning,
+          lastPrize: updateData.lastPrize
+        };
+      }
+    }
+
+    console.log(`[Firebase Realtime] Successfully credited ₹${numAmount} (${walletCategory}) to user ${targetDocId}. New Balances: Total=₹${newTotal}, Dep=₹${newDeposit}, Win=₹${newWinning}`);
     return { 
       success: true, 
       user: { 
-        uid: rawQuery, 
-        nickname: rawQuery, 
-        wallet: numAmount, 
-        depositBalance: initialDeposit, 
-        winningBalance: initialWinning 
+        ...latestUserData, 
+        wallet: newTotal, 
+        depositBalance: newDeposit, 
+        winningBalance: newWinning 
       },
-      newBalance: numAmount,
-      balances: { totalBalance: numAmount, depositBalance: initialDeposit, winningBalance: initialWinning }
+      newBalance: newTotal,
+      balances: { totalBalance: newTotal, depositBalance: newDeposit, winningBalance: newWinning }
     };
   } catch (error) {
     console.error("[Firebase] Error crediting user wallet:", error);
@@ -1019,14 +1081,17 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
 export const markUserMatchRefundedRealtime = async (userId, tournamentId, refundDetails = {}) => {
   try {
     if (!userId || !tournamentId) return { success: false };
-    const rawUser = String(userId).trim();
-    let targetDocId = rawUser;
+    let targetDocId = null;
     try {
-      const matched = await findUserInFirestoreAcrossDevices(rawUser);
+      const matched = await findUserInFirestoreAcrossDevices(userId);
       if (matched && !matched.isNetworkError) {
-        targetDocId = matched.docId || matched.id || rawUser;
+        targetDocId = matched.docId || matched.id;
       }
     } catch (_) {}
+    if (!targetDocId && typeof userId === 'string') {
+      targetDocId = userId.trim();
+    }
+    if (!targetDocId) return { success: false };
 
     const userRef = doc(db, "users", targetDocId);
     const snap = await getDoc(userRef);
@@ -1113,7 +1178,7 @@ export const refundAllTournamentPlayersRealtime = async (tournamentId, {
       const identifier = player.uid || player.email || player.phone || player.nickname;
       try {
         const creditRes = await creditUserWalletRealtime(
-          identifier,
+          player,
           numAmt,
           '💳 Tournament Match Refund',
           finalReason,
@@ -1127,7 +1192,7 @@ export const refundAllTournamentPlayersRealtime = async (tournamentId, {
 
           // Update user's permanent joinedMatchesHistory to mark match as refunded
           try {
-            await markUserMatchRefundedRealtime(identifier, tournamentId, {
+            await markUserMatchRefundedRealtime(player, tournamentId, {
               refundAmount: numAmt,
               refundReason: finalReason,
               refundedAt: new Date().toISOString()
@@ -1136,10 +1201,15 @@ export const refundAllTournamentPlayersRealtime = async (tournamentId, {
 
           // Send in-app notification
           try {
-            const cleanTargets = [
+            const cleanTargets = Array.from(new Set([
               String(player.uid || '').trim().toLowerCase(),
-              String(identifier).trim().toLowerCase()
-            ].filter(Boolean);
+              String(player.phone || '').trim().toLowerCase(),
+              String(player.email || '').trim().toLowerCase(),
+              String(player.id || '').trim().toLowerCase(),
+              String(creditRes.user?.id || '').trim().toLowerCase(),
+              String(creditRes.user?.uid || '').trim().toLowerCase(),
+              String(creditRes.user?.docId || '').trim().toLowerCase()
+            ].filter(Boolean)));
 
             await sendNotificationRealtime({
               title: '💳 Match Refund Credited',
@@ -1200,168 +1270,190 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
       return { success: false, error: 'Please enter a valid positive deduction amount.' };
     }
 
-    const queryStr = String(uidOrEmail).trim().toLowerCase();
-    const rawQuery = String(uidOrEmail).trim();
-    
+    if (!uidOrEmail) {
+      return { success: false, error: 'Missing player identifier or profile data.' };
+    }
+
     let targetDocId = null;
     let targetUserData = null;
 
-    // Fast universal lookup
+    // Fast universal lookup (supports candidate object or string)
     try {
-      const fastMatched = await findUserInFirestoreAcrossDevices(rawQuery);
+      const fastMatched = await findUserInFirestoreAcrossDevices(uidOrEmail);
       if (fastMatched && !fastMatched.isNetworkError) {
-        targetDocId = fastMatched.docId || fastMatched.id || rawQuery;
+        targetDocId = fastMatched.docId || fastMatched.id;
         targetUserData = fastMatched;
       }
     } catch (e) {
       console.warn("[Deduct] Fast lookup notice:", e);
     }
 
+    // Direct getDoc fallback if string
+    if (!targetDocId && typeof uidOrEmail === 'string' && uidOrEmail.trim()) {
+      try {
+        const directDoc = await getDoc(doc(db, "users", uidOrEmail.trim()));
+        if (directDoc.exists()) {
+          targetDocId = directDoc.id;
+          targetUserData = { ...directDoc.data(), id: directDoc.id, docId: directDoc.id };
+        }
+      } catch (_) {}
+    }
+
     if (!targetDocId) {
-      const usersCollection = collection(db, "users");
-      const snapshot = await getDocs(usersCollection);
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const docIdMatch = docSnap.id.trim().toLowerCase() === queryStr;
-        const uidMatch = data.uid && String(data.uid).trim().toLowerCase() === queryStr;
-        const emailMatch = data.email && String(data.email).trim().toLowerCase() === queryStr;
-        const nickMatch = data.nickname && String(data.nickname).trim().toLowerCase() === queryStr;
-
-        if (docIdMatch || uidMatch || emailMatch || nickMatch) {
-          targetDocId = docSnap.id;
-          targetUserData = data;
-        }
-      });
+      const displayKey = typeof uidOrEmail === 'object'
+        ? (uidOrEmail.uid || uidOrEmail.phone || uidOrEmail.email || uidOrEmail.nickname || 'Unknown Player')
+        : String(uidOrEmail);
+      return { success: false, error: `Player account not found in database for "${displayKey}".` };
     }
 
-    if (targetDocId) {
-      const balances = getUserBalances(targetUserData);
-      let newDeposit = balances.depositBalance;
-      let newWinning = balances.winningBalance;
-      let newTotal = balances.totalBalance;
-      let txType = 'penalty';
-      let txTitle = `Deduction: ${reason}`;
-      let txDetailReason = reason || 'Penalty / Balance Adjustment';
-
-      if (deductMode === 'withdrawal') {
-        // Enforce: Only winning amount can be used for withdrawal
-        if (numAmount > balances.winningBalance) {
-          return {
-            success: false,
-            error: `Only winning amount (₹${balances.winningBalance}) can be withdrawn. Deposit cash (₹${balances.depositBalance}) is reserved for tournament entries.`
-          };
-        }
-        newWinning = Math.max(0, Number((balances.winningBalance - numAmount).toFixed(2)));
-        newDeposit = balances.depositBalance;
-        newTotal = Number((newDeposit + newWinning).toFixed(2));
-        txType = 'withdrawal';
-        txTitle = `Withdrawal: ${reason}`;
-        txDetailReason = reason;
-      } else if (deductMode === 'winning') {
-        // Enforce: Deduct specifically from winningBalance
-        if (numAmount > balances.winningBalance) {
-          return {
-            success: false,
-            error: `Cannot deduct ₹${numAmount} from Winnings Cash. Player only has ₹${balances.winningBalance} in Winnings (Deposit: ₹${balances.depositBalance}, Total: ₹${balances.totalBalance}).`
-          };
-        }
-        newWinning = Math.max(0, Number((balances.winningBalance - numAmount).toFixed(2)));
-        newDeposit = balances.depositBalance;
-        newTotal = Number((newDeposit + newWinning).toFixed(2));
-        txType = 'penalty';
-        txTitle = `Deduction from Winnings: ${reason || 'Admin Adjustment'}`;
-        txDetailReason = reason ? `${reason} (Deducted from Winnings Cash)` : 'Deducted from Winnings Cash';
-      } else if (deductMode === 'deposit') {
-        // Enforce: Deduct specifically from depositBalance
-        if (numAmount > balances.depositBalance) {
-          return {
-            success: false,
-            error: `Cannot deduct ₹${numAmount} from Deposit Cash. Player only has ₹${balances.depositBalance} in Deposit (Winnings: ₹${balances.winningBalance}, Total: ₹${balances.totalBalance}).`
-          };
-        }
-        newDeposit = Math.max(0, Number((balances.depositBalance - numAmount).toFixed(2)));
-        newWinning = balances.winningBalance;
-        newTotal = Number((newDeposit + newWinning).toFixed(2));
-        txType = 'penalty';
-        txTitle = `Deduction from Deposit: ${reason || 'Admin Adjustment'}`;
-        txDetailReason = reason ? `${reason} (Deducted from Deposit Cash)` : 'Deducted from Deposit Cash';
-      } else if (deductMode === 'match_entry') {
-        // Deduct from deposit balance first, remainder from winning balance
-        const split = calculateMatchEntrySplit(balances.depositBalance, balances.winningBalance, numAmount);
-        if (!split.canAfford) {
-          return {
-            success: false,
-            error: `Insufficient total balance (₹${balances.totalBalance}) for entry fee ₹${numAmount}.`
-          };
-        }
-        newDeposit = split.newDeposit;
-        newWinning = split.newWinning;
-        newTotal = split.newTotal;
-        txType = 'entry_fee';
-        txTitle = `Match Entry Fee: ${reason}`;
-        txDetailReason = `Paid from: ₹${split.deductFromDeposit} Deposit + ₹${split.deductFromWinning} Winnings`;
-      } else {
-        // General penalty or adjustment: deduct from deposit first, remainder from winning
-        const split = calculateMatchEntrySplit(balances.depositBalance, balances.winningBalance, numAmount);
-        newDeposit = split.newDeposit;
-        newWinning = split.newWinning;
-        newTotal = split.newTotal;
-        txType = 'penalty';
-        txTitle = `Deduction: ${reason}`;
-        txDetailReason = reason;
+    // Fetch fresh document directly from Firestore to eliminate stale balance calculation bugs!
+    const targetRef = doc(db, "users", targetDocId);
+    let latestUserData = targetUserData;
+    try {
+      const freshSnap = await getDoc(targetRef);
+      if (freshSnap.exists()) {
+        latestUserData = { ...freshSnap.data(), id: freshSnap.id, docId: freshSnap.id };
       }
-
-      const targetRef = doc(db, "users", targetDocId);
-      const dateStr = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-      
-      const matchIdExtract = reason.match(/(daily_br_[a-zA-Z0-9_\-]+|daily_[a-zA-Z0-9_\-]+|custom[-_][a-zA-Z0-9_\-]+|tourney[-_][a-zA-Z0-9_\-]+|match[-_][a-zA-Z0-9_\-]+)/i) ||
-                             reason.match(/Match[:\s]+([a-zA-Z0-9_\-]+)/i);
-      const extractedMatchId = matchIdExtract ? matchIdExtract[1] : undefined;
-
-      const txRecord = {
-        id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-        type: txType,
-        amount: numAmount,
-        title: txTitle,
-        reason: txDetailReason,
-        matchId: extractedMatchId,
-        tournamentId: extractedMatchId,
-        date: dateStr,
-        status: deductMode === 'withdrawal' ? 'Processing' : 'Deducted',
-        createdAt: new Date().toISOString()
-      };
-      
-      await setDoc(targetRef, {
-        wallet: newTotal,
-        depositBalance: newDeposit,
-        winningBalance: newWinning,
-        transactions: arrayUnion(txRecord),
-        lastDeduction: {
-          amount: numAmount,
-          reason: txDetailReason,
-          deductMode: deductMode,
-          deductedAt: new Date().toISOString()
-        },
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      console.log(`[Firebase Realtime] Successfully deducted ₹${numAmount} (${deductMode}) from user ${targetDocId}. New Balances: Total=₹${newTotal}, Dep=₹${newDeposit}, Win=₹${newWinning}`);
-      return { 
-        success: true, 
-        user: { 
-          ...targetUserData, 
-          wallet: newTotal, 
-          depositBalance: newDeposit, 
-          winningBalance: newWinning 
-        }, 
-        newBalance: newTotal,
-        newDeposit: newDeposit,
-        newWinning: newWinning,
-        balances: { totalBalance: newTotal, depositBalance: newDeposit, winningBalance: newWinning }
-      };
+    } catch (fErr) {
+      console.warn("[Deduct] Fresh doc fetch notice, using cached data:", fErr?.message);
     }
 
-    return { success: false, error: 'Player account not found in Firebase database.' };
+    const balances = getUserBalances(latestUserData);
+    let newDeposit = balances.depositBalance;
+    let newWinning = balances.winningBalance;
+    let newTotal = balances.totalBalance;
+    let txType = 'penalty';
+    let txTitle = `Deduction: ${reason}`;
+    let txDetailReason = reason || 'Penalty / Balance Adjustment';
+
+    if (deductMode === 'withdrawal') {
+      // Enforce: Only winning amount can be used for withdrawal
+      if (numAmount > balances.winningBalance) {
+        return {
+          success: false,
+          error: `Only winning amount (₹${balances.winningBalance}) can be withdrawn. Deposit cash (₹${balances.depositBalance}) is reserved for tournament entries.`
+        };
+      }
+      newWinning = Math.max(0, Number((balances.winningBalance - numAmount).toFixed(2)));
+      newDeposit = balances.depositBalance;
+      newTotal = Number((newDeposit + newWinning).toFixed(2));
+      txType = 'withdrawal';
+      txTitle = `Withdrawal: ${reason}`;
+      txDetailReason = reason;
+    } else if (deductMode === 'winning') {
+      // Enforce: Deduct specifically from winningBalance
+      if (numAmount > balances.winningBalance) {
+        return {
+          success: false,
+          error: `Cannot deduct ₹${numAmount} from Winnings Cash. Player only has ₹${balances.winningBalance} in Winnings (Deposit: ₹${balances.depositBalance}, Total: ₹${balances.totalBalance}).`
+        };
+      }
+      newWinning = Math.max(0, Number((balances.winningBalance - numAmount).toFixed(2)));
+      newDeposit = balances.depositBalance;
+      newTotal = Number((newDeposit + newWinning).toFixed(2));
+      txType = 'penalty';
+      txTitle = `Deduction from Winnings: ${reason || 'Admin Adjustment'}`;
+      txDetailReason = reason ? `${reason} (Deducted from Winnings Cash)` : 'Deducted from Winnings Cash';
+    } else if (deductMode === 'deposit') {
+      // Enforce: Deduct specifically from depositBalance
+      if (numAmount > balances.depositBalance) {
+        return {
+          success: false,
+          error: `Cannot deduct ₹${numAmount} from Deposit Cash. Player only has ₹${balances.depositBalance} in Deposit (Winnings: ₹${balances.winningBalance}, Total: ₹${balances.totalBalance}).`
+        };
+      }
+      newDeposit = Math.max(0, Number((balances.depositBalance - numAmount).toFixed(2)));
+      newWinning = balances.winningBalance;
+      newTotal = Number((newDeposit + newWinning).toFixed(2));
+      txType = 'penalty';
+      txTitle = `Deduction from Deposit: ${reason || 'Admin Adjustment'}`;
+      txDetailReason = reason ? `${reason} (Deducted from Deposit Cash)` : 'Deducted from Deposit Cash';
+    } else if (deductMode === 'match_entry') {
+      // Deduct from deposit balance first, remainder from winning balance
+      const split = calculateMatchEntrySplit(balances.depositBalance, balances.winningBalance, numAmount);
+      if (!split.canAfford) {
+        return {
+          success: false,
+          error: `Insufficient total balance (₹${balances.totalBalance}) for entry fee ₹${numAmount}.`
+        };
+      }
+      newDeposit = split.newDeposit;
+      newWinning = split.newWinning;
+      newTotal = split.newTotal;
+      txType = 'entry_fee';
+      txTitle = `Match Entry Fee: ${reason}`;
+      txDetailReason = `Paid from: ₹${split.deductFromDeposit} Deposit + ₹${split.deductFromWinning} Winnings`;
+    } else {
+      // General penalty or adjustment: deduct from deposit first, remainder from winning
+      const split = calculateMatchEntrySplit(balances.depositBalance, balances.winningBalance, numAmount);
+      newDeposit = split.newDeposit;
+      newWinning = split.newWinning;
+      newTotal = split.newTotal;
+      txType = 'penalty';
+      txTitle = `Deduction: ${reason}`;
+      txDetailReason = reason;
+    }
+
+    const dateStr = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    
+    const matchIdExtract = reason.match(/(daily_br_[a-zA-Z0-9_\-]+|daily_[a-zA-Z0-9_\-]+|custom[-_][a-zA-Z0-9_\-]+|tourney[-_][a-zA-Z0-9_\-]+|match[-_][a-zA-Z0-9_\-]+)/i) ||
+                           reason.match(/Match[:\s]+([a-zA-Z0-9_\-]+)/i);
+    const extractedMatchId = matchIdExtract ? matchIdExtract[1] : undefined;
+
+    const txRecord = {
+      id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      type: txType,
+      amount: numAmount,
+      title: txTitle,
+      reason: txDetailReason,
+      matchId: extractedMatchId,
+      tournamentId: extractedMatchId,
+      date: dateStr,
+      status: deductMode === 'withdrawal' ? 'Processing' : 'Deducted',
+      createdAt: new Date().toISOString()
+    };
+    
+    await setDoc(targetRef, {
+      wallet: newTotal,
+      depositBalance: newDeposit,
+      winningBalance: newWinning,
+      transactions: arrayUnion(txRecord),
+      lastDeduction: {
+        amount: numAmount,
+        reason: txDetailReason,
+        deductMode: deductMode,
+        deductedAt: new Date().toISOString()
+      },
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    // Update in-memory live users cache immediately
+    if (Array.isArray(liveUsersCache)) {
+      const idx = liveUsersCache.findIndex(u => (u.id || u.docId) === targetDocId);
+      if (idx !== -1) {
+        liveUsersCache[idx] = {
+          ...liveUsersCache[idx],
+          wallet: newTotal,
+          depositBalance: newDeposit,
+          winningBalance: newWinning
+        };
+      }
+    }
+
+    console.log(`[Firebase Realtime] Successfully deducted ₹${numAmount} (${deductMode}) from user ${targetDocId}. New Balances: Total=₹${newTotal}, Dep=₹${newDeposit}, Win=₹${newWinning}`);
+    return { 
+      success: true, 
+      user: { 
+        ...latestUserData, 
+        wallet: newTotal, 
+        depositBalance: newDeposit, 
+        winningBalance: newWinning 
+      }, 
+      newBalance: newTotal,
+      newDeposit: newDeposit,
+      newWinning: newWinning,
+      balances: { totalBalance: newTotal, depositBalance: newDeposit, winningBalance: newWinning }
+    };
   } catch (error) {
     console.error("[Firebase] Error deducting user wallet:", error);
     return { success: false, error: error.message };
