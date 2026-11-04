@@ -80,6 +80,8 @@ export default function AdminHostPanel({
   const [editingTournament, setEditingTournament] = useState(null);
   const [managingPlayersTourney, setManagingPlayersTourney] = useState(null);
   const [rosterSearchQuery, setRosterSearchQuery] = useState('');
+  const [rosterFilterCheck, setRosterFilterCheck] = useState('all'); // 'all' | 'checked' | 'unchecked'
+  const [checkedPlayerMap, setCheckedPlayerMap] = useState({});
   const [removingPlayerId, setRemovingPlayerId] = useState(null);
   
   // Direct Roster Prize Modal states
@@ -90,6 +92,69 @@ export default function AdminHostPanel({
   const [rosterPrizeCategory, setRosterPrizeCategory] = useState('winning'); // 'winning' | 'deposit'
   const [rosterPrizeLoading, setRosterPrizeLoading] = useState(false);
   const [rosterPrizeStatus, setRosterPrizeStatus] = useState('');
+
+  // Roster Player Check-in Helpers (for Free Fire BR Verification)
+  const getPlayerRosterKey = (tourneyId, player, idx) => {
+    const raw = player?.uid || player?.email || player?.phone || player?.nickname || `slot_${idx}`;
+    return `${tourneyId}_${String(raw).trim().toLowerCase()}`;
+  };
+
+  const handleTogglePlayerCheck = (tourneyId, player, idx) => {
+    const key = getPlayerRosterKey(tourneyId, player, idx);
+    setCheckedPlayerMap(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem(`zest_checked_roster_${tourneyId}`, JSON.stringify(next));
+      } catch (_) {}
+      return next;
+    });
+  };
+
+  const handleCheckAllPlayers = (tourneyId, players) => {
+    setCheckedPlayerMap(prev => {
+      const next = { ...prev };
+      players.forEach((p, idx) => {
+        const key = getPlayerRosterKey(tourneyId, p, idx);
+        next[key] = true;
+      });
+      try {
+        localStorage.setItem(`zest_checked_roster_${tourneyId}`, JSON.stringify(next));
+      } catch (_) {}
+      return next;
+    });
+  };
+
+  const handleResetAllChecks = (tourneyId) => {
+    if (!window.confirm("Are you sure you want to uncheck all players for this match?")) return;
+    setCheckedPlayerMap(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => {
+        if (k.startsWith(`${tourneyId}_`)) {
+          delete next[k];
+        }
+      });
+      try {
+        localStorage.setItem(`zest_checked_roster_${tourneyId}`, JSON.stringify(next));
+      } catch (_) {}
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (managingPlayersTourney?.id) {
+      try {
+        const saved = localStorage.getItem(`zest_checked_roster_${managingPlayersTourney.id}`);
+        if (saved) {
+          setCheckedPlayerMap(JSON.parse(saved));
+        } else {
+          setCheckedPlayerMap({});
+        }
+      } catch (_) {
+        setCheckedPlayerMap({});
+      }
+      setRosterFilterCheck('all');
+    }
+  }, [managingPlayersTourney?.id]);
 
   // Bulk & Single Refund Modal states
   const [refundTourney, setRefundTourney] = useState(null);
@@ -5332,7 +5397,7 @@ export default function AdminHostPanel({
         const maxSlots = latestTourney.slotsTotal || latestTourney.maxSlots || 48;
 
         const q = rosterSearchQuery.trim().toLowerCase();
-        const filteredPlayerList = q
+        const searchedPlayerList = q
           ? playerList.filter(player => {
               const name = (player.nickname || '').toLowerCase();
               const uid = (player.uid || '').toString().toLowerCase();
@@ -5342,6 +5407,20 @@ export default function AdminHostPanel({
               return name.includes(q) || uid.includes(q) || email.includes(q) || phone.includes(q) || squad.includes(q);
             })
           : playerList;
+
+        const checkedCount = playerList.reduce((acc, player, idx) => {
+          const key = getPlayerRosterKey(latestTourney.id, player, idx);
+          return acc + (checkedPlayerMap[key] ? 1 : 0);
+        }, 0);
+
+        const filteredPlayerList = searchedPlayerList.filter((player) => {
+          const originalIdx = playerList.indexOf(player);
+          const key = getPlayerRosterKey(latestTourney.id, player, originalIdx);
+          const isChecked = Boolean(checkedPlayerMap[key]);
+          if (rosterFilterCheck === 'checked') return isChecked;
+          if (rosterFilterCheck === 'unchecked') return !isChecked;
+          return true;
+        });
 
         return (
           <div style={{
@@ -5537,6 +5616,119 @@ export default function AdminHostPanel({
                 </div>
               )}
 
+              {/* Room Check-in / Verification Bar (for Free Fire BR Verification) */}
+              {playerList.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  padding: '12px 14px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                }}>
+                  <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem' }}>📋</span>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#fff' }}>
+                          Room Check-in: <span style={{ color: checkedCount === playerList.length && playerList.length > 0 ? '#00e676' : 'var(--secondary)' }}>{checkedCount} / {playerList.length} Checked</span>
+                          {checkedCount === playerList.length && playerList.length > 0 && (
+                            <span style={{ color: '#00e676', marginLeft: '6px', fontWeight: '900' }}>✓ ALL VERIFIED!</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          Tick players (○ / ✓) as they join the Free Fire Custom Room.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleCheckAllPlayers(latestTourney.id, playerList)}
+                        className="btn"
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: '800',
+                          borderRadius: '6px',
+                          background: 'rgba(0, 230, 118, 0.15)',
+                          color: '#00e676',
+                          border: '1px solid rgba(0, 230, 118, 0.35)',
+                          cursor: 'pointer'
+                        }}
+                        title="Mark all players checked in room"
+                      >
+                        ✓ Check All
+                      </button>
+                      {checkedCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleResetAllChecks(latestTourney.id)}
+                          className="btn btn-outline"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.72rem',
+                            fontWeight: '700',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                          title="Reset all checks"
+                        >
+                          ✕ Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div style={{
+                    width: '100%',
+                    height: '6px',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    borderRadius: '3px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${playerList.length > 0 ? (checkedCount / playerList.length) * 100 : 0}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #00e676 0%, #00e5ff 100%)',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[
+                      { id: 'all', label: `All (${searchedPlayerList.length})` },
+                      { id: 'checked', label: `✅ Checked (${checkedCount})` },
+                      { id: 'unchecked', label: `⏳ Missing / Unchecked (${playerList.length - checkedCount})` }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setRosterFilterCheck(tab.id)}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          fontSize: '0.74rem',
+                          fontWeight: '800',
+                          borderRadius: '6px',
+                          border: rosterFilterCheck === tab.id ? '1.5px solid var(--secondary)' : '1px solid rgba(255, 255, 255, 0.08)',
+                          background: rosterFilterCheck === tab.id ? 'rgba(0, 229, 255, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                          color: rosterFilterCheck === tab.id ? 'var(--secondary)' : 'var(--text-muted)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Player list */}
               {playerList.length > 0 ? (
                 filteredPlayerList.length > 0 ? (
@@ -5549,26 +5741,71 @@ export default function AdminHostPanel({
                       );
                       const displaySlot = originalIdx >= 0 ? originalIdx + 1 : 1;
 
+                      const playerKey = getPlayerRosterKey(latestTourney.id, player, originalIdx);
+                      const isChecked = Boolean(checkedPlayerMap[playerKey]);
+
                       return (
                         <div
                           key={player.uid || player.email || displaySlot}
                           className="flex-between glass-panel"
                           style={{
                             padding: '12px 14px',
-                            background: 'rgba(255, 255, 255, 0.03)',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            background: isChecked ? 'rgba(0, 230, 118, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                            border: isChecked ? '1.5px solid #00e676' : '1px solid rgba(255, 255, 255, 0.08)',
+                            boxShadow: isChecked ? '0 0 14px rgba(0, 230, 118, 0.18)' : 'none',
                             borderRadius: '10px',
                             flexWrap: 'wrap',
-                            gap: '10px'
+                            gap: '10px',
+                            transition: 'all 0.2s ease'
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span style={{ fontWeight: '900', color: 'var(--secondary)', fontSize: '0.95rem', minWidth: '32px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {/* Tick Button for Free Fire BR Verification */}
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePlayerCheck(latestTourney.id, player, originalIdx)}
+                              style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '8px',
+                                border: isChecked ? '2px solid #00e676' : '1.5px solid rgba(255, 255, 255, 0.25)',
+                                background: isChecked ? 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)' : 'rgba(255, 255, 255, 0.05)',
+                                color: isChecked ? '#000' : 'rgba(255, 255, 255, 0.4)',
+                                fontSize: isChecked ? '1.15rem' : '0.9rem',
+                                fontWeight: '900',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                boxShadow: isChecked ? '0 0 10px rgba(0, 230, 118, 0.4)' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                              title={isChecked ? "Verified in Free Fire Room (Click to uncheck)" : "Click to mark player checked in Free Fire Room"}
+                            >
+                              {isChecked ? '✓' : '○'}
+                            </button>
+
+                            <span style={{ fontWeight: '900', color: isChecked ? '#00e676' : 'var(--secondary)', fontSize: '0.95rem', minWidth: '32px' }}>
                               #{displaySlot}
                             </span>
                             <div>
-                              <div style={{ fontWeight: '800', color: '#fff', fontSize: '0.92rem' }}>
-                                {player.nickname}
+                              <div style={{ fontWeight: '800', color: '#fff', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span>{player.nickname}</span>
+                                {isChecked && (
+                                  <span style={{
+                                    fontSize: '0.65rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    background: 'rgba(0, 230, 118, 0.2)',
+                                    color: '#00e676',
+                                    fontWeight: '900',
+                                    border: '1px solid rgba(0, 230, 118, 0.4)',
+                                    letterSpacing: '0.3px'
+                                  }}>
+                                    ✓ IN ROOM
+                                  </span>
+                                )}
                               </div>
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '2px' }}>
                                 <span>UID: <strong style={{ color: 'var(--secondary)' }}>{player.uid}</strong></span>
