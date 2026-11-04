@@ -37,6 +37,24 @@ export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
 });
 
+/**
+ * Strips all undefined fields recursively to prevent Firestore arrayUnion / setDoc crashes
+ */
+export const cleanFirestoreData = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const clean = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) {
+      if (v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date) && typeof v?.toMillis !== 'function') {
+        clean[k] = cleanFirestoreData(v);
+      } else {
+        clean[k] = v;
+      }
+    }
+  }
+  return clean;
+};
+
 // In-memory live cache of registered users maintained via onSnapshot
 let liveUsersCache = [];
 let usersSyncInitialized = false;
@@ -208,7 +226,7 @@ export const joinTournamentRealtime = async (tournamentId, participantData) => {
     // Add participant and increment slot counter
     await updateDoc(tourneyRef, {
       slotsJoined: increment(1),
-      joinedPlayers: arrayUnion(participantData),
+      joinedPlayers: arrayUnion(cleanFirestoreData(participantData)),
       updatedAt: serverTimestamp()
     });
 
@@ -1014,25 +1032,29 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       amount: numAmount,
       title: title || (isDepositCategory ? 'Deposit Balance Added' : 'Admin Prize Credit'),
       reason: finalReason,
-      matchId: matchId || undefined,
-      tournamentId: matchId || undefined,
       date: dateStr,
       status: 'Success',
       createdAt: new Date().toISOString()
     };
+    if (matchId) {
+      txRecord.matchId = String(matchId);
+      txRecord.tournamentId = String(matchId);
+    }
+
+    const cleanTx = cleanFirestoreData(txRecord);
 
     const updateData = {
       wallet: newTotal,
       depositBalance: newDeposit,
       winningBalance: newWinning,
-      transactions: arrayUnion(txRecord),
-      lastPrize: {
+      transactions: arrayUnion(cleanTx),
+      lastPrize: cleanFirestoreData({
         amount: numAmount,
-        title: title,
+        title: title || '',
         reason: finalReason,
         category: walletCategory,
         creditedAt: new Date().toISOString()
-      },
+      }),
       updatedAt: serverTimestamp()
     };
 
@@ -1398,7 +1420,7 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
     
     const matchIdExtract = reason.match(/(daily_br_[a-zA-Z0-9_\-]+|daily_[a-zA-Z0-9_\-]+|custom[-_][a-zA-Z0-9_\-]+|tourney[-_][a-zA-Z0-9_\-]+|match[-_][a-zA-Z0-9_\-]+)/i) ||
                            reason.match(/Match[:\s]+([a-zA-Z0-9_\-]+)/i);
-    const extractedMatchId = matchIdExtract ? matchIdExtract[1] : undefined;
+    const extractedMatchId = matchIdExtract ? matchIdExtract[1] : null;
 
     const txRecord = {
       id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
@@ -1406,24 +1428,28 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
       amount: numAmount,
       title: txTitle,
       reason: txDetailReason,
-      matchId: extractedMatchId,
-      tournamentId: extractedMatchId,
       date: dateStr,
       status: deductMode === 'withdrawal' ? 'Processing' : 'Deducted',
       createdAt: new Date().toISOString()
     };
+    if (extractedMatchId) {
+      txRecord.matchId = String(extractedMatchId);
+      txRecord.tournamentId = String(extractedMatchId);
+    }
     
+    const cleanTx = cleanFirestoreData(txRecord);
+
     await setDoc(targetRef, {
       wallet: newTotal,
       depositBalance: newDeposit,
       winningBalance: newWinning,
-      transactions: arrayUnion(txRecord),
-      lastDeduction: {
+      transactions: arrayUnion(cleanTx),
+      lastDeduction: cleanFirestoreData({
         amount: numAmount,
         reason: txDetailReason,
         deductMode: deductMode,
         deductedAt: new Date().toISOString()
-      },
+      }),
       updatedAt: serverTimestamp()
     }, { merge: true });
 
