@@ -229,7 +229,6 @@ export const recordJoinedMatchToUserRealtime = async (userId, matchSummary) => {
   try {
     if (!userId || !matchSummary) return { success: false };
     const cleanUid = String(userId).trim();
-    const userRef = doc(db, "users", cleanUid);
     
     // Clean matchSummary to avoid undefined keys
     const cleanSummary = {};
@@ -237,12 +236,31 @@ export const recordJoinedMatchToUserRealtime = async (userId, matchSummary) => {
       if (matchSummary[k] !== undefined) cleanSummary[k] = matchSummary[k];
     });
 
-    await setDoc(userRef, {
-      joinedMatchesHistory: arrayUnion(cleanSummary),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+    // Locate the authoritative user document in Cloud Firestore across all devices
+    let targetDocId = cleanUid;
+    try {
+      const matched = await findUserInFirestoreAcrossDevices(cleanUid);
+      if (matched && !matched.isNetworkError) {
+        targetDocId = matched.docId || matched.id || cleanUid;
+      }
+    } catch (_) {}
 
-    console.log(`[Firebase] Successfully recorded match ${cleanSummary.id || ''} into permanent history for user ${cleanUid}`);
+    const updatePayload = {
+      joinedMatchesHistory: arrayUnion(cleanSummary),
+      'stats.matches': increment(1),
+      updatedAt: serverTimestamp()
+    };
+
+    await setDoc(doc(db, "users", targetDocId), updatePayload, { merge: true });
+
+    // If targetDocId is different from cleanUid, sync both for 100% device consistency
+    if (targetDocId !== cleanUid) {
+      try {
+        await setDoc(doc(db, "users", cleanUid), updatePayload, { merge: true });
+      } catch (_) {}
+    }
+
+    console.log(`[Firebase] Successfully recorded match ${cleanSummary.id || ''} into permanent history for user ${targetDocId}`);
     return { success: true };
   } catch (err) {
     console.warn("[Firebase] Could not record joined match to user history:", err);
@@ -1122,12 +1140,19 @@ export const deductUserWalletRealtime = async (uidOrEmail, amount, reason = 'Pen
 
       const targetRef = doc(db, "users", targetDocId);
       const dateStr = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      
+      const matchIdExtract = reason.match(/(daily_br_[a-zA-Z0-9_\-]+|daily_[a-zA-Z0-9_\-]+|custom[-_][a-zA-Z0-9_\-]+|tourney[-_][a-zA-Z0-9_\-]+|match[-_][a-zA-Z0-9_\-]+)/i) ||
+                             reason.match(/Match[:\s]+([a-zA-Z0-9_\-]+)/i);
+      const extractedMatchId = matchIdExtract ? matchIdExtract[1] : undefined;
+
       const txRecord = {
         id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
         type: txType,
         amount: numAmount,
         title: txTitle,
         reason: txDetailReason,
+        matchId: extractedMatchId,
+        tournamentId: extractedMatchId,
         date: dateStr,
         status: deductMode === 'withdrawal' ? 'Processing' : 'Deducted',
         createdAt: new Date().toISOString()

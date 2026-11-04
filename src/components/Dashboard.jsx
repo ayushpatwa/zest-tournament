@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { formatMatchDate, sortTournamentsByTime } from '../services/dateUtils';
 import { subscribeToAppSettingsRealtime } from '../services/firebase';
-import { isMatchCompleted } from '../services/matchHistoryService';
+import { isMatchCompleted, getUserAllJoinedMatches } from '../services/matchHistoryService';
 
 // Countdown Timer Component
 function CountdownTimer({ startTime }) {
@@ -86,19 +86,55 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
     return () => unsub();
   }, []);
   
-  const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
-  const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
+  const userJoinedMatches = getUserAllJoinedMatches(tournaments, userProfile);
+  const userUpcomingJoined = userJoinedMatches.filter(t => !isMatchCompleted(t, tournaments));
+  const joinedCount = userUpcomingJoined.length;
 
   const isPlayerInMatch = (tourney) => {
-    if ((!cleanUserUid && !cleanUserEmail) || !tourney.joinedPlayers) return false;
+    if (!tourney) return false;
+
+    // Direct check if match exists in userProfile's joinedMatchesHistory
+    if (Array.isArray(userProfile?.joinedMatchesHistory)) {
+      if (userProfile.joinedMatchesHistory.some(m => String(m?.id || '').trim() === String(tourney.id).trim())) {
+        return true;
+      }
+    }
+
+    if (!Array.isArray(tourney.joinedPlayers)) return false;
+
+    const userKeys = new Set();
+    const addKey = (val) => {
+      if (!val) return;
+      const s = String(val).trim().toLowerCase();
+      if (s && s !== 'n/a' && s !== 'undefined' && s !== 'null') {
+        userKeys.add(s);
+        const digits = s.replace(/\D/g, '');
+        if (digits.length >= 10) userKeys.add(digits.slice(-10));
+      }
+    };
+
+    addKey(userProfile?.uid);
+    addKey(userProfile?.id);
+    addKey(userProfile?.docId);
+    addKey(userProfile?.email);
+    addKey(userProfile?.phone);
+    addKey(userProfile?.nickname);
+
+    if (userKeys.size === 0) return false;
+
     return tourney.joinedPlayers.some(p => {
-      const pUid = String(p.uid || '').trim().toLowerCase();
-      const pEmail = String(p.email || '').trim().toLowerCase();
-      return (cleanUserUid && pUid === cleanUserUid) || (cleanUserEmail && pEmail === cleanUserEmail);
+      if (!p) return false;
+      const playerValues = [p.uid, p.id, p.email, p.phone, p.nickname, p.playerUid, p.freeFireUid];
+      return playerValues.some(v => {
+        if (!v) return false;
+        const s = String(v).trim().toLowerCase();
+        if (userKeys.has(s)) return true;
+        const digits = s.replace(/\D/g, '');
+        if (digits.length >= 10 && userKeys.has(digits.slice(-10))) return true;
+        return false;
+      });
     });
   };
-
-  const joinedCount = tournaments.filter(tourney => isPlayerInMatch(tourney)).length;
   
   // Featured Banners list
   const featured = [
@@ -227,7 +263,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             borderRadius: '8px',
             border: 'none',
             background: 'transparent',
-            color: joinedCount > 0 ? 'var(--secondary)' : 'var(--text-muted)',
+            color: (joinedCount > 0 || userJoinedMatches.length > 0) ? 'var(--secondary)' : 'var(--text-muted)',
             fontFamily: 'var(--font-heading)',
             fontSize: '0.78rem',
             fontWeight: '700',
@@ -240,16 +276,16 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
           }}
         >
           <span>🎯 {t('dashboard.my_matches_tab', {}, 'MY MATCHES')}</span>
-          {joinedCount > 0 && (
+          {(joinedCount > 0 || userJoinedMatches.length > 0) && (
             <span style={{
-              background: 'var(--secondary)',
-              color: '#000',
+              background: joinedCount > 0 ? 'var(--secondary)' : 'rgba(255, 255, 255, 0.2)',
+              color: joinedCount > 0 ? '#000' : '#fff',
               borderRadius: '10px',
               padding: '1px 6px',
               fontSize: '0.65rem',
               fontWeight: '900'
             }}>
-              {joinedCount}
+              {joinedCount > 0 ? joinedCount : userJoinedMatches.length}
             </span>
           )}
         </button>
@@ -468,16 +504,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                 const isMatchFull = joinedSlots >= totalSlots;
                 const slotsPct = Math.min(Math.round((joinedSlots / totalSlots) * 100), 100);
 
-                const cleanUserUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
-                const cleanUserEmail = String(userProfile?.email || '').trim().toLowerCase();
-                const isUserJoined = Boolean(
-                  (cleanUserUid || cleanUserEmail) &&
-                  tourney.joinedPlayers?.some(p => {
-                    const pUid = String(p.uid || '').trim().toLowerCase();
-                    const pEmail = String(p.email || '').trim().toLowerCase();
-                    return (cleanUserUid && pUid === cleanUserUid) || (cleanUserEmail && pEmail === cleanUserEmail);
-                  })
-                );
+                const isUserJoined = isPlayerInMatch(tourney);
 
                 const isPinned = Boolean(tourney.isPinned || tourney.pinned || tourney.isHighlighted);
 

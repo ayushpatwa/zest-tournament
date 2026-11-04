@@ -353,15 +353,23 @@ export default function App() {
       const isMasterAdmin = 
         String(currentUser?.uid || liveUserData?.uid || '').trim() === '9084311275';
 
-      setUserProfile(prev => ({
-        ...prev,
-        ...liveUserData,
-        role: isMasterAdmin ? 'admin' : (liveUserData.role === 'admin' ? 'player' : (liveUserData.role || 'player')),
-        isHost: isMasterAdmin,
-        wallet: typeof liveUserData.wallet === 'number' ? liveUserData.wallet : prev.wallet,
-        depositBalance: liveUserData.depositBalance !== undefined ? liveUserData.depositBalance : prev.depositBalance,
-        winningBalance: liveUserData.winningBalance !== undefined ? liveUserData.winningBalance : prev.winningBalance
-      }));
+      setUserProfile(prev => {
+        const liveHist = Array.isArray(liveUserData?.joinedMatchesHistory) ? liveUserData.joinedMatchesHistory : [];
+        const prevHist = Array.isArray(prev?.joinedMatchesHistory) ? prev.joinedMatchesHistory : [];
+        const mergedHist = [...liveHist, ...prevHist];
+        const uniqueHist = Array.from(new Map(mergedHist.filter(m => m?.id).map(m => [String(m.id).trim(), m])).values());
+
+        return {
+          ...prev,
+          ...liveUserData,
+          joinedMatchesHistory: uniqueHist.length > 0 ? uniqueHist : (liveUserData?.joinedMatchesHistory || prev?.joinedMatchesHistory || []),
+          role: isMasterAdmin ? 'admin' : (liveUserData?.role === 'admin' ? 'player' : (liveUserData?.role || 'player')),
+          isHost: isMasterAdmin,
+          wallet: typeof liveUserData?.wallet === 'number' ? liveUserData.wallet : prev?.wallet,
+          depositBalance: liveUserData?.depositBalance !== undefined ? liveUserData.depositBalance : prev?.depositBalance,
+          winningBalance: liveUserData?.winningBalance !== undefined ? liveUserData.winningBalance : prev?.winningBalance
+        };
+      });
 
       // Real-time instant role synchronization across all tabs & connected devices
       setCurrentUser(prev => {
@@ -441,7 +449,7 @@ export default function App() {
 
     // 1. Deduct Entry Fee locally and in Firestore Cloud
     setWalletBalance(prev => Math.max(0, prev - numFee));
-    const targetUserId = userProfile.uid || userProfile.id || uid;
+    const targetUserId = userProfile.uid || userProfile.id || userProfile.docId || currentUser?.uid || currentUser?.id || uid;
     if (targetUserId && numFee > 0) {
       await deductUserWalletRealtime(targetUserId, numFee, `Entry Fee: Match ${tournamentId}`, 'match_entry');
     }
@@ -453,6 +461,9 @@ export default function App() {
       type: 'registration',
       amount: numFee,
       title: `Registration - Entry Fee`,
+      matchId: tournamentId,
+      tournamentId: tournamentId,
+      tournamentTitle: targetTourney?.title || `Tournament Match #${tournamentId}`,
       date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       status: 'Success'
     };
@@ -490,13 +501,18 @@ export default function App() {
       if (typeof localStorage !== 'undefined') {
         try {
           localStorage.setItem('zest_user_profile', JSON.stringify(updatedProfile));
+          const rawCurrent = localStorage.getItem('zest_current_user');
+          if (rawCurrent) {
+            const parsed = JSON.parse(rawCurrent);
+            localStorage.setItem('zest_current_user', JSON.stringify({ ...parsed, joinedMatchesHistory: updatedHist }));
+          }
         } catch (_) {}
       }
       return updatedProfile;
     });
 
     // Record permanently in Firestore Cloud so match is never lost from history
-    recordJoinedMatchToUserRealtime(targetUserId, matchRecord);
+    await recordJoinedMatchToUserRealtime(targetUserId, matchRecord);
 
     // Specific participant record strictly tied to this player's UID
     const userParticipant = { 

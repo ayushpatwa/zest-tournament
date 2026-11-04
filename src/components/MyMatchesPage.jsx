@@ -187,13 +187,63 @@ export default function MyMatchesPage({
           >
             {t('matches.browse_btn', {}, '🔥 Browse Live Arena Matches ➔')}
           </button>
+
+          {filter === 'upcoming' && completedMatches.length > 0 && (
+            <div style={{ marginTop: '14px' }}>
+              <button
+                type="button"
+                onClick={() => setFilter('completed')}
+                className="btn btn-secondary"
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '0.85rem',
+                  fontWeight: '700',
+                  background: 'rgba(0, 229, 255, 0.15)',
+                  border: '1px solid var(--secondary)',
+                  color: 'var(--secondary)'
+                }}
+              >
+                🏁 View Completed Matches ({completedMatches.length}) ➔
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {sortedMatches.map(tourney => {
             const completed = isMatchCompleted(tourney, tournaments);
-            const playerSlot = tourney.joinedPlayers?.find(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
-            const slotIndex = tourney.joinedPlayers?.findIndex(p => p.isUser || p.uid === userProfile.uid || p.nickname === userProfile.nickname);
+            const userKeys = new Set();
+            const addKey = (val) => {
+              if (!val) return;
+              const s = String(val).trim().toLowerCase();
+              if (s && s !== 'n/a' && s !== 'undefined' && s !== 'null') {
+                userKeys.add(s);
+                const digits = s.replace(/\D/g, '');
+                if (digits.length >= 10) userKeys.add(digits.slice(-10));
+              }
+            };
+            addKey(userProfile?.uid);
+            addKey(userProfile?.id);
+            addKey(userProfile?.docId);
+            addKey(userProfile?.email);
+            addKey(userProfile?.phone);
+            addKey(userProfile?.nickname);
+
+            const playerSlot = tourney.playerSlot || tourney.joinedPlayers?.find(p => {
+              if (!p) return false;
+              if (p.isUser) return true;
+              const vals = [p.uid, p.id, p.email, p.phone, p.nickname, p.playerUid, p.freeFireUid];
+              return vals.some(v => {
+                if (!v) return false;
+                const s = String(v).trim().toLowerCase();
+                if (userKeys.has(s)) return true;
+                const digits = s.replace(/\D/g, '');
+                if (digits.length >= 10 && userKeys.has(digits.slice(-10))) return true;
+                return false;
+              });
+            });
+
+            const slotIndex = tourney.joinedPlayers && playerSlot ? tourney.joinedPlayers.indexOf(playerSlot) : -1;
 
             const isPinned = Boolean(tourney.isPinned || tourney.pinned || tourney.isHighlighted);
 

@@ -4,16 +4,18 @@ import { getTournamentSortTimestamp, formatMatchDate, getTodayDateString } from 
  * Checks whether a tournament match has been completed.
  * A match is completed if:
  * 1. Its status is explicitly 'completed', 'ended', 'finished', or 'closed'
- * 2. It has an explicit isCompleted flag
+ * 2. It has an explicit isCompleted or isHistory flag
  * 3. A prize was credited for this match (prizeWon > 0)
- * 4. Its scheduled start time has passed by more than 25 minutes
- * 5. It was joined > 40 minutes ago and not in the future
- * 6. It was in history but has been removed from the active arena list by the host
+ * 4. The scheduled start time was more than 90 minutes ago (1.5 hours) AND player did not join recently
+ * 5. It was in history but has been removed from the active arena list by the host
+ *
+ * NOTE: If a player joined recently (< 90 minutes ago) or Room ID is active, the match
+ * CANNOT be prematurely marked completed, so players never lose their live matches or room credentials!
  */
 export const isMatchCompleted = (tourney, activeTournamentsList = null) => {
   if (!tourney) return false;
 
-  // 1. Explicit completion flags or statuses
+  // 1. Explicit completion flags or statuses set by Admin/Host
   if (
     tourney.status === 'completed' || 
     tourney.status === 'ended' || 
@@ -30,28 +32,35 @@ export const isMatchCompleted = (tourney, activeTournamentsList = null) => {
     return true;
   }
 
-  // 3. Check joinedAt timestamp: if joined more than 40 minutes ago (Free Fire match lasts ~15-20 min)
+  // PROTECTION 1: If player joined recently (within last 90 minutes), keep match active/upcoming!
+  // Prevents matches joined today from vanishing when older schedule dates are still active in database.
   if (tourney.joinedAt) {
     const joinedTime = new Date(tourney.joinedAt).getTime();
     if (!isNaN(joinedTime) && joinedTime > 0) {
-      if (Date.now() > joinedTime + 40 * 60 * 1000) {
-        const matchTimestamp = getTournamentSortTimestamp(tourney);
-        if (!matchTimestamp || Date.now() > matchTimestamp + 20 * 60 * 1000) {
-          return true;
-        }
+      if (Date.now() < joinedTime + 90 * 60 * 1000) {
+        return false;
       }
     }
   }
 
-  // 4. Check scheduled match date & time: if start time was more than 25 minutes ago
+  // PROTECTION 2: If Room ID has been dropped by Admin and match is live, keep it active
+  // so players can easily view and copy the Room ID & Password to enter Free Fire.
+  if (tourney.roomId && String(tourney.roomId).trim() !== '' && tourney.status !== 'completed') {
+    const matchTimestamp = getTournamentSortTimestamp(tourney);
+    if (!matchTimestamp || Date.now() < matchTimestamp + 90 * 60 * 1000) {
+      return false;
+    }
+  }
+
+  // 3. Check scheduled match date & time: only consider completed if start time was more than 90 minutes ago
   const matchTimestamp = getTournamentSortTimestamp(tourney);
   if (matchTimestamp && typeof matchTimestamp === 'number' && matchTimestamp > 0) {
-    if (Date.now() > matchTimestamp + 25 * 60 * 1000) {
+    if (Date.now() > matchTimestamp + 90 * 60 * 1000) {
       return true;
     }
   }
 
-  // 5. If the tournament was in history and is no longer an active tournament in Arena
+  // 4. If the tournament was in history and is no longer an active tournament in Arena
   if (activeTournamentsList && Array.isArray(activeTournamentsList) && activeTournamentsList.length > 0) {
     const isStillActiveInArena = activeTournamentsList.some(t => t.id === tourney.id);
     if (!isStillActiveInArena) {
@@ -114,9 +123,9 @@ export const parseTournamentFromId = (matchId, fallbackTitle = '', fee = 0, date
   }
 
   // Construct a user-friendly match title
-  let title = fallbackTitle;
-  if (!title || title.includes('Match Entry Fee') || title.includes('daily_')) {
-    title = `${mode} ${type} (Slot #${slotNum})`;
+  let title = (fallbackTitle || '').replace(/^(Match Entry Fee:\s*|Deduction:\s*Entry Fee:\s*Match\s*|Registration\s*-\s*Entry Fee:?\s*)/i, '').trim();
+  if (!title || title.includes('daily_') || title.includes('custom-') || title.includes('Entry Fee')) {
+    title = `${mode} ${type}${slotNum ? ` (Slot #${slotNum})` : ''}`;
   }
 
   return {
@@ -154,13 +163,17 @@ export const extractCompletedMatchesFromTransactions = (userProfile = {}) => {
                     String(tx.reason || '').toLowerCase().includes('entry fee');
 
     if (isEntry) {
-      // Extract match ID from title or reason
-      const combined = `${tx.title || ''} ${tx.reason || ''}`;
-      const matchIdExtract = combined.match(/(daily_[a-zA-Z0-9_\-]+|tourney_[a-zA-Z0-9_\-]+|match_[a-zA-Z0-9_\-]+)/);
-      const matchId = matchIdExtract ? matchIdExtract[1] : (tx.id || `hist_${tx.createdAt || Date.now()}`);
+      // Extract match ID from tx fields, title or reason
+      let matchId = tx.matchId || tx.tournamentId;
+      if (!matchId) {
+        const combined = `${tx.title || ''} ${tx.reason || ''}`;
+        const matchIdExtract = combined.match(/(daily_br_[a-zA-Z0-9_\-]+|daily_[a-zA-Z0-9_\-]+|custom[-_][a-zA-Z0-9_\-]+|tourney[-_][a-zA-Z0-9_\-]+|match[-_][a-zA-Z0-9_\-]+)/i) ||
+                               combined.match(/Match[:\s]+([a-zA-Z0-9_\-]+)/i);
+        matchId = matchIdExtract ? matchIdExtract[1] : (tx.id || `hist_${tx.createdAt || Date.now()}`);
+      }
 
       if (!completedMap.has(matchId)) {
-        const parsed = parseTournamentFromId(matchId, tx.title, tx.amount, tx.date);
+        const parsed = parseTournamentFromId(matchId, tx.tournamentTitle || tx.title, tx.amount, tx.date);
         parsed.joinedAt = tx.createdAt || tx.date;
         parsed.feePaid = tx.amount || 0;
         completedMap.set(matchId, parsed);
@@ -176,7 +189,7 @@ export const extractCompletedMatchesFromTransactions = (userProfile = {}) => {
       for (const [id, m] of completedMap.entries()) {
         const modeLower = (m.mode || '').toLowerCase();
         const typeLower = (m.type || '').toLowerCase();
-        if ((modeLower && reasonLower.includes(modeLower)) || (typeLower && reasonLower.includes(typeLower))) {
+        if ((modeLower && reasonLower.includes(modeLower)) || (typeLower && reasonLower.includes(typeLower)) || reasonLower.includes(id.toLowerCase())) {
           m.prizeWon = (m.prizeWon || 0) + (parseFloat(tx.amount) || 0);
           m.prizeReason = tx.reason;
           break;
@@ -197,9 +210,23 @@ export const extractCompletedMatchesFromTransactions = (userProfile = {}) => {
  * Guarantees every joined match is preserved and shows in Completed once finished.
  */
 export const getUserAllJoinedMatches = (tournaments = [], userProfile = {}) => {
-  const cleanUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
+  const cleanUid = String(userProfile?.uid || '').trim().toLowerCase();
+  const cleanId = String(userProfile?.id || '').trim().toLowerCase();
+  const cleanDocId = String(userProfile?.docId || '').trim().toLowerCase();
   const cleanEmail = String(userProfile?.email || '').trim().toLowerCase();
   const cleanNick = String(userProfile?.nickname || '').trim().toLowerCase();
+  const cleanPhone = String(userProfile?.phone || '').trim().replace(/\D/g, '');
+
+  const userKeys = new Set();
+  if (cleanUid) userKeys.add(cleanUid);
+  if (cleanId) userKeys.add(cleanId);
+  if (cleanDocId) userKeys.add(cleanDocId);
+  if (cleanEmail && cleanEmail !== 'undefined' && cleanEmail !== 'n/a') userKeys.add(cleanEmail);
+  if (cleanNick) userKeys.add(cleanNick);
+  if (cleanPhone && cleanPhone.length >= 6) {
+    userKeys.add(cleanPhone);
+    if (cleanPhone.length >= 10) userKeys.add(cleanPhone.slice(-10));
+  }
 
   const allMap = new Map();
 
@@ -207,19 +234,39 @@ export const getUserAllJoinedMatches = (tournaments = [], userProfile = {}) => {
   if (Array.isArray(tournaments)) {
     tournaments.forEach((tourney) => {
       if (!tourney || !tourney.joinedPlayers) return;
-      const isJoined = tourney.joinedPlayers.some((p) => {
+      let matchedPlayer = null;
+      for (const p of tourney.joinedPlayers) {
+        if (!p) continue;
         const pUid = String(p.uid || '').trim().toLowerCase();
+        const pId = String(p.id || '').trim().toLowerCase();
+        const pFfUid = String(p.ffUid || '').trim().toLowerCase();
         const pEmail = String(p.email || '').trim().toLowerCase();
         const pNick = String(p.nickname || '').trim().toLowerCase();
-        return (cleanUid && pUid === cleanUid) || 
-               (cleanEmail && pEmail === cleanEmail) || 
-               (cleanNick && pNick === cleanNick);
-      });
+        const pPhone = String(p.phone || '').trim().replace(/\D/g, '');
 
-      if (isJoined) {
-        const completed = isMatchCompleted(tourney, tournaments);
-        allMap.set(tourney.id, {
+        const isMatch = (pUid && userKeys.has(pUid)) ||
+                        (pId && userKeys.has(pId)) ||
+                        (pFfUid && userKeys.has(pFfUid)) ||
+                        (pEmail && pEmail !== 'n/a' && pEmail !== 'undefined' && userKeys.has(pEmail)) ||
+                        (pNick && userKeys.has(pNick)) ||
+                        (pPhone && pPhone.length >= 6 && (userKeys.has(pPhone) || (pPhone.length >= 10 && userKeys.has(pPhone.slice(-10))))) ||
+                        p.isUser === true;
+
+        if (isMatch) {
+          matchedPlayer = p;
+          break;
+        }
+      }
+
+      if (matchedPlayer) {
+        const enrichedTourney = {
           ...tourney,
+          joinedAt: matchedPlayer.joinedAt || tourney.joinedAt,
+          playerSlot: matchedPlayer
+        };
+        const completed = isMatchCompleted(enrichedTourney, tournaments);
+        allMap.set(tourney.id, {
+          ...enrichedTourney,
           isCompleted: completed,
           status: completed ? 'completed' : (tourney.status || 'upcoming')
         });
