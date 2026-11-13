@@ -70,9 +70,9 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
 
   useEffect(() => {
     const unsub = subscribeToWinningLeaderboardRealtime((data) => {
-      setLiveLeaderboard(data || []);
+      setLiveLeaderboard((data || []).slice(0, 10));
       setLeaderboardLoading(false);
-    });
+    }, 10);
     return () => unsub();
   }, []);
   const [referralReward, setReferralReward] = useState(0);
@@ -737,14 +737,14 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                 boxShadow: '0 0 8px #00e676',
                 display: 'inline-block'
               }} />
-              ● LIVE REAL-TIME RANKINGS
+              ● TOP 10 LIVE REAL-TIME RANKINGS
             </div>
 
             <h2 style={{ fontFamily: 'var(--font-heading)', color: 'var(--accent)', margin: '0 0 4px 0', fontSize: '1.4rem' }}>
-              👑 ESPORTS WINNINGS LEADERBOARD
+              👑 TOP 10 ESPORTS WINNINGS LEADERBOARD
             </h2>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-              Live rankings ordered strictly by player tournament winning cash.
+              Top 10 players ranked strictly by tournament winning cash in real-time.
             </p>
           </div>
 
@@ -849,7 +849,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
               <div className="glass-panel" style={{ padding: '12px' }}>
                 <div className="flex-between" style={{ marginBottom: '10px', paddingBottom: '6px', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Rank & Player
+                    Rank & Player Name
                   </span>
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Winning Amount
@@ -886,14 +886,27 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                       >
                         {/* Left: Rank & Player Name Only */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                          <span style={{
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            minWidth: '78px',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.74rem',
                             fontWeight: '900',
-                            fontSize: '0.9rem',
-                            minWidth: '28px',
-                            color: isTop1 ? '#ffd600' : isTop2 ? '#c0c0c0' : isTop3 ? '#cd7f32' : 'var(--text-muted)'
+                            letterSpacing: '0.4px',
+                            background: isTop1 ? 'linear-gradient(135deg, rgba(255, 214, 0, 0.28) 0%, rgba(255, 143, 0, 0.18) 100%)'
+                                      : isTop2 ? 'linear-gradient(135deg, rgba(224, 224, 224, 0.25) 0%, rgba(158, 158, 158, 0.15) 100%)'
+                                      : isTop3 ? 'linear-gradient(135deg, rgba(205, 127, 50, 0.25) 0%, rgba(139, 69, 19, 0.15) 100%)'
+                                      : 'rgba(255, 255, 255, 0.06)',
+                            color: isTop1 ? '#ffd600' : isTop2 ? '#e0e0e0' : isTop3 ? '#cd7f32' : 'var(--text-secondary)',
+                            border: `1px solid ${isTop1 ? '#ffd600' : isTop2 ? '#b0bec5' : isTop3 ? '#cd7f32' : 'rgba(255, 255, 255, 0.1)'}`,
+                            boxShadow: isTop1 ? '0 0 10px rgba(255, 214, 0, 0.25)' : 'none',
+                            flexShrink: 0
                           }}>
-                            {isTop1 ? '🥇 #1' : isTop2 ? '🥈 #2' : isTop3 ? '🥉 #3' : `#${idx + 1}`}
-                          </span>
+                            {isTop1 ? '🥇 RANK #1' : isTop2 ? '🥈 RANK #2' : isTop3 ? '🥉 RANK #3' : `RANK #${idx + 1}`}
+                          </div>
                           <span style={{
                             fontSize: '0.9rem',
                             fontWeight: '800',

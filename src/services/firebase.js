@@ -953,7 +953,7 @@ export const subscribeToAllUsersRealtime = (onUpdate) => {
  * Ranked strictly by the player's winning amount.
  * Contains only the player name and winning amount, updated live across all devices!
  */
-export const subscribeToWinningLeaderboardRealtime = (onUpdate) => {
+export const subscribeToWinningLeaderboardRealtime = (onUpdate, limitCount = 10) => {
   try {
     const usersCollection = collection(db, "users");
     const unsubscribe = onSnapshot(usersCollection, (snapshot) => {
@@ -989,7 +989,11 @@ export const subscribeToWinningLeaderboardRealtime = (onUpdate) => {
       // Sort strictly by winning amount descending
       list.sort((a, b) => b.winningAmount - a.winningAmount);
 
-      onUpdate(list);
+      const topList = typeof limitCount === 'number' && limitCount > 0 
+        ? list.slice(0, limitCount) 
+        : list;
+
+      onUpdate(topList);
     }, (err) => {
       console.warn("[Firebase] Winning leaderboard subscription notice:", err);
     });
