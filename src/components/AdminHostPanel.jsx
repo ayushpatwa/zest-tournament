@@ -281,8 +281,8 @@ export default function AdminHostPanel({
 
   // Deposit QR & UPI Management states
   const [qrImageUrl, setQrImageUrl] = useState(depositQrConfig?.qrImageUrl || '');
-  const [qrReceiverName, setQrReceiverName] = useState(depositQrConfig?.receiverName || 'Divyansh Maheshwari');
-  const [qrUpiId, setQrUpiId] = useState(depositQrConfig?.upiId || 'divyansh-308@ptyes');
+  const [qrReceiverName, setQrReceiverName] = useState(depositQrConfig?.receiverName || 'isha rani');
+  const [qrUpiId, setQrUpiId] = useState(depositQrConfig?.upiId || '9571753070@mbk');
   const [qrSaveStatus, setQrSaveStatus] = useState('');
   const [isSavingQr, setIsSavingQr] = useState(false);
   const [qrUploadPreview, setQrUploadPreview] = useState(depositQrConfig?.qrImageUrl || '');
@@ -508,14 +508,14 @@ export default function AdminHostPanel({
   };
 
   const handleResetToDefaultQr = async () => {
-    if (window.confirm('Reset Deposit QR & UPI to default (Divyansh Maheshwari / divyansh-308@ptyes)?')) {
+    if (window.confirm('Reset Deposit QR & UPI to default (isha rani / 9571753070@mbk)?')) {
       setIsSavingQr(true);
       setQrSaveStatus('');
       const res = await saveAppSettingsRealtime({
         depositQr: {
           qrImageUrl: '',
-          receiverName: 'Divyansh Maheshwari',
-          upiId: 'divyansh-308@ptyes',
+          receiverName: 'isha rani',
+          upiId: '9571753070@mbk',
           updatedAt: new Date().toISOString()
         }
       });
@@ -523,8 +523,8 @@ export default function AdminHostPanel({
       if (res.success) {
         setQrImageUrl('');
         setQrUploadPreview('');
-        setQrReceiverName('Divyansh Maheshwari');
-        setQrUpiId('divyansh-308@ptyes');
+        setQrReceiverName('isha rani');
+        setQrUpiId('9571753070@mbk');
         setQrSaveStatus('✅ Reset to default payment QR & UPI ID!');
         setTimeout(() => setQrSaveStatus(''), 4000);
       }
@@ -4728,7 +4728,7 @@ export default function AdminHostPanel({
                   type="text"
                   value={qrReceiverName}
                   onChange={(e) => setQrReceiverName(e.target.value)}
-                  placeholder="e.g. Divyansh Maheshwari"
+                  placeholder="e.g. isha rani"
                   className="form-input"
                   required
                 />

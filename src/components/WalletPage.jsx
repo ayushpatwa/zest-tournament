@@ -21,8 +21,8 @@ export default function WalletPage({
   const [copiedUpi, setCopiedUpi] = useState(false);
 
   const currentQrImg = depositQrConfig?.qrImageUrl || paymentQrImg;
-  const currentReceiverName = depositQrConfig?.receiverName || 'Divyansh Maheshwari';
-  const currentUpiId = depositQrConfig?.upiId || 'divyansh-308@ptyes';
+  const currentReceiverName = depositQrConfig?.receiverName || 'isha rani';
+  const currentUpiId = depositQrConfig?.upiId || '9571753070@mbk';
 
   const handleCopyUpi = () => {
     try {
