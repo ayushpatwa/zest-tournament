@@ -1039,11 +1039,11 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                           (You)
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '1px' }}>
-                        {myRank 
-                          ? `Rank #${myRank} of ${liveLeaderboard.length} cash winners` 
-                          : 'Win tournament matches to enter the leaderboard!'}
-                      </div>
+                      {!myRank && (
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                          Win tournament matches to enter the leaderboard!
+                        </div>
+                      )}
                     </div>
                   </div>
 
