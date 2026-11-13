@@ -953,11 +953,40 @@ export { getUserBalances, calculateMatchEntrySplit } from "./walletUtils.js";
  * Credits money into a user's wallet in Firestore and updates cloud balance in real-time.
  * Supports walletCategory: 'winning' (eligible for withdrawal) or 'deposit' (non-withdrawable, for match entry).
  */
-export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tournament Prize Winnings', reason = '', walletCategory = 'winning', matchId = null) => {
+export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tournament Prize Winnings', reason = '', walletCategory = 'winning', matchId = null, splitConfig = null) => {
   try {
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      return { success: false, error: 'Please enter a valid positive prize amount.' };
+    let winAmt = 0;
+    let depAmt = 0;
+    let totalAmt = 0;
+
+    if (walletCategory === 'both' || walletCategory === 'split') {
+      if (splitConfig && typeof splitConfig === 'object') {
+        winAmt = Math.max(0, parseFloat(splitConfig.winningAmount ?? splitConfig.winning ?? 0) || 0);
+        depAmt = Math.max(0, parseFloat(splitConfig.depositAmount ?? splitConfig.deposit ?? 0) || 0);
+      } else if (typeof amount === 'object' && amount !== null) {
+        winAmt = Math.max(0, parseFloat(amount.winningAmount ?? amount.winning ?? 0) || 0);
+        depAmt = Math.max(0, parseFloat(amount.depositAmount ?? amount.deposit ?? 0) || 0);
+      } else {
+        const parsed = parseFloat(amount) || 0;
+        winAmt = Math.ceil(parsed / 2);
+        depAmt = Number((parsed - winAmt).toFixed(2));
+      }
+      totalAmt = Number((winAmt + depAmt).toFixed(2));
+      if (totalAmt <= 0) {
+        return { success: false, error: 'Please enter a valid positive prize amount for winning and/or deposit.' };
+      }
+    } else {
+      const numAmount = parseFloat(amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        return { success: false, error: 'Please enter a valid positive prize amount.' };
+      }
+      if (walletCategory === 'deposit') {
+        depAmt = numAmount;
+        totalAmt = numAmount;
+      } else {
+        winAmt = numAmount;
+        totalAmt = numAmount;
+      }
     }
 
     if (!uidOrEmail) {
@@ -1015,23 +1044,28 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
     }
 
     const currentBalances = getUserBalances(latestUserData);
+    const isBoth = walletCategory === 'both' || walletCategory === 'split';
     const isDepositCategory = walletCategory === 'deposit';
-    const newDeposit = isDepositCategory 
-      ? Number((currentBalances.depositBalance + numAmount).toFixed(2)) 
-      : currentBalances.depositBalance;
-    const newWinning = !isDepositCategory 
-      ? Number((currentBalances.winningBalance + numAmount).toFixed(2)) 
-      : currentBalances.winningBalance;
+    const newDeposit = Number((currentBalances.depositBalance + depAmt).toFixed(2));
+    const newWinning = Number((currentBalances.winningBalance + winAmt).toFixed(2));
     const newTotal = Number((newDeposit + newWinning).toFixed(2));
 
     const dateStr = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    const finalReason = reason || title || (isDepositCategory ? 'Deposit Credit' : 'Tournament Prize / Winning');
+    const defaultTitle = title || (isBoth ? '🎁 Prize Credit (Winning + Deposit)' : (isDepositCategory ? 'Deposit Balance Added' : 'Admin Prize Credit'));
+    let finalReason = reason || defaultTitle;
+    if (isBoth && !finalReason.includes('Winning') && !finalReason.includes('Deposit')) {
+      finalReason = `${finalReason} (₹${winAmt} Winning + ₹${depAmt} Deposit)`;
+    }
+
     const txRecord = {
       id: `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      type: isDepositCategory ? 'deposit' : 'winning',
-      amount: numAmount,
-      title: title || (isDepositCategory ? 'Deposit Balance Added' : 'Admin Prize Credit'),
+      type: isBoth ? 'both' : (isDepositCategory ? 'deposit' : 'winning'),
+      amount: totalAmt,
+      winningAmount: winAmt,
+      depositAmount: depAmt,
+      title: defaultTitle,
       reason: finalReason,
+      category: walletCategory,
       date: dateStr,
       status: 'Success',
       createdAt: new Date().toISOString()
@@ -1049,8 +1083,10 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       winningBalance: newWinning,
       transactions: arrayUnion(cleanTx),
       lastPrize: cleanFirestoreData({
-        amount: numAmount,
-        title: title || '',
+        amount: totalAmt,
+        winningAmount: winAmt,
+        depositAmount: depAmt,
+        title: defaultTitle,
         reason: finalReason,
         category: walletCategory,
         creditedAt: new Date().toISOString()
@@ -1058,8 +1094,8 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       updatedAt: serverTimestamp()
     };
 
-    if (!isDepositCategory) {
-      updateData["stats.earnings"] = increment(numAmount);
+    if (winAmt > 0) {
+      updateData["stats.earnings"] = increment(winAmt);
       updateData["stats.wins"] = increment(1);
     }
 
@@ -1079,7 +1115,7 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
       }
     }
 
-    console.log(`[Firebase Realtime] Successfully credited ₹${numAmount} (${walletCategory}) to user ${targetDocId}. New Balances: Total=₹${newTotal}, Dep=₹${newDeposit}, Win=₹${newWinning}`);
+    console.log(`[Firebase Realtime] Successfully credited ₹${totalAmt} (${walletCategory}: Win=₹${winAmt}, Dep=₹${depAmt}) to user ${targetDocId}. New Balances: Total=₹${newTotal}, Dep=₹${newDeposit}, Win=₹${newWinning}`);
     return { 
       success: true, 
       user: { 
@@ -1089,7 +1125,10 @@ export const creditUserWalletRealtime = async (uidOrEmail, amount, title = 'Tour
         winningBalance: newWinning 
       },
       newBalance: newTotal,
-      balances: { totalBalance: newTotal, depositBalance: newDeposit, winningBalance: newWinning }
+      balances: { totalBalance: newTotal, depositBalance: newDeposit, winningBalance: newWinning },
+      totalAmount: totalAmt,
+      winningAmount: winAmt,
+      depositAmount: depAmt
     };
   } catch (error) {
     console.error("[Firebase] Error crediting user wallet:", error);

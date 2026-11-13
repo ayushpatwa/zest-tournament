@@ -33,7 +33,9 @@ export default function TournamentLobby({
   const [rosterPrizePlayer, setRosterPrizePlayer] = useState(null);
   const [rosterPrizeAmount, setRosterPrizeAmount] = useState('');
   const [rosterPrizeReason, setRosterPrizeReason] = useState('');
-  const [rosterPrizeCategory, setRosterPrizeCategory] = useState('winning'); // 'winning' | 'deposit'
+  const [rosterPrizeCategory, setRosterPrizeCategory] = useState('winning'); // 'winning' | 'deposit' | 'both'
+  const [rosterWinningAmount, setRosterWinningAmount] = useState('50');
+  const [rosterDepositAmount, setRosterDepositAmount] = useState('50');
   const [rosterPrizeLoading, setRosterPrizeLoading] = useState(false);
   const [rosterPrizeStatus, setRosterPrizeStatus] = useState('');
 
@@ -74,7 +76,10 @@ export default function TournamentLobby({
   const handleOpenRosterPrize = (player) => {
     setRosterPrizePlayer({ player, tournament });
     const defaultAmt = tournament.bounty || tournament.prizePool || '50';
+    const numAmt = parseFloat(defaultAmt) || 50;
     setRosterPrizeAmount(String(defaultAmt));
+    setRosterWinningAmount(String(Math.ceil(numAmt / 2)));
+    setRosterDepositAmount(String(Math.floor(numAmt / 2)));
     setRosterPrizeReason(`1st Place Winner - ${tournament.title}`);
     setRosterPrizeCategory('winning');
     setRosterPrizeStatus('');
@@ -85,10 +90,30 @@ export default function TournamentLobby({
     if (!rosterPrizePlayer) return;
 
     const { player } = rosterPrizePlayer;
-    const amt = parseFloat(rosterPrizeAmount);
-    if (isNaN(amt) || amt <= 0) {
-      setRosterPrizeStatus('⚠️ Please enter a valid positive prize amount.');
-      return;
+    const isBoth = rosterPrizeCategory === 'both';
+    let winAmt = 0;
+    let depAmt = 0;
+    let amt = 0;
+
+    if (isBoth) {
+      winAmt = parseFloat(rosterWinningAmount) || 0;
+      depAmt = parseFloat(rosterDepositAmount) || 0;
+      amt = Number((winAmt + depAmt).toFixed(2));
+      if (amt <= 0) {
+        setRosterPrizeStatus('⚠️ Please enter a positive coin amount for Winning and/or Deposit.');
+        return;
+      }
+    } else {
+      amt = parseFloat(rosterPrizeAmount);
+      if (isNaN(amt) || amt <= 0) {
+        setRosterPrizeStatus('⚠️ Please enter a valid positive prize amount.');
+        return;
+      }
+      if (rosterPrizeCategory === 'deposit') {
+        depAmt = amt;
+      } else {
+        winAmt = amt;
+      }
     }
 
     setRosterPrizeLoading(true);
@@ -108,22 +133,28 @@ export default function TournamentLobby({
       const res = await creditUserWalletRealtime(
         playerCandidate, 
         amt, 
-        rosterPrizeCategory === 'deposit' ? '💳 Tournament Match Refund / Deposit' : '🏆 Tournament Prize Winnings', 
+        isBoth ? '🎁 Tournament Prize (Winning + Deposit)' : (rosterPrizeCategory === 'deposit' ? '💳 Tournament Match Refund / Deposit' : '🏆 Tournament Prize Winnings'), 
         finalReason,
         rosterPrizeCategory,
-        tournament.id
+        tournament.id,
+        isBoth ? { winningAmount: winAmt, depositAmount: depAmt } : null
       );
 
       if (res.success) {
-        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to ${player.nickname || player.uid}'s wallet! (New Total: ₹${res.newBalance})`);
+        const catLabel = isBoth ? `(₹${winAmt} Winning + ₹${depAmt} Deposit)` : (rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash');
+        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} ${catLabel} to ${player.nickname || player.uid}'s wallet! (New Total: ₹${res.newBalance})`);
 
+        const isBothPrize = rosterPrizeCategory === 'both';
+        const prizeDetailsCat = isBothPrize 
+          ? `₹${winAmt} Winning + ₹${depAmt} Deposit` 
+          : (rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash');
         await sendToMakeWebhook({
           eventType: 'PRIZE_PAYOUT',
           nickname: player.nickname || res.user?.nickname || player.uid,
           ffUid: player.uid || res.user?.uid || 'N/A',
           email: player.email || res.user?.email || 'N/A',
           phone: player.phone || res.user?.phone || 'N/A',
-          details: `Lobby Direct Prize: ₹${amt} (${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'}) (${finalReason}) [Match: ${tournament.title}]`
+          details: `Lobby Direct Prize: ₹${amt} (${prizeDetailsCat}) (${finalReason}) [Match: ${tournament.title}]`
         });
 
         try {
@@ -137,12 +168,16 @@ export default function TournamentLobby({
             String(res.user?.docId || '').trim().toLowerCase()
           ].filter(Boolean)));
 
+          const notifCategoryLabel = isBothPrize
+            ? `₹${amt} (₹${winAmt} Winning + ₹${depAmt} Deposit)`
+            : (rosterPrizeCategory === 'deposit' ? `₹${amt} deposit cash` : `₹${amt} winnings cash`);
+
           await sendNotificationRealtime({
-            title: `🏆 ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Prize Money'} Credited: ₹${amt}!`,
-            message: `Congratulations ${player.nickname || 'Player'}! You have received ₹${amt} ${rosterPrizeCategory === 'deposit' ? 'deposit cash' : 'winnings cash'} in "${tournament.title}". The amount has been added to your wallet!`,
+            title: `🏆 Prize Money Credited: ₹${amt}!`,
+            message: `Congratulations ${player.nickname || 'Player'}! You have received ${notifCategoryLabel} in "${tournament.title}". The amount has been added to your wallet!`,
             type: 'prize',
-            category: rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'WINNINGS',
-            badgeText: rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'PRIZE',
+            category: isBothPrize ? 'BOTH' : (rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'WINNINGS'),
+            badgeText: isBothPrize ? 'PRIZE' : (rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'PRIZE'),
             targetUids: notifUids
           });
         } catch (notifErr) {
@@ -1194,12 +1229,133 @@ export default function TournamentLobby({
                 >
                   💳 Deposit Cash (For Matches Only)
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRosterPrizeCategory('both');
+                    const cur = parseFloat(rosterPrizeAmount) || 50;
+                    if (!rosterWinningAmount || rosterWinningAmount === '0') setRosterWinningAmount(String(Math.ceil(cur / 2)));
+                    if (!rosterDepositAmount || rosterDepositAmount === '0') setRosterDepositAmount(String(Math.floor(cur / 2)));
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: rosterPrizeCategory === 'both' ? '1px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
+                    background: rosterPrizeCategory === 'both' ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255,255,255,0.03)',
+                    color: rosterPrizeCategory === 'both' ? '#00e676' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.78rem',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🎁 Both (Winning + Deposit)
+                </button>
               </div>
             </div>
 
             {/* Prize Amount Input & Quick Chips */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px' }}>
+            {rosterPrizeCategory === 'both' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '800', color: '#ffd600', marginBottom: '6px' }}>
+                      🏆 Winning Cash (₹ Coins) <span style={{ color: '#ff1744' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#ffd600', fontWeight: '900', fontSize: '1rem' }}>₹</span>
+                      <input
+                        type="number"
+                        value={rosterWinningAmount}
+                        onChange={(e) => setRosterWinningAmount(e.target.value)}
+                        placeholder="50"
+                        min="0"
+                        className="input-field"
+                        style={{
+                          paddingLeft: '28px',
+                          fontSize: '0.95rem',
+                          fontWeight: '800',
+                          borderColor: 'rgba(255, 214, 0, 0.4)',
+                          background: 'rgba(0,0,0,0.4)'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '800', color: '#00e5ff', marginBottom: '6px' }}>
+                      💳 Deposit Cash (₹ Coins) <span style={{ color: '#ff1744' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#00e5ff', fontWeight: '900', fontSize: '1rem' }}>₹</span>
+                      <input
+                        type="number"
+                        value={rosterDepositAmount}
+                        onChange={(e) => setRosterDepositAmount(e.target.value)}
+                        placeholder="50"
+                        min="0"
+                        className="input-field"
+                        style={{
+                          paddingLeft: '28px',
+                          fontSize: '0.95rem',
+                          fontWeight: '800',
+                          borderColor: 'rgba(0, 229, 255, 0.4)',
+                          background: 'rgba(0,0,0,0.4)'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Split presets & Live Total */}
+                <div style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(0, 230, 118, 0.08)',
+                  border: '1px solid rgba(0, 230, 118, 0.25)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Quick Split:</span>
+                    {[
+                      { win: '25', dep: '25' },
+                      { win: '50', dep: '50' },
+                      { win: '100', dep: '50' },
+                      { win: '100', dep: '100' },
+                      { win: '250', dep: '250' }
+                    ].map(p => (
+                      <button
+                        key={`${p.win}-${p.dep}`}
+                        type="button"
+                        onClick={() => { setRosterWinningAmount(p.win); setRosterDepositAmount(p.dep); }}
+                        style={{
+                          background: (rosterWinningAmount === p.win && rosterDepositAmount === p.dep) ? '#00e676' : 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          color: (rosterWinningAmount === p.win && rosterDepositAmount === p.dep) ? '#000' : '#fff',
+                          fontWeight: '700',
+                          borderRadius: '8px',
+                          padding: '2px 7px',
+                          fontSize: '0.68rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ₹{p.win}+₹{p.dep}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontWeight: '900', fontSize: '0.85rem', color: '#00e676' }}>
+                    ⚡ Total: ₹{(parseFloat(rosterWinningAmount) || 0) + (parseFloat(rosterDepositAmount) || 0)} (₹{parseFloat(rosterWinningAmount) || 0} Win + ₹{parseFloat(rosterDepositAmount) || 0} Dep)
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 Prize Money Amount (₹ Coins) <span style={{ color: '#ff1744' }}>*</span>
               </label>
               
@@ -1280,6 +1436,7 @@ export default function TournamentLobby({
                 />
               </div>
             </div>
+            )}
 
             {/* Prize Reason & Preset Chips */}
             <div>
@@ -1353,7 +1510,7 @@ export default function TournamentLobby({
               <button
                 type="button"
                 onClick={handleConfirmRosterPrize}
-                disabled={rosterPrizeLoading || !rosterPrizeAmount || parseFloat(rosterPrizeAmount) <= 0}
+                disabled={rosterPrizeLoading || (rosterPrizeCategory === 'both' ? ((parseFloat(rosterWinningAmount) || 0) + (parseFloat(rosterDepositAmount) || 0) <= 0) : (!rosterPrizeAmount || parseFloat(rosterPrizeAmount) <= 0))}
                 className="btn"
                 style={{
                   flex: 2,
@@ -1375,9 +1532,15 @@ export default function TournamentLobby({
                 {rosterPrizeLoading ? (
                   '⚡ Crediting Wallet...'
                 ) : (
-                  <>
-                    <span>{rosterPrizeCategory === 'deposit' ? '💳' : '🏆'}</span> Send ₹{rosterPrizeAmount || 0} ({rosterPrizeCategory === 'deposit' ? 'Deposit' : 'Winning'} Cash) to Wallet
-                  </>
+                  rosterPrizeCategory === 'both' ? (
+                    <>
+                      <span>🎁</span> Send ₹{(parseFloat(rosterWinningAmount) || 0) + (parseFloat(rosterDepositAmount) || 0)} (₹{parseFloat(rosterWinningAmount) || 0} Win + ₹{parseFloat(rosterDepositAmount) || 0} Dep) to Wallet
+                    </>
+                  ) : (
+                    <>
+                      <span>{rosterPrizeCategory === 'deposit' ? '💳' : '🏆'}</span> Send ₹{rosterPrizeAmount || 0} ({rosterPrizeCategory === 'deposit' ? 'Deposit' : 'Winning'} Cash) to Wallet
+                    </>
+                  )
                 )}
               </button>
             </div>

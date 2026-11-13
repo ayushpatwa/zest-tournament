@@ -367,7 +367,7 @@ export default function WalletPage({
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {displayTransactions.map(tx => {
-              const isCredit = tx.type === 'deposit' || tx.type === 'winning' || tx.type === 'credit';
+              const isCredit = tx.type === 'deposit' || tx.type === 'winning' || tx.type === 'credit' || tx.type === 'both' || tx.type === 'split';
               const isPenalty = tx.type === 'penalty' || tx.type === 'deduction';
               
               return (

@@ -89,7 +89,9 @@ export default function AdminHostPanel({
   const [rosterPrizeAmount, setRosterPrizeAmount] = useState('');
   const [rosterPrizeReason, setRosterPrizeReason] = useState('');
   const [rosterPrizeCustomMsg, setRosterPrizeCustomMsg] = useState('');
-  const [rosterPrizeCategory, setRosterPrizeCategory] = useState('winning'); // 'winning' | 'deposit'
+  const [rosterPrizeCategory, setRosterPrizeCategory] = useState('winning'); // 'winning' | 'deposit' | 'both'
+  const [rosterWinningAmount, setRosterWinningAmount] = useState('50');
+  const [rosterDepositAmount, setRosterDepositAmount] = useState('50');
   const [rosterPrizeLoading, setRosterPrizeLoading] = useState(false);
   const [rosterPrizeStatus, setRosterPrizeStatus] = useState('');
 
@@ -200,7 +202,9 @@ export default function AdminHostPanel({
 
   // Prize & Wallet Manager states
   const [walletAction, setWalletAction] = useState('credit'); // 'credit' | 'deduct'
-  const [creditCategory, setCreditCategory] = useState('winning'); // 'winning' | 'deposit'
+  const [creditCategory, setCreditCategory] = useState('winning'); // 'winning' | 'deposit' | 'both'
+  const [payoutWinningAmount, setPayoutWinningAmount] = useState('50');
+  const [payoutDepositAmount, setPayoutDepositAmount] = useState('50');
   const [deductCategory, setDeductCategory] = useState('winning'); // 'winning' | 'deposit'
   const [payoutPlayerIdentifier, setPayoutPlayerIdentifier] = useState('');
   const [payoutAmount, setPayoutAmount] = useState('500');
@@ -1244,26 +1248,63 @@ export default function AdminHostPanel({
     setPayoutLoading(true);
 
     if (walletAction === 'credit') {
-      const res = await creditUserWalletRealtime(
-        payoutPlayerIdentifier.trim(), 
-        amt, 
-        payoutReason.trim(), 
-        '', 
-        creditCategory
-      );
-      if (res.success) {
-        setPayoutStatus(`✅ Successfully credited ₹${amt} ${creditCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to ${res.user?.nickname || payoutPlayerIdentifier}! New Total: ₹${res.newBalance} (Dep: ₹${res.balances?.depositBalance ?? 0}, Win: ₹${res.balances?.winningBalance ?? 0})`);
-        await sendToMakeWebhook({
-          eventType: 'PRIZE_PAYOUT',
-          nickname: res.user?.nickname || payoutPlayerIdentifier,
-          ffUid: res.user?.uid || payoutPlayerIdentifier,
-          email: res.user?.email || 'N/A',
-          phone: res.user?.phone || 'N/A',
-          details: `Admin Credited Coins: +₹${amt} (${creditCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'}) (${payoutReason})`
-        });
-        setPayoutPlayerIdentifier('');
+      let res;
+      let finalAmt = amt;
+      const isBoth = creditCategory === 'both';
+      if (isBoth) {
+        const winAmt = parseFloat(payoutWinningAmount) || 0;
+        const depAmt = parseFloat(payoutDepositAmount) || 0;
+        finalAmt = Number((winAmt + depAmt).toFixed(2));
+        if (finalAmt <= 0) {
+          setPayoutStatus('⚠️ Please enter a positive coin amount for Winning and/or Deposit.');
+          setPayoutLoading(false);
+          return;
+        }
+        res = await creditUserWalletRealtime(
+          payoutPlayerIdentifier.trim(),
+          finalAmt,
+          payoutReason.trim() || '🎁 Prize Credit (Winning + Deposit)',
+          payoutReason.trim() ? `${payoutReason.trim()} (₹${winAmt} Winning + ₹${depAmt} Deposit)` : `Direct Prize (₹${winAmt} Winning + ₹${depAmt} Deposit)`,
+          'both',
+          null,
+          { winningAmount: winAmt, depositAmount: depAmt }
+        );
+        if (res.success) {
+          setPayoutStatus(`✅ Successfully credited ₹${finalAmt} (₹${winAmt} Winning + ₹${depAmt} Deposit) to ${res.user?.nickname || payoutPlayerIdentifier}! New Total: ₹${res.newBalance} (Dep: ₹${res.balances?.depositBalance ?? 0}, Win: ₹${res.balances?.winningBalance ?? 0})`);
+          await sendToMakeWebhook({
+            eventType: 'PRIZE_PAYOUT',
+            nickname: res.user?.nickname || payoutPlayerIdentifier,
+            ffUid: res.user?.uid || payoutPlayerIdentifier,
+            email: res.user?.email || 'N/A',
+            phone: res.user?.phone || 'N/A',
+            details: `Admin Credited Coins: +₹${finalAmt} (₹${winAmt} Winning + ₹${depAmt} Deposit) (${payoutReason || 'Direct Prize'})`
+          });
+          setPayoutPlayerIdentifier('');
+        } else {
+          setPayoutStatus(`⚠️ ${res.error || 'Failed to credit coins'}`);
+        }
       } else {
-        setPayoutStatus(`⚠️ ${res.error || 'Failed to credit coins'}`);
+        res = await creditUserWalletRealtime(
+          payoutPlayerIdentifier.trim(), 
+          amt, 
+          payoutReason.trim() || (creditCategory === 'deposit' ? '💳 Deposit Cash Added' : '🏆 Prize Winnings'), 
+          payoutReason.trim(), 
+          creditCategory
+        );
+        if (res.success) {
+          setPayoutStatus(`✅ Successfully credited ₹${amt} ${creditCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to ${res.user?.nickname || payoutPlayerIdentifier}! New Total: ₹${res.newBalance} (Dep: ₹${res.balances?.depositBalance ?? 0}, Win: ₹${res.balances?.winningBalance ?? 0})`);
+          await sendToMakeWebhook({
+            eventType: 'PRIZE_PAYOUT',
+            nickname: res.user?.nickname || payoutPlayerIdentifier,
+            ffUid: res.user?.uid || payoutPlayerIdentifier,
+            email: res.user?.email || 'N/A',
+            phone: res.user?.phone || 'N/A',
+            details: `Admin Credited Coins: +₹${amt} (${creditCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'}) (${payoutReason})`
+          });
+          setPayoutPlayerIdentifier('');
+        } else {
+          setPayoutStatus(`⚠️ ${res.error || 'Failed to credit coins'}`);
+        }
       }
     } else {
       // Deduct mode
@@ -1298,7 +1339,10 @@ export default function AdminHostPanel({
     setRosterPrizePlayer({ player, tourney });
     // Check if tournament has a custom bounty (e.g. CS 1v1), prize pool, or default 50
     const defaultAmt = tourney.bounty || tourney.prizePool || '50';
+    const numAmt = parseFloat(defaultAmt) || 50;
     setRosterPrizeAmount(String(defaultAmt));
+    setRosterWinningAmount(String(Math.ceil(numAmt / 2)));
+    setRosterDepositAmount(String(Math.floor(numAmt / 2)));
     setRosterPrizeReason(`1st Place Winner - ${tourney.title}`);
     setRosterPrizeCustomMsg(`Congratulations ${player.nickname || 'Champion'}! Excellent match performance. Your winning prize has been credited!`);
     setRosterPrizeCategory('winning');
@@ -1310,10 +1354,30 @@ export default function AdminHostPanel({
     if (!rosterPrizePlayer) return;
 
     const { player, tourney } = rosterPrizePlayer;
-    const amt = parseFloat(rosterPrizeAmount);
-    if (isNaN(amt) || amt <= 0) {
-      setRosterPrizeStatus('⚠️ Please enter a valid positive prize amount.');
-      return;
+    const isBoth = rosterPrizeCategory === 'both';
+    let winAmt = 0;
+    let depAmt = 0;
+    let amt = 0;
+
+    if (isBoth) {
+      winAmt = parseFloat(rosterWinningAmount) || 0;
+      depAmt = parseFloat(rosterDepositAmount) || 0;
+      amt = Number((winAmt + depAmt).toFixed(2));
+      if (amt <= 0) {
+        setRosterPrizeStatus('⚠️ Please enter a positive coin amount for Winning and/or Deposit.');
+        return;
+      }
+    } else {
+      amt = parseFloat(rosterPrizeAmount);
+      if (isNaN(amt) || amt <= 0) {
+        setRosterPrizeStatus('⚠️ Please enter a valid positive prize amount.');
+        return;
+      }
+      if (rosterPrizeCategory === 'deposit') {
+        depAmt = amt;
+      } else {
+        winAmt = amt;
+      }
     }
 
     setRosterPrizeLoading(true);
@@ -1335,14 +1399,16 @@ export default function AdminHostPanel({
       const res = await creditUserWalletRealtime(
         playerCandidate, 
         amt, 
-        rosterPrizeCategory === 'deposit' ? '💳 Tournament Match Refund / Deposit' : '🏆 Tournament Prize Winnings', 
+        isBoth ? '🎁 Tournament Prize (Winning + Deposit)' : (rosterPrizeCategory === 'deposit' ? '💳 Tournament Match Refund / Deposit' : '🏆 Tournament Prize Winnings'), 
         txReason,
         rosterPrizeCategory,
-        tourney.id
+        tourney.id,
+        isBoth ? { winningAmount: winAmt, depositAmount: depAmt } : null
       );
 
       if (res.success) {
-        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'} to ${player.nickname || player.uid}'s wallet! (New Total: ₹${res.newBalance})`);
+        const catLabel = isBoth ? `(₹${winAmt} Winning + ₹${depAmt} Deposit)` : (rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash');
+        setRosterPrizeStatus(`✅ Successfully credited ₹${amt} ${catLabel} to ${player.nickname || player.uid}'s wallet! (New Total: ₹${res.newBalance})`);
 
         // Automatically update the tournament to record winner and match completion
         if (typeof onUpdateTournament === 'function') {
@@ -1364,20 +1430,26 @@ export default function AdminHostPanel({
         }
 
         // Send Make.com webhook logging
+        const isBothPrize = rosterPrizeCategory === 'both';
+        const prizeDetailsCat = isBothPrize 
+          ? `₹${winAmt} Winning + ₹${depAmt} Deposit` 
+          : (rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash');
         await sendToMakeWebhook({
           eventType: 'PRIZE_PAYOUT',
           nickname: player.nickname || res.user?.nickname || player.uid,
           ffUid: player.uid || res.user?.uid || 'N/A',
           email: player.email || res.user?.email || 'N/A',
           phone: player.phone || res.user?.phone || 'N/A',
-          details: `Match Roster Direct Prize: ₹${amt} (${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winnings Cash'}) (${finalReason}) [Match: ${tourney.title}]${customMsg ? ` | Msg: "${customMsg}"` : ''}`
+          details: `Match Roster Direct Prize: ₹${amt} (${prizeDetailsCat}) (${finalReason}) [Match: ${tourney.title}]${customMsg ? ` | Msg: "${customMsg}"` : ''}`
         });
 
         // Send in-app notification & closed-app push notification to the winner
-        const notifCategoryLabel = rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Winning Prize';
+        const notifCategoryLabel = isBothPrize
+          ? `₹${amt} (₹${winAmt} Winning + ₹${depAmt} Deposit)`
+          : (rosterPrizeCategory === 'deposit' ? `₹${amt} Deposit Cash` : `₹${amt} Winning Prize`);
         const notifMessage = customMsg
-          ? `${customMsg}\n\n🏆 ₹${amt} ${notifCategoryLabel} credited for "${tourney.title}".`
-          : `Congratulations ${player.nickname || 'Player'}! You have received ₹${amt} ${notifCategoryLabel} for "${tourney.title}". The amount has been added to your wallet!`;
+          ? `${customMsg}\n\n🏆 ${notifCategoryLabel} credited for "${tourney.title}".`
+          : `Congratulations ${player.nickname || 'Player'}! You have received ${notifCategoryLabel} for "${tourney.title}". The amount has been added to your wallet!`;
 
         const playerUids = Array.from(new Set([
           String(player.uid || '').trim().toLowerCase(),
@@ -1391,11 +1463,11 @@ export default function AdminHostPanel({
 
         try {
           await sendNotificationRealtime({
-            title: `🏆 ${rosterPrizeCategory === 'deposit' ? 'Deposit Cash' : 'Prize Money'} Credited: ₹${amt}!`,
+            title: `🏆 Prize Money Credited: ₹${amt}!`,
             message: notifMessage,
             type: 'prize',
-            category: rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'WINNINGS',
-            badgeText: rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'PRIZE',
+            category: isBothPrize ? 'BOTH' : (rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'WINNINGS'),
+            badgeText: isBothPrize ? 'PRIZE' : (rosterPrizeCategory === 'deposit' ? 'DEPOSIT' : 'PRIZE'),
             targetTournamentId: tourney.id,
             targetUids: playerUids,
             tournamentTitle: tourney.title
@@ -1403,7 +1475,7 @@ export default function AdminHostPanel({
 
           await dispatchPushNotification({
             title: `🏆 Prize Money Won: ₹${amt}!`,
-            message: customMsg ? `"${customMsg}" (₹${amt} credited)` : `You won ₹${amt} in "${tourney.title}"! Checked into your wallet.`,
+            message: customMsg ? `"${customMsg}" (₹${amt} credited)` : `You won ${notifCategoryLabel} in "${tourney.title}"! Checked into your wallet.`,
             type: 'prize',
             targetUids: playerUids
           });
@@ -2721,6 +2793,29 @@ export default function AdminHostPanel({
                 >
                   💳 Deposit Cash (For Matches Only)
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreditCategory('both');
+                    const parsed = parseFloat(payoutAmount) || 100;
+                    if (!payoutWinningAmount || payoutWinningAmount === '0') setPayoutWinningAmount(String(Math.ceil(parsed / 2)));
+                    if (!payoutDepositAmount || payoutDepositAmount === '0') setPayoutDepositAmount(String(Math.floor(parsed / 2)));
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: creditCategory === 'both' ? '1px solid #00e676' : '1px solid var(--border-color)',
+                    background: creditCategory === 'both' ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255,255,255,0.03)',
+                    color: creditCategory === 'both' ? '#00e676' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.78rem',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🎁 Both (Winning + Deposit)
+                </button>
               </div>
             </div>
           )}
@@ -2795,103 +2890,230 @@ export default function AdminHostPanel({
             />
           </div>
 
-          <div className="grid-2">
-            <div className="form-group">
-              <label>{walletAction === 'credit' ? 'Prize Amount to Credit (₹)' : 'Amount to Deduct (₹)'} <span style={{ color: 'var(--primary)' }}>*</span></label>
-              <input 
-                type="number" 
-                value={payoutAmount} 
-                onChange={(e) => setPayoutAmount(e.target.value)} 
-                placeholder="e.g. 500"
-                className="form-input"
-                min="1"
-                required
-              />
-              <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
-                {['50', '100', '250', '500', '1000', '2000'].map(amt => (
-                  <button
-                    key={amt}
-                    type="button"
-                    onClick={() => setPayoutAmount(amt)}
-                    style={{
-                      background: payoutAmount === amt ? (walletAction === 'credit' ? 'var(--success)' : 'var(--danger)') : 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      color: payoutAmount === amt ? (walletAction === 'credit' ? '#000' : '#fff') : '#fff',
-                      fontWeight: '700',
-                      borderRadius: '12px',
-                      padding: '2px 8px',
-                      fontSize: '0.7rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    ₹{amt}
-                  </button>
-                ))}
-              </div>
-            </div>
+          {walletAction === 'credit' && creditCategory === 'both' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="grid-2">
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.8rem', color: '#ffd600', fontWeight: '800' }}>
+                    🏆 Winning Cash (₹ Coins) <span style={{ color: 'var(--primary)' }}>*</span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#ffd600', fontWeight: '900', fontSize: '1rem' }}>₹</span>
+                    <input 
+                      type="number" 
+                      value={payoutWinningAmount} 
+                      onChange={(e) => setPayoutWinningAmount(e.target.value)} 
+                      placeholder="50"
+                      className="form-input"
+                      min="0"
+                      style={{ paddingLeft: '28px', fontWeight: '800' }}
+                      required
+                    />
+                  </div>
+                </div>
 
-            <div className="form-group">
-              <label>{walletAction === 'credit' ? 'Prize Reason / Remarks' : 'Reason for Coin Deduction / Penalty'} <span style={{ color: 'var(--primary)' }}>*</span></label>
-              <input 
-                type="text" 
-                value={payoutReason} 
-                onChange={(e) => setPayoutReason(e.target.value)} 
-                placeholder={walletAction === 'credit' ? "e.g. 1st Place Winner - CS 2v2" : "e.g. DPI Penalty / Daily Match Limit Exceeded"}
-                className="form-input"
-                required
-              />
-              <div style={{ display: 'flex', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
-                {walletAction === 'credit' ? [
-                  '1st Place Winner 🏆',
-                  '2nd Place Runner-Up 🥈',
-                  'Per-Kill Bounty 🎯',
-                  'Match Remake Refund 🔄',
-                  'Bonus Reward ⭐'
-                ].map(r => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setPayoutReason(r)}
-                    style={{
-                      background: payoutReason === r ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255,255,255,0.06)',
-                      border: payoutReason === r ? '1px solid var(--success)' : '1px solid rgba(255,255,255,0.1)',
-                      color: payoutReason === r ? '#00e676' : 'var(--text-muted)',
-                      borderRadius: '12px',
-                      padding: '2px 8px',
-                      fontSize: '0.68rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {r}
-                  </button>
-                )) : [
-                  'DPI Violation Penalty (-₹20) 🚫',
-                  'Daily Match Limit Exceeded ⚠️',
-                  'No POV Submission Penalty 📹',
-                  'Teaming / Hack Violation ⛔',
-                  'Late Join / Missed Match 🔻',
-                  'Manual Balance Adjustment'
-                ].map(r => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setPayoutReason(r)}
-                    style={{
-                      background: payoutReason === r ? 'rgba(255, 23, 68, 0.2)' : 'rgba(255,255,255,0.06)',
-                      border: payoutReason === r ? '1px solid var(--danger)' : '1px solid rgba(255,255,255,0.1)',
-                      color: payoutReason === r ? '#ff5252' : 'var(--text-muted)',
-                      borderRadius: '12px',
-                      padding: '2px 8px',
-                      fontSize: '0.68rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {r}
-                  </button>
-                ))}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.8rem', color: '#00e5ff', fontWeight: '800' }}>
+                    💳 Deposit Cash (₹ Coins) <span style={{ color: 'var(--primary)' }}>*</span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#00e5ff', fontWeight: '900', fontSize: '1rem' }}>₹</span>
+                    <input 
+                      type="number" 
+                      value={payoutDepositAmount} 
+                      onChange={(e) => setPayoutDepositAmount(e.target.value)} 
+                      placeholder="50"
+                      className="form-input"
+                      min="0"
+                      style={{ paddingLeft: '28px', fontWeight: '800' }}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Split chips & Total Banner */}
+              <div style={{
+                padding: '8px 12px',
+                borderRadius: '8px',
+                background: 'rgba(0, 230, 118, 0.08)',
+                border: '1px solid rgba(0, 230, 118, 0.25)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Quick Split:</span>
+                  {[
+                    { win: '25', dep: '25' },
+                    { win: '50', dep: '50' },
+                    { win: '100', dep: '50' },
+                    { win: '100', dep: '100' },
+                    { win: '250', dep: '250' }
+                  ].map(p => (
+                    <button
+                      key={`${p.win}-${p.dep}`}
+                      type="button"
+                      onClick={() => { setPayoutWinningAmount(p.win); setPayoutDepositAmount(p.dep); }}
+                      style={{
+                        background: (payoutWinningAmount === p.win && payoutDepositAmount === p.dep) ? 'var(--success)' : 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: (payoutWinningAmount === p.win && payoutDepositAmount === p.dep) ? '#000' : '#fff',
+                        fontWeight: '700',
+                        borderRadius: '10px',
+                        padding: '2px 7px',
+                        fontSize: '0.68rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ₹{p.win}+₹{p.dep}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontWeight: '900', fontSize: '0.85rem', color: '#00e676' }}>
+                  ⚡ Total to Credit: ₹{(parseFloat(payoutWinningAmount) || 0) + (parseFloat(payoutDepositAmount) || 0)} (₹{parseFloat(payoutWinningAmount) || 0} Win + ₹{parseFloat(payoutDepositAmount) || 0} Dep)
+                </div>
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Prize Reason / Remarks <span style={{ color: 'var(--primary)' }}>*</span></label>
+                <input 
+                  type="text" 
+                  value={payoutReason} 
+                  onChange={(e) => setPayoutReason(e.target.value)} 
+                  placeholder="e.g. 1st Place Winner - CS 2v2"
+                  className="form-input"
+                  required
+                />
+                <div style={{ display: 'flex', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {[
+                    '1st Place Winner 🏆',
+                    '2nd Place Runner-Up 🥈',
+                    'Per-Kill Bounty 🎯',
+                    'Match Remake Refund 🔄',
+                    'Bonus Reward ⭐'
+                  ].map(r => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setPayoutReason(r)}
+                      style={{
+                        background: payoutReason === r ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255,255,255,0.06)',
+                        border: payoutReason === r ? '1px solid var(--success)' : '1px solid rgba(255,255,255,0.1)',
+                        color: payoutReason === r ? '#00e676' : 'var(--text-muted)',
+                        borderRadius: '12px',
+                        padding: '2px 8px',
+                        fontSize: '0.68rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid-2">
+              <div className="form-group">
+                <label>{walletAction === 'credit' ? 'Prize Amount to Credit (₹)' : 'Amount to Deduct (₹)'} <span style={{ color: 'var(--primary)' }}>*</span></label>
+                <input 
+                  type="number" 
+                  value={payoutAmount} 
+                  onChange={(e) => setPayoutAmount(e.target.value)} 
+                  placeholder="e.g. 500"
+                  className="form-input"
+                  min="1"
+                  required
+                />
+                <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {['50', '100', '250', '500', '1000', '2000'].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setPayoutAmount(amt)}
+                      style={{
+                        background: payoutAmount === amt ? (walletAction === 'credit' ? 'var(--success)' : 'var(--danger)') : 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: payoutAmount === amt ? (walletAction === 'credit' ? '#000' : '#fff') : '#fff',
+                        fontWeight: '700',
+                        borderRadius: '12px',
+                        padding: '2px 8px',
+                        fontSize: '0.7rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ₹{amt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>{walletAction === 'credit' ? 'Prize Reason / Remarks' : 'Reason for Coin Deduction / Penalty'} <span style={{ color: 'var(--primary)' }}>*</span></label>
+                <input 
+                  type="text" 
+                  value={payoutReason} 
+                  onChange={(e) => setPayoutReason(e.target.value)} 
+                  placeholder={walletAction === 'credit' ? "e.g. 1st Place Winner - CS 2v2" : "e.g. DPI Penalty / Daily Match Limit Exceeded"}
+                  className="form-input"
+                  required
+                />
+                <div style={{ display: 'flex', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {walletAction === 'credit' ? [
+                    '1st Place Winner 🏆',
+                    '2nd Place Runner-Up 🥈',
+                    'Per-Kill Bounty 🎯',
+                    'Match Remake Refund 🔄',
+                    'Bonus Reward ⭐'
+                  ].map(r => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setPayoutReason(r)}
+                      style={{
+                        background: payoutReason === r ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255,255,255,0.06)',
+                        border: payoutReason === r ? '1px solid var(--success)' : '1px solid rgba(255,255,255,0.1)',
+                        color: payoutReason === r ? '#00e676' : 'var(--text-muted)',
+                        borderRadius: '12px',
+                        padding: '2px 8px',
+                        fontSize: '0.68rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {r}
+                    </button>
+                  )) : [
+                    'DPI Violation Penalty (-₹20) 🚫',
+                    'Daily Match Limit Exceeded ⚠️',
+                    'No POV Submission Penalty 📹',
+                    'Teaming / Hack Violation ⛔',
+                    'Late Join / Missed Match 🔻',
+                    'Manual Balance Adjustment'
+                  ].map(r => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setPayoutReason(r)}
+                      style={{
+                        background: payoutReason === r ? 'rgba(255, 23, 68, 0.2)' : 'rgba(255,255,255,0.06)',
+                        border: payoutReason === r ? '1px solid var(--danger)' : '1px solid rgba(255,255,255,0.1)',
+                        color: payoutReason === r ? '#ff5252' : 'var(--text-muted)',
+                        borderRadius: '12px',
+                        padding: '2px 8px',
+                        fontSize: '0.68rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <button 
             type="submit" 
@@ -2910,7 +3132,10 @@ export default function AdminHostPanel({
             {payoutLoading 
               ? '⚡ Processing Cloud Update...' 
               : (walletAction === 'credit' 
-                  ? `⚡ Credit ₹${payoutAmount || 0} (${creditCategory === 'deposit' ? 'Deposit' : 'Winning'} Cash) to Player Wallet` 
+                  ? (creditCategory === 'both'
+                      ? `⚡ Credit ₹${(parseFloat(payoutWinningAmount) || 0) + (parseFloat(payoutDepositAmount) || 0)} (₹${parseFloat(payoutWinningAmount) || 0} Win + ₹${parseFloat(payoutDepositAmount) || 0} Dep) in 1-Click`
+                      : `⚡ Credit ₹${payoutAmount || 0} (${creditCategory === 'deposit' ? 'Deposit' : 'Winning'} Cash) to Player Wallet`
+                    )
                   : `🔻 Deduct ₹${payoutAmount || 0} (${deductCategory === 'deposit' ? 'Deposit' : 'Winning'} Cash) from Player Wallet`)}
           </button>
 
@@ -6109,93 +6334,215 @@ export default function AdminHostPanel({
                 >
                   💳 Deposit Cash (For Matches Only)
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRosterPrizeCategory('both');
+                    const cur = parseFloat(rosterPrizeAmount) || 50;
+                    if (!rosterWinningAmount || rosterWinningAmount === '0') setRosterWinningAmount(String(Math.ceil(cur / 2)));
+                    if (!rosterDepositAmount || rosterDepositAmount === '0') setRosterDepositAmount(String(Math.floor(cur / 2)));
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: rosterPrizeCategory === 'both' ? '1px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
+                    background: rosterPrizeCategory === 'both' ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255,255,255,0.03)',
+                    color: rosterPrizeCategory === 'both' ? '#00e676' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.78rem',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🎁 Both (Winning + Deposit)
+                </button>
               </div>
             </div>
 
             {/* Prize Amount Input & Quick Chips */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                Prize Money Amount (₹ Coins) <span style={{ color: '#ff1744' }}>*</span>
-              </label>
-              
-              {/* Preset Chips */}
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                {rosterPrizePlayer.tourney.bounty && (
-                  <button
-                    type="button"
-                    onClick={() => setRosterPrizeAmount(String(rosterPrizePlayer.tourney.bounty))}
-                    style={{
-                      padding: '4px 10px',
-                      fontSize: '0.72rem',
-                      borderRadius: '6px',
-                      border: rosterPrizeAmount === String(rosterPrizePlayer.tourney.bounty) ? '1px solid #ffd600' : '1px solid rgba(255,255,255,0.1)',
-                      background: rosterPrizeAmount === String(rosterPrizePlayer.tourney.bounty) ? '#ffd600' : 'rgba(255,255,255,0.05)',
-                      color: rosterPrizeAmount === String(rosterPrizePlayer.tourney.bounty) ? '#000' : '#fff',
-                      fontWeight: '800',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    🎯 Bounty: ₹{rosterPrizePlayer.tourney.bounty}
-                  </button>
-                )}
-                {rosterPrizePlayer.tourney.prizePool && (
-                  <button
-                    type="button"
-                    onClick={() => setRosterPrizeAmount(String(rosterPrizePlayer.tourney.prizePool))}
-                    style={{
-                      padding: '4px 10px',
-                      fontSize: '0.72rem',
-                      borderRadius: '6px',
-                      border: rosterPrizeAmount === String(rosterPrizePlayer.tourney.prizePool) ? '1px solid #ffd600' : '1px solid rgba(255,255,255,0.1)',
-                      background: rosterPrizeAmount === String(rosterPrizePlayer.tourney.prizePool) ? '#ffd600' : 'rgba(255,255,255,0.05)',
-                      color: rosterPrizeAmount === String(rosterPrizePlayer.tourney.prizePool) ? '#000' : '#fff',
-                      fontWeight: '800',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    🏆 Prize Pool: ₹{rosterPrizePlayer.tourney.prizePool}
-                  </button>
-                )}
-                {['20', '50', '100', '200', '500'].map(amt => (
-                  <button
-                    key={amt}
-                    type="button"
-                    onClick={() => setRosterPrizeAmount(amt)}
-                    style={{
-                      padding: '4px 10px',
-                      fontSize: '0.72rem',
-                      borderRadius: '6px',
-                      border: rosterPrizeAmount === amt ? '1px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
-                      background: rosterPrizeAmount === amt ? '#00e676' : 'rgba(255,255,255,0.05)',
-                      color: rosterPrizeAmount === amt ? '#000' : '#fff',
-                      fontWeight: '800',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    ₹{amt}
-                  </button>
-                ))}
-              </div>
+            {rosterPrizeCategory === 'both' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '800', color: '#ffd600', marginBottom: '6px' }}>
+                      🏆 Winning Cash (₹ Coins) <span style={{ color: '#ff1744' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#ffd600', fontWeight: '900', fontSize: '1rem' }}>₹</span>
+                      <input
+                        type="number"
+                        value={rosterWinningAmount}
+                        onChange={(e) => setRosterWinningAmount(e.target.value)}
+                        placeholder="50"
+                        min="0"
+                        className="input-field"
+                        style={{
+                          paddingLeft: '28px',
+                          fontSize: '0.95rem',
+                          fontWeight: '800',
+                          borderColor: 'rgba(255, 214, 0, 0.4)',
+                          background: 'rgba(0,0,0,0.4)'
+                        }}
+                      />
+                    </div>
+                  </div>
 
-              <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#ffd600', fontWeight: '900', fontSize: '1.1rem' }}>₹</span>
-                <input
-                  type="number"
-                  value={rosterPrizeAmount}
-                  onChange={(e) => setRosterPrizeAmount(e.target.value)}
-                  placeholder="Enter prize amount (e.g. 50)"
-                  min="1"
-                  className="input-field"
-                  style={{
-                    paddingLeft: '32px',
-                    fontSize: '1rem',
-                    fontWeight: '800',
-                    borderColor: 'rgba(255, 214, 0, 0.4)',
-                    background: 'rgba(0,0,0,0.4)'
-                  }}
-                />
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '800', color: '#00e5ff', marginBottom: '6px' }}>
+                      💳 Deposit Cash (₹ Coins) <span style={{ color: '#ff1744' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#00e5ff', fontWeight: '900', fontSize: '1rem' }}>₹</span>
+                      <input
+                        type="number"
+                        value={rosterDepositAmount}
+                        onChange={(e) => setRosterDepositAmount(e.target.value)}
+                        placeholder="50"
+                        min="0"
+                        className="input-field"
+                        style={{
+                          paddingLeft: '28px',
+                          fontSize: '0.95rem',
+                          fontWeight: '800',
+                          borderColor: 'rgba(0, 229, 255, 0.4)',
+                          background: 'rgba(0,0,0,0.4)'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Split presets & Live Total */}
+                <div style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(0, 230, 118, 0.08)',
+                  border: '1px solid rgba(0, 230, 118, 0.25)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Quick Split:</span>
+                    {[
+                      { win: '25', dep: '25' },
+                      { win: '50', dep: '50' },
+                      { win: '100', dep: '50' },
+                      { win: '100', dep: '100' },
+                      { win: '250', dep: '250' }
+                    ].map(p => (
+                      <button
+                        key={`${p.win}-${p.dep}`}
+                        type="button"
+                        onClick={() => { setRosterWinningAmount(p.win); setRosterDepositAmount(p.dep); }}
+                        style={{
+                          background: (rosterWinningAmount === p.win && rosterDepositAmount === p.dep) ? '#00e676' : 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          color: (rosterWinningAmount === p.win && rosterDepositAmount === p.dep) ? '#000' : '#fff',
+                          fontWeight: '700',
+                          borderRadius: '8px',
+                          padding: '2px 7px',
+                          fontSize: '0.68rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ₹{p.win}+₹{p.dep}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontWeight: '900', fontSize: '0.85rem', color: '#00e676' }}>
+                    ⚡ Total: ₹{(parseFloat(rosterWinningAmount) || 0) + (parseFloat(rosterDepositAmount) || 0)} (₹{parseFloat(rosterWinningAmount) || 0} Win + ₹{parseFloat(rosterDepositAmount) || 0} Dep)
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  Prize Money Amount (₹ Coins) <span style={{ color: '#ff1744' }}>*</span>
+                </label>
+                
+                {/* Preset Chips */}
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                  {rosterPrizePlayer.tourney.bounty && (
+                    <button
+                      type="button"
+                      onClick={() => setRosterPrizeAmount(String(rosterPrizePlayer.tourney.bounty))}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.72rem',
+                        borderRadius: '6px',
+                        border: rosterPrizeAmount === String(rosterPrizePlayer.tourney.bounty) ? '1px solid #ffd600' : '1px solid rgba(255,255,255,0.1)',
+                        background: rosterPrizeAmount === String(rosterPrizePlayer.tourney.bounty) ? '#ffd600' : 'rgba(255,255,255,0.05)',
+                        color: rosterPrizeAmount === String(rosterPrizePlayer.tourney.bounty) ? '#000' : '#fff',
+                        fontWeight: '800',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🎯 Bounty: ₹{rosterPrizePlayer.tourney.bounty}
+                    </button>
+                  )}
+                  {rosterPrizePlayer.tourney.prizePool && (
+                    <button
+                      type="button"
+                      onClick={() => setRosterPrizeAmount(String(rosterPrizePlayer.tourney.prizePool))}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.72rem',
+                        borderRadius: '6px',
+                        border: rosterPrizeAmount === String(rosterPrizePlayer.tourney.prizePool) ? '1px solid #ffd600' : '1px solid rgba(255,255,255,0.1)',
+                        background: rosterPrizeAmount === String(rosterPrizePlayer.tourney.prizePool) ? '#ffd600' : 'rgba(255,255,255,0.05)',
+                        color: rosterPrizeAmount === String(rosterPrizePlayer.tourney.prizePool) ? '#000' : '#fff',
+                        fontWeight: '800',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🏆 Prize Pool: ₹{rosterPrizePlayer.tourney.prizePool}
+                    </button>
+                  )}
+                  {['20', '50', '100', '200', '500'].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setRosterPrizeAmount(amt)}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.72rem',
+                        borderRadius: '6px',
+                        border: rosterPrizeAmount === amt ? '1px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
+                        background: rosterPrizeAmount === amt ? '#00e676' : 'rgba(255,255,255,0.05)',
+                        color: rosterPrizeAmount === amt ? '#000' : '#fff',
+                        fontWeight: '800',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ₹{amt}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#ffd600', fontWeight: '900', fontSize: '1.1rem' }}>₹</span>
+                  <input
+                    type="number"
+                    value={rosterPrizeAmount}
+                    onChange={(e) => setRosterPrizeAmount(e.target.value)}
+                    placeholder="Enter prize amount (e.g. 50)"
+                    min="1"
+                    className="input-field"
+                    style={{
+                      paddingLeft: '32px',
+                      fontSize: '1rem',
+                      fontWeight: '800',
+                      borderColor: 'rgba(255, 214, 0, 0.4)',
+                      background: 'rgba(0,0,0,0.4)'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Prize Reason & Preset Chips */}
             <div>
@@ -6323,7 +6670,7 @@ export default function AdminHostPanel({
               <button
                 type="button"
                 onClick={handleConfirmRosterPrize}
-                disabled={rosterPrizeLoading || !rosterPrizeAmount || parseFloat(rosterPrizeAmount) <= 0}
+                disabled={rosterPrizeLoading || (rosterPrizeCategory === 'both' ? ((parseFloat(rosterWinningAmount) || 0) + (parseFloat(rosterDepositAmount) || 0) <= 0) : (!rosterPrizeAmount || parseFloat(rosterPrizeAmount) <= 0))}
                 className="btn"
                 style={{
                   flex: 2,
@@ -6345,9 +6692,15 @@ export default function AdminHostPanel({
                 {rosterPrizeLoading ? (
                   '⚡ Crediting Wallet...'
                 ) : (
-                  <>
-                    <span>{rosterPrizeCategory === 'deposit' ? '💳' : '🏆'}</span> Send ₹{rosterPrizeAmount || 0} ({rosterPrizeCategory === 'deposit' ? 'Deposit' : 'Winning'} Cash) to Wallet
-                  </>
+                  rosterPrizeCategory === 'both' ? (
+                    <>
+                      <span>🎁</span> Send ₹{(parseFloat(rosterWinningAmount) || 0) + (parseFloat(rosterDepositAmount) || 0)} (₹{parseFloat(rosterWinningAmount) || 0} Win + ₹{parseFloat(rosterDepositAmount) || 0} Dep) to Wallet
+                    </>
+                  ) : (
+                    <>
+                      <span>{rosterPrizeCategory === 'deposit' ? '💳' : '🏆'}</span> Send ₹{rosterPrizeAmount || 0} ({rosterPrizeCategory === 'deposit' ? 'Deposit' : 'Winning'} Cash) to Wallet
+                    </>
+                  )
                 )}
               </button>
             </div>

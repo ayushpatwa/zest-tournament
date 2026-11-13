@@ -188,7 +188,7 @@ export const extractCompletedMatchesFromTransactions = (userProfile = {}) => {
 
   // Attach any won prizes to the corresponding completed matches
   transactions.forEach((tx) => {
-    if (tx.type === 'winning' || String(tx.title || '').includes('Tournament Prize Winnings')) {
+    if (tx.type === 'winning' || tx.type === 'both' || String(tx.title || '').includes('Tournament Prize') || String(tx.title || '').includes('Prize Credit')) {
       const reasonLower = String(tx.reason || '').toLowerCase();
       // Look for a completed match that matches the winning tournament reason
       for (const [id, m] of completedMap.entries()) {
