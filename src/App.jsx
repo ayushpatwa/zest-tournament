@@ -439,6 +439,10 @@ export default function App() {
 
     // Strict validation: Check if match is already completely full
     const targetTourney = tournaments.find(t => t.id === tournamentId);
+    if (targetTourney && (targetTourney.isDraft === true || targetTourney.isPublished === false || targetTourney.status === 'draft')) {
+      alert('⚠️ This match is currently in draft staging and not open for registration until published by the host.');
+      return { success: false, error: 'Match is unpublished draft' };
+    }
     const maxSlots = targetTourney?.slotsTotal || targetTourney?.maxSlots || 48;
     const currentJoined = Math.max(targetTourney?.slotsJoined || 0, (targetTourney?.joinedPlayers || []).length);
     

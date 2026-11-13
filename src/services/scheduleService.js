@@ -7,9 +7,11 @@ import {
   query, 
   where, 
   writeBatch, 
-  serverTimestamp 
+  serverTimestamp,
+  updateDoc,
+  deleteDoc 
 } from 'firebase/firestore';
-import { db } from './firebase.js';
+import { db, cleanFirestoreData } from './firebase.js';
 import { getTodayDateString, getTomorrowDateString } from './dateUtils.js';
 
 /**
@@ -134,7 +136,7 @@ export const DAILY_TIME_SLOTS = [
  * Slot 4 (11:30 AM) -> Lone wolf 1v1 (head)
  * ... (cycles every 30 minutes until 10:00 PM, 25 matches total per day)
  */
-export const generateDaily1v1Matches = async (targetDateString, overwriteExisting = false) => {
+export const generateDaily1v1Matches = async (targetDateString, overwriteExisting = false, asDraft = false) => {
   try {
     const targetDate = targetDateString ? String(targetDateString).trim() : getTomorrowDateString();
     console.log(`[AutoScheduler] Generating 1v1 daily sequential matches for date: ${targetDate}...`);
@@ -180,7 +182,9 @@ export const generateDaily1v1Matches = async (targetDateString, overwriteExistin
         joinedPlayers: [],
         matchDate: targetDate,
         startTime: slot.time,
-        status: 'upcoming',
+        status: asDraft ? 'draft' : 'upcoming',
+        isDraft: Boolean(asDraft),
+        isPublished: !asDraft,
         roomId: '',
         roomPassword: '',
         leaderboard: [],
@@ -239,7 +243,7 @@ export const generateDaily1v1Matches = async (targetDateString, overwriteExistin
  * Winning prize pool: ₹10
  * Player slots: 10
  */
-export const generateDailyClassicBRMatches = async (targetDateString, overwriteExisting = false) => {
+export const generateDailyClassicBRMatches = async (targetDateString, overwriteExisting = false, asDraft = false) => {
   try {
     const targetDate = targetDateString ? String(targetDateString).trim() : getTodayDateString();
     console.log(`[AutoScheduler] Generating Classic Battle Royale daily matches for date: ${targetDate}...`);
@@ -283,7 +287,9 @@ export const generateDailyClassicBRMatches = async (targetDateString, overwriteE
         joinedPlayers: [],
         matchDate: targetDate,
         startTime: slot.time,
-        status: 'upcoming',
+        status: asDraft ? 'draft' : 'upcoming',
+        isDraft: Boolean(asDraft),
+        isPublished: !asDraft,
         roomId: '',
         roomPassword: '',
         leaderboard: [],
@@ -321,9 +327,9 @@ export const generateDailyClassicBRMatches = async (targetDateString, overwriteE
 /**
  * Generates both Classic Battle Royale and 1v1 match schedules for the specified date
  */
-export const generateAllDailyMatches = async (targetDateString, overwriteExisting = false) => {
-  const brRes = await generateDailyClassicBRMatches(targetDateString, overwriteExisting);
-  const oneVoneRes = await generateDaily1v1Matches(targetDateString, overwriteExisting);
+export const generateAllDailyMatches = async (targetDateString, overwriteExisting = false, asDraft = false) => {
+  const brRes = await generateDailyClassicBRMatches(targetDateString, overwriteExisting, asDraft);
+  const oneVoneRes = await generateDaily1v1Matches(targetDateString, overwriteExisting, asDraft);
   return {
     success: brRes.success && oneVoneRes.success,
     createdCount: (brRes.createdCount || 0) + (oneVoneRes.createdCount || 0),
@@ -472,3 +478,263 @@ export const setupDaily1030PmScheduleTimer = () => {
 
 // Compatibility alias
 export const setupDaily11PmScheduleTimer = setupDaily1030PmScheduleTimer;
+
+/**
+ * Copies all matches from a source date (e.g. Today) and pastes them into a target date (e.g. Tomorrow)
+ * All cloned matches have fresh IDs, slotsJoined: 0, joinedPlayers: [], no room codes,
+ * and by default are set to Draft mode (isDraft: true, isPublished: false, status: 'draft')
+ * so that players cannot see them until the Host explicitly publishes them!
+ */
+export const copyDayScheduleRealtime = async (sourceDateString, targetDateString, asDraft = true) => {
+  try {
+    const srcDate = String(sourceDateString || '').trim();
+    const dstDate = String(targetDateString || '').trim();
+    if (!srcDate || !dstDate) {
+      return { success: false, error: 'Source date and Target date are required.' };
+    }
+    if (srcDate === dstDate) {
+      return { success: false, error: 'Source date and Target date cannot be the same day.' };
+    }
+
+    const tournamentsCol = collection(db, "tournaments");
+    const snap = await getDocs(tournamentsCol);
+
+    const matchesToCopy = [];
+    snap.forEach(d => {
+      const data = d.data() || {};
+      const docDate = String(data.matchDate || '').trim();
+      const isDateMatch = docDate === srcDate || d.id.includes(srcDate);
+      if (isDateMatch) {
+        matchesToCopy.push({ ...data, id: d.id });
+      }
+    });
+
+    if (matchesToCopy.length === 0) {
+      return { success: false, error: `No matches found on ${srcDate} to copy.` };
+    }
+
+    // Sort chronologically so slot order is preserved
+    matchesToCopy.sort((a, b) => {
+      const slotA = typeof a.slotIndex === 'number' ? a.slotIndex : 99;
+      const slotB = typeof b.slotIndex === 'number' ? b.slotIndex : 99;
+      return slotA - slotB;
+    });
+
+    let copiedCount = 0;
+    // Chunk writes in groups of 400 to comply with Firestore batch limits
+    for (let i = 0; i < matchesToCopy.length; i += 400) {
+      const chunk = matchesToCopy.slice(i, i + 400);
+      const batch = writeBatch(db);
+
+      chunk.forEach((srcMatch, idx) => {
+        let newId;
+        if (srcMatch.id.includes(srcDate)) {
+          newId = srcMatch.id.split(srcDate).join(dstDate);
+        } else {
+          newId = `staged_${dstDate}_${Date.now()}_${i + idx + 1}`;
+        }
+
+        const matchDocRef = doc(db, "tournaments", newId);
+        const clonedData = {
+          ...srcMatch,
+          id: newId,
+          matchDate: dstDate,
+          status: asDraft ? 'draft' : 'upcoming',
+          isDraft: Boolean(asDraft),
+          isPublished: !asDraft,
+          slotsJoined: 0,
+          joinedPlayers: [],
+          leaderboard: [],
+          roomId: '',
+          roomPassword: '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+
+        // Clean any historical completion or refund flags
+        delete clonedData.isCompleted;
+        delete clonedData.completedAt;
+        delete clonedData.isRefunded;
+        delete clonedData.refundedAt;
+        delete clonedData.refundReason;
+
+        batch.set(matchDocRef, cleanFirestoreData(clonedData), { merge: true });
+        copiedCount++;
+      });
+
+      await batch.commit();
+    }
+
+    console.log(`[AutoScheduler] Successfully copied ${copiedCount} matches from ${srcDate} to ${dstDate} (asDraft: ${asDraft})`);
+
+    return {
+      success: true,
+      copiedCount,
+      sourceDate: srcDate,
+      targetDate: dstDate,
+      asDraft: Boolean(asDraft)
+    };
+  } catch (err) {
+    console.error(`[AutoScheduler] Error copying day schedule:`, err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Publishes all matches for a given date in real-time, making them instantly visible to regular players.
+ * Sets isDraft: false, isPublished: true, status: 'upcoming'.
+ */
+export const publishDayScheduleRealtime = async (targetDateString) => {
+  try {
+    const targetDate = String(targetDateString || '').trim();
+    if (!targetDate) {
+      return { success: false, error: 'Target date is required.' };
+    }
+
+    const tournamentsCol = collection(db, "tournaments");
+    const snap = await getDocs(tournamentsCol);
+
+    const matchesToPublish = [];
+    snap.forEach(d => {
+      const data = d.data() || {};
+      const docDate = String(data.matchDate || '').trim();
+      const isDateMatch = docDate === targetDate || d.id.includes(targetDate);
+      if (isDateMatch) {
+        matchesToPublish.push(d.id);
+      }
+    });
+
+    if (matchesToPublish.length === 0) {
+      return { success: false, error: `No matches found on ${targetDate} to publish.` };
+    }
+
+    let publishedCount = 0;
+    for (let i = 0; i < matchesToPublish.length; i += 400) {
+      const chunk = matchesToPublish.slice(i, i + 400);
+      const batch = writeBatch(db);
+      chunk.forEach(id => {
+        batch.update(doc(db, "tournaments", id), {
+          isDraft: false,
+          isPublished: true,
+          status: 'upcoming',
+          publishedAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        publishedCount++;
+      });
+      await batch.commit();
+    }
+
+    console.log(`[AutoScheduler] Successfully published ${publishedCount} matches for ${targetDate}`);
+    return { success: true, count: publishedCount, targetDate };
+  } catch (err) {
+    console.error(`[AutoScheduler] Error publishing matches for ${targetDateString}:`, err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Unpublishes all matches for a given date, reverting them to Draft mode.
+ * Immediately clears the match section in the Arena for regular players!
+ */
+export const unpublishDayScheduleRealtime = async (targetDateString) => {
+  try {
+    const targetDate = String(targetDateString || '').trim();
+    if (!targetDate) {
+      return { success: false, error: 'Target date is required.' };
+    }
+
+    const tournamentsCol = collection(db, "tournaments");
+    const snap = await getDocs(tournamentsCol);
+
+    const matchesToUnpublish = [];
+    snap.forEach(d => {
+      const data = d.data() || {};
+      const docDate = String(data.matchDate || '').trim();
+      const isDateMatch = docDate === targetDate || d.id.includes(targetDate);
+      if (isDateMatch) {
+        matchesToUnpublish.push(d.id);
+      }
+    });
+
+    if (matchesToUnpublish.length === 0) {
+      return { success: false, error: `No matches found on ${targetDate} to unpublish.` };
+    }
+
+    let unpublishedCount = 0;
+    for (let i = 0; i < matchesToUnpublish.length; i += 400) {
+      const chunk = matchesToUnpublish.slice(i, i + 400);
+      const batch = writeBatch(db);
+      chunk.forEach(id => {
+        batch.update(doc(db, "tournaments", id), {
+          isDraft: true,
+          isPublished: false,
+          status: 'draft',
+          unpublishedAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        unpublishedCount++;
+      });
+      await batch.commit();
+    }
+
+    console.log(`[AutoScheduler] Successfully unpublished ${unpublishedCount} matches for ${targetDate}`);
+    return { success: true, count: unpublishedCount, targetDate };
+  } catch (err) {
+    console.error(`[AutoScheduler] Error unpublishing matches for ${targetDateString}:`, err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Toggles a single match between Draft and Published state
+ */
+export const toggleMatchPublishRealtime = async (matchId, shouldPublish) => {
+  try {
+    const cleanId = String(matchId || '').trim();
+    if (!cleanId) return { success: false, error: 'Match ID required' };
+    const matchRef = doc(db, "tournaments", cleanId);
+    await updateDoc(matchRef, {
+      isDraft: !shouldPublish,
+      isPublished: Boolean(shouldPublish),
+      status: shouldPublish ? 'upcoming' : 'draft',
+      updatedAt: serverTimestamp()
+    });
+    return { success: true, isPublished: Boolean(shouldPublish) };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Allows the host to edit match details (title, map, mode, type, time, fee, prize, slots, etc.)
+ */
+export const updateMatchDetailsRealtime = async (matchId, updatedFields) => {
+  try {
+    const cleanId = String(matchId || '').trim();
+    if (!cleanId) return { success: false, error: 'Match ID required' };
+    const matchRef = doc(db, "tournaments", cleanId);
+    const cleanPayload = cleanFirestoreData({
+      ...updatedFields,
+      updatedAt: serverTimestamp()
+    });
+    await updateDoc(matchRef, cleanPayload);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Deletes a single match from Firestore
+ */
+export const deleteMatchRealtime = async (matchId) => {
+  try {
+    const cleanId = String(matchId || '').trim();
+    if (!cleanId) return { success: false, error: 'Match ID required' };
+    await deleteDoc(doc(db, "tournaments", cleanId));
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};

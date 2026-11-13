@@ -65,6 +65,7 @@ export default function TournamentLobby({
                         String(userProfile?.phone || '').trim() === '9084311275' ||
                         userProfile?.role === 'admin' || 
                         userProfile?.isHost;
+  const isDraftMatch = Boolean(tournament.isDraft === true || tournament.isPublished === false || tournament.status === 'draft');
   const canViewCredentials = isUserJoined || isHostOrAdmin;
 
   const copyToClipboard = (text, key) => {
@@ -247,6 +248,25 @@ export default function TournamentLobby({
         </button>
         <span className="badge badge-live">● MATCH LOBBY</span>
       </div>
+
+      {/* Host Staging Notice */}
+      {isDraftMatch && (
+        <div style={{
+          padding: '10px 14px',
+          background: 'rgba(255, 171, 0, 0.12)',
+          border: '1px dashed #ffab00',
+          borderRadius: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          color: '#ffab00',
+          fontSize: '0.8rem',
+          fontWeight: '700'
+        }}>
+          <span>🔒</span>
+          <span>DRAFT MODE: This match is currently hidden from regular players. It will only be visible in Arena once published by the host.</span>
+        </div>
+      )}
 
       {/* Hero Tournament Title Banner */}
       {(() => {
@@ -584,6 +604,21 @@ export default function TournamentLobby({
                 🚫 THIS MATCH IS HOUSEFULL (0 SLOTS LEFT)
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   All {totalSlots} player slots have been filled. Registration is now closed for this match.
+                </p>
+              </div>
+            ) : isDraftMatch && !isHostOrAdmin ? (
+              <div style={{
+                background: 'rgba(255, 152, 0, 0.1)',
+                border: '1px solid rgba(255, 152, 0, 0.4)',
+                padding: '16px',
+                borderRadius: '10px',
+                textAlign: 'center',
+                color: '#ffb74d'
+              }}>
+                <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>📝</div>
+                <div style={{ fontWeight: '800', fontSize: '0.95rem' }}>MATCH IN DRAFT STAGING</div>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  This match is currently being prepared by the host and has not been published yet. Registrations will open once published!
                 </p>
               </div>
             ) : (

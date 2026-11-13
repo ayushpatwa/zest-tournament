@@ -168,6 +168,12 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
   }, []);
 
   const filteredTournaments = tournaments.filter(tourney => {
+    // 0. Host Staging & Draft Protection: Hide unpublished/draft matches from regular players
+    // Until published by host, the match section will be completely clear for all players.
+    if (tourney.isDraft === true || tourney.isPublished === false || tourney.status === 'draft') {
+      return false;
+    }
+
     // 1. If Room ID has been dropped, remove match from public Arena
     if (tourney.roomId && tourney.roomId.trim() !== '') {
       return false;

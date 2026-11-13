@@ -55,6 +55,7 @@ import {
 } from '../services/scheduleService';
 
 import paymentQrImg from '../assets/payment_qr.jpg';
+import HostDayPlanner from './HostDayPlanner';
 
 export default function AdminHostPanel({ 
   tournaments = [], 
@@ -1715,6 +1716,22 @@ export default function AdminHostPanel({
           </button>
 
           <button
+            onClick={() => setActiveTab('day_planner')}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              background: activeTab === 'day_planner' ? 'linear-gradient(135deg, #00e5ff 0%, #00e676 100%)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'day_planner' ? '#000' : '#00e5ff',
+              border: activeTab === 'day_planner' ? '1px solid #00e5ff' : '1px solid var(--border-color)',
+              fontWeight: '800'
+            }}
+          >
+            📅 Day Planner & Staging
+          </button>
+
+          <button
             onClick={() => setActiveTab('rooms')}
             className="btn"
             style={{
@@ -2618,6 +2635,14 @@ export default function AdminHostPanel({
       )}
 
       {/* MODE 2: ROOM ID BROADCASTER */}
+      {/* MODE 1.5: HOST DAY PLANNER & SCHEDULE STAGING */}
+      {activeTab === 'day_planner' && (
+        <HostDayPlanner 
+          tournaments={tournaments} 
+          isHost={isHost} 
+        />
+      )}
+
       {activeTab === 'rooms' && (
         <form onSubmit={handleBroadcastRoom} className="glass-panel animate-slide-in" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <h3 style={{ fontSize: '1.05rem', color: 'var(--accent)', marginBottom: '4px' }}>
