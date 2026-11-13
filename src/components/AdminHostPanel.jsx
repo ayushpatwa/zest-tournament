@@ -24,6 +24,7 @@ import {
   subscribeToAllUsersRealtime,
   resetUserPasswordRealtime,
   deleteUserRealtime,
+  deleteZeroBalancePlayersRealtime,
   toggleUserHostRoleRealtime,
   sendNotificationRealtime,
   deleteNotificationRealtime,
@@ -205,6 +206,7 @@ export default function AdminHostPanel({
   const [creditCategory, setCreditCategory] = useState('winning'); // 'winning' | 'deposit' | 'both'
   const [payoutWinningAmount, setPayoutWinningAmount] = useState('50');
   const [payoutDepositAmount, setPayoutDepositAmount] = useState('50');
+  const [isDeletingZeroPlayers, setIsDeletingZeroPlayers] = useState(false);
   const [deductCategory, setDeductCategory] = useState('winning'); // 'winning' | 'deposit'
   const [payoutPlayerIdentifier, setPayoutPlayerIdentifier] = useState('');
   const [payoutAmount, setPayoutAmount] = useState('500');
@@ -3197,6 +3199,52 @@ export default function AdminHostPanel({
                       >
                         <span>🤖</span> +Seed 108 Esports Bots
                       </button>
+
+                      {(() => {
+                        const zeroBalCount = nonAdminPlayers.filter(p => (parseFloat(p.wallet) || 0) <= 0 && (parseFloat(p.depositBalance) || 0) <= 0 && (parseFloat(p.winningBalance) || 0) <= 0).length;
+                        return (
+                          <button
+                            type="button"
+                            disabled={isDeletingZeroPlayers || zeroBalCount === 0}
+                            onClick={async () => {
+                              if (zeroBalCount === 0) {
+                                alert('All registered players currently have active coin balances (> ₹0).');
+                                return;
+                              }
+                              const ok = window.confirm(`⚠️ Permanently delete ${zeroBalCount} players whose wallet balance is 0?\n\nThis will remove their zero-balance accounts from the cloud database and keep only active funded players.`);
+                              if (!ok) return;
+                              setIsDeletingZeroPlayers(true);
+                              try {
+                                const res = await deleteZeroBalancePlayersRealtime();
+                                if (res.success) {
+                                  alert(`🗑️ Successfully deleted ${res.count} players with 0 balance.`);
+                                } else {
+                                  alert(`⚠️ Failed to delete: ${res.error}`);
+                                }
+                              } catch (e) {
+                                alert(`⚠️ Error: ${e.message}`);
+                              } finally {
+                                setIsDeletingZeroPlayers(false);
+                              }
+                            }}
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: '0.72rem',
+                              background: zeroBalCount > 0 ? 'rgba(255, 23, 68, 0.15)' : 'rgba(255,255,255,0.04)',
+                              color: zeroBalCount > 0 ? '#ff1744' : 'var(--text-muted)',
+                              border: zeroBalCount > 0 ? '1px solid rgba(255, 23, 68, 0.4)' : '1px solid rgba(255,255,255,0.1)',
+                              borderRadius: '6px',
+                              fontWeight: '800',
+                              cursor: (isDeletingZeroPlayers || zeroBalCount === 0) ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <span>🗑️</span> {isDeletingZeroPlayers ? 'Purging...' : `Delete 0-Balance Players (${zeroBalCount})`}
+                          </button>
+                        );
+                      })()}
                     </div>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                       Tap "Select" to credit/deduct coins or appoint host

@@ -9,6 +9,7 @@ import {
   where,
   updateDoc, 
   deleteDoc,
+  writeBatch,
   onSnapshot, 
   arrayUnion, 
   increment,
@@ -2543,5 +2544,89 @@ export const subscribeToUserReferralsRealtime = (userUid, onUpdate, onError) => 
   } catch (err) {
     console.error("[Firebase] subscribeToUserReferrals init error:", err);
     return () => {};
+  }
+};
+
+/**
+ * Permanently deletes all players whose wallet balance is 0 from Firestore.
+ * Strictly protects Admin and Host accounts.
+ */
+export const deleteZeroBalancePlayersRealtime = async () => {
+  try {
+    const usersCollection = collection(db, "users");
+    const snapshot = await getDocs(usersCollection);
+    const toDeleteDocs = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() || {};
+      const docId = docSnap.id;
+      const w = parseFloat(data.wallet) || 0;
+      const dep = parseFloat(data.depositBalance) || 0;
+      const win = parseFloat(data.winningBalance) || 0;
+      const isZero = (w <= 0 && dep <= 0 && win <= 0);
+
+      const isAdmin = 
+        data.role === 'admin' ||
+        data.isHost === true ||
+        docId === '9084311275' ||
+        String(data.uid || '').trim() === '9084311275' ||
+        String(data.phone || '').trim().includes('9084311275') ||
+        docId === 'admin_master_1' ||
+        String(data.email || '').toLowerCase() === 'admin@zest.gg';
+
+      if (isZero && !isAdmin) {
+        toDeleteDocs.push({ docId, uid: data.uid });
+      }
+    });
+
+    if (toDeleteDocs.length === 0) {
+      return { success: true, count: 0, message: 'No zero-balance players found.' };
+    }
+
+    const CHUNK_SIZE = 450;
+    for (let i = 0; i < toDeleteDocs.length; i += CHUNK_SIZE) {
+      const chunk = toDeleteDocs.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      for (const item of chunk) {
+        batch.delete(doc(db, "users", item.docId));
+      }
+      await batch.commit();
+    }
+
+    // Purge corresponding device tokens
+    try {
+      const deletedUidSet = new Set(toDeleteDocs.map(d => String(d.uid || d.docId)).filter(Boolean));
+      const tokensCollection = collection(db, "device_tokens");
+      const tokensSnap = await getDocs(tokensCollection);
+      const tokensToDelete = [];
+      tokensSnap.forEach(tDoc => {
+        const tData = tDoc.data() || {};
+        if (deletedUidSet.has(String(tData.uid))) {
+          tokensToDelete.push(tDoc.id);
+        }
+      });
+      for (let i = 0; i < tokensToDelete.length; i += CHUNK_SIZE) {
+        const chunk = tokensToDelete.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        for (const tId of chunk) {
+          batch.delete(doc(db, "device_tokens", tId));
+        }
+        await batch.commit();
+      }
+    } catch (tErr) {
+      console.warn("[Firebase] Purging device tokens notice:", tErr?.message);
+    }
+
+    // Update in-memory live users cache immediately
+    const deletedIdSet = new Set(toDeleteDocs.map(d => d.docId));
+    if (Array.isArray(liveUsersCache)) {
+      liveUsersCache = liveUsersCache.filter(u => !deletedIdSet.has(u.id) && !deletedIdSet.has(u.docId));
+    }
+
+    console.log(`[Firebase] Successfully deleted ${toDeleteDocs.length} zero-balance players.`);
+    return { success: true, count: toDeleteDocs.length };
+  } catch (error) {
+    console.error("[Firebase] Error deleting zero-balance players:", error);
+    return { success: false, error: error.message };
   }
 };
