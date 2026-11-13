@@ -2192,6 +2192,99 @@ export const seedDemoPlayersRealtime = async () => {
 };
 
 /**
+ * Purges all demo bot player documents from Firestore and cleans them from tournament rosters
+ */
+export const removeAllBotsRealtime = async () => {
+  try {
+    const [usersSnap, tourneysSnap] = await Promise.all([
+      getDocs(collection(db, 'users')),
+      getDocs(collection(db, 'tournaments'))
+    ]);
+
+    const demoUids = new Set(DEMO_PLAYERS.map(p => String(p.uid).trim()));
+    const demoIds = new Set(DEMO_PLAYERS.map(p => String(p.id).trim()));
+
+    const botsToDelete = [];
+    usersSnap.forEach(d => {
+      const data = d.data() || {};
+      const docId = d.id;
+      const isBot = 
+        docId.startsWith('user_demo_') || 
+        String(data.id || '').startsWith('user_demo_') || 
+        data.isBot === true ||
+        demoUids.has(String(data.uid).trim()) ||
+        demoIds.has(String(data.id).trim()) ||
+        demoIds.has(docId);
+
+      if (isBot) {
+        botsToDelete.push(docId);
+        demoUids.add(String(data.uid).trim());
+        demoIds.add(String(data.id).trim());
+      }
+    });
+
+    if (botsToDelete.length === 0) {
+      return { success: true, count: 0, message: "No bot players found in database." };
+    }
+
+    const CHUNK_SIZE = 450;
+    for (let i = 0; i < botsToDelete.length; i += CHUNK_SIZE) {
+      const chunk = botsToDelete.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      for (const docId of chunk) {
+        batch.delete(doc(db, 'users', docId));
+      }
+      await batch.commit();
+    }
+
+    // Clean from tournament rosters
+    for (const tDoc of tourneysSnap.docs) {
+      const tData = tDoc.data();
+      let needsUpdate = false;
+      const updateObj = {};
+
+      if (Array.isArray(tData.joinedPlayers)) {
+        const filtered = tData.joinedPlayers.filter(p => !demoUids.has(String(p.uid || '').trim()) && !demoIds.has(String(p.id || '').trim()));
+        if (filtered.length !== tData.joinedPlayers.length) {
+          updateObj.joinedPlayers = filtered;
+          updateObj.slotsJoined = filtered.length;
+          needsUpdate = true;
+        }
+      }
+
+      if (Array.isArray(tData.registeredPlayers)) {
+        const filtered = tData.registeredPlayers.filter(p => !demoUids.has(String(p.uid || '').trim()) && !demoIds.has(String(p.id || '').trim()));
+        if (filtered.length !== tData.registeredPlayers.length) {
+          updateObj.registeredPlayers = filtered;
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        await updateDoc(doc(db, 'tournaments', tDoc.id), updateObj);
+      }
+    }
+
+    // Update in-memory live users cache
+    const deletedSet = new Set(botsToDelete);
+    if (Array.isArray(liveUsersCache)) {
+      liveUsersCache = liveUsersCache.filter(u => !deletedSet.has(u.id) && !deletedSet.has(u.docId));
+    }
+
+    // Clean localStorage
+    const localUsers = JSON.parse(localStorage.getItem('zest_registered_users') || '[]');
+    const cleanedLocal = localUsers.filter(u => !deletedSet.has(u.id) && !deletedSet.has(u.uid));
+    localStorage.setItem('zest_registered_users', JSON.stringify(cleanedLocal));
+
+    console.log(`[Firebase] Purged ${botsToDelete.length} demo bots successfully!`);
+    return { success: true, count: botsToDelete.length };
+  } catch (err) {
+    console.error("[Firebase] Error purging demo bots:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
  * Adds demo players to a specific tournament in Firestore
  * @param {string} tournamentId
 /**

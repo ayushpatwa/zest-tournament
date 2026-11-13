@@ -30,6 +30,7 @@ import {
   deleteNotificationRealtime,
   subscribeToNotificationsRealtime,
   seedDemoPlayersRealtime,
+  removeAllBotsRealtime,
   addDemoPlayersToTournamentRealtime,
   addDemoPlayersToAllMatchesRealtime,
   refundAllTournamentPlayersRealtime,
@@ -3197,7 +3198,39 @@ export default function AdminHostPanel({
                           gap: '4px'
                         }}
                       >
-                        <span>🤖</span> +Seed 108 Esports Bots
+                        <span>🤖</span> +Seed Bots
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm("⚠️ Are you sure you want to remove ALL bots from the player database and tournament rosters?")) return;
+                          try {
+                            const res = await removeAllBotsRealtime();
+                            if (res.success) {
+                              alert(`🤖 Successfully purged ${res.count} bots!`);
+                            } else {
+                              alert(`⚠️ Failed to purge bots: ${res.error}`);
+                            }
+                          } catch (e) {
+                            alert(`⚠️ Error: ${e.message}`);
+                          }
+                        }}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          background: 'rgba(255, 87, 34, 0.15)',
+                          color: '#ff5722',
+                          border: '1px solid rgba(255, 87, 34, 0.4)',
+                          borderRadius: '6px',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <span>🤖</span> Remove All Bots
                       </button>
 
                       {(() => {
