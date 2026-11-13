@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { formatMatchDate, sortTournamentsByTime } from '../services/dateUtils';
-import { subscribeToAppSettingsRealtime } from '../services/firebase';
+import { subscribeToAppSettingsRealtime, subscribeToWinningLeaderboardRealtime } from '../services/firebase';
 import { isMatchCompleted, getUserAllJoinedMatches } from '../services/matchHistoryService';
 
 // Countdown Timer Component
@@ -54,16 +54,7 @@ function CountdownTimer({ startTime }) {
   );
 }
 
-// Hall of Fame Top Players Data
-const HALL_OF_FAME_DATA = [
-  { rank: 1, nickname: "SOUL_Viper", uid: "582910394", avatar: "👑", earnings: 48500, kills: 382, wins: 46, kd: "5.8" },
-  { rank: 2, nickname: "Garena_Sniper", uid: "192837465", avatar: "🎯", earnings: 34200, kills: 310, wins: 33, kd: "4.9" },
-  { rank: 3, nickname: "TotalGaming_Fan", uid: "910293847", avatar: "⚡", earnings: 27800, kills: 275, wins: 28, kd: "4.2" },
-  { rank: 4, nickname: "ShadowHunter", uid: "482910283", avatar: "🦊", earnings: 21500, kills: 230, wins: 22, kd: "3.8" },
-  { rank: 5, nickname: "Thunder_God", uid: "849201938", avatar: "🔥", earnings: 18900, kills: 198, wins: 19, kd: "3.5" },
-  { rank: 6, nickname: "Raptor_FF", uid: "772910481", avatar: "💀", earnings: 16200, kills: 174, wins: 16, kd: "3.2" },
-  { rank: 7, nickname: "Panda_OP", uid: "284019284", avatar: "🐼", earnings: 14500, kills: 160, wins: 14, kd: "3.0" }
-];
+
 
 export default function Dashboard({ tournaments, onSelectTournament, setCurrentView, userProfile }) {
   const { t } = useLanguage();
@@ -74,7 +65,16 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
   const [mainView, setMainView] = useState('tournaments'); // 'tournaments' | 'hall_of_fame'
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [hofCategory, setHofCategory] = useState('earnings'); // 'earnings' | 'kills' | 'wins'
+  const [liveLeaderboard, setLiveLeaderboard] = useState([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = subscribeToWinningLeaderboardRealtime((data) => {
+      setLiveLeaderboard(data || []);
+      setLeaderboardLoading(false);
+    });
+    return () => unsub();
+  }, []);
   const [referralReward, setReferralReward] = useState(0);
 
   useEffect(() => {
@@ -219,12 +219,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
 
   const sortedTournaments = sortTournamentsByTime(filteredTournaments);
 
-  const sortedHof = [...HALL_OF_FAME_DATA].sort((a, b) => {
-    if (hofCategory === 'earnings') return b.earnings - a.earnings;
-    if (hofCategory === 'kills') return b.kills - a.kills;
-    if (hofCategory === 'wins') return b.wins - a.wins;
-    return 0;
-  });
+  
 
   return (
     <div className="animate-slide-in" style={{ paddingBottom: '24px' }}>
@@ -314,7 +309,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             transition: 'all 0.2s ease'
           }}
         >
-          🏆 {t('dashboard.hall_of_fame_tab', {}, 'HALL OF FAME')}
+          🏆 {t('dashboard.hall_of_fame_tab', {}, 'LEADERBOARD')}
         </button>
       </div>
 
@@ -708,7 +703,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
         </>
       )}
 
-      {/* MODE 2: HALL OF FAME LEADERBOARD */}
+      {/* MODE 2: LIVE WINNINGS LEADERBOARD */}
       {mainView === 'hall_of_fame' && (
         <div className="animate-slide-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
@@ -718,131 +713,227 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
             padding: '20px',
             borderRadius: '16px',
             border: '1px solid rgba(255, 214, 0, 0.3)',
-            textAlign: 'center'
+            textAlign: 'center',
+            position: 'relative'
           }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 12px',
+              borderRadius: '20px',
+              background: 'rgba(0, 230, 118, 0.15)',
+              border: '1px solid rgba(0, 230, 118, 0.4)',
+              color: '#00e676',
+              fontSize: '0.72rem',
+              fontWeight: '800',
+              marginBottom: '8px'
+            }}>
+              <span style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: '#00e676',
+                boxShadow: '0 0 8px #00e676',
+                display: 'inline-block'
+              }} />
+              ● LIVE REAL-TIME RANKINGS
+            </div>
+
             <h2 style={{ fontFamily: 'var(--font-heading)', color: 'var(--accent)', margin: '0 0 4px 0', fontSize: '1.4rem' }}>
-              👑 ESPORTS HALL OF FAME
+              👑 ESPORTS WINNINGS LEADERBOARD
             </h2>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-              Top competitive Free Fire warriors & prize earners on Zest.
+              Live rankings ordered strictly by player tournament winning cash.
             </p>
           </div>
 
-          {/* Filter Categories */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {[
-              { id: 'earnings', label: '💰 Top Earners (₹)' },
-              { id: 'kills', label: '🎯 Kill Masters' },
-              { id: 'wins', label: '🏆 Win Champions' }
-            ].map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setHofCategory(cat.id)}
-                style={{
-                  flex: 1,
-                  padding: '8px 4px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: hofCategory === cat.id ? 'var(--secondary)' : 'rgba(255,255,255,0.05)',
-                  color: hofCategory === cat.id ? '#000' : '#fff',
-                  fontFamily: 'var(--font-heading)',
-                  fontSize: '0.72rem',
-                  fontWeight: '700',
-                  cursor: 'pointer'
-                }}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Top 3 Podium Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', alignItems: 'end', marginTop: '8px' }}>
-            
-            {/* Rank 2 - Silver */}
-            <div className="glass-panel" style={{ padding: '12px 6px', textAlign: 'center', border: '1px solid #c0c0c0', background: 'rgba(192,192,192,0.08)' }}>
-              <div style={{ fontSize: '1.4rem' }}>🥈</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#fff', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {sortedHof[1]?.nickname}
-              </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: '900', marginTop: '2px' }}>
-                {hofCategory === 'earnings' ? `₹${sortedHof[1]?.earnings}` : hofCategory === 'kills' ? `${sortedHof[1]?.kills} Kills` : `${sortedHof[1]?.wins} Wins`}
-              </div>
+          {leaderboardLoading ? (
+            <div className="glass-panel" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '8px' }}>⏳</div>
+              <div>Loading live leaderboard from cloud...</div>
             </div>
-
-            {/* Rank 1 - Gold (Elevated) */}
-            <div className="glass-panel" style={{ padding: '16px 6px', textAlign: 'center', border: '2px solid #ffd600', background: 'rgba(255,214,0,0.12)', boxShadow: '0 0 20px rgba(255,214,0,0.3)', transform: 'translateY(-10px)' }}>
-              <div style={{ fontSize: '1.8rem' }}>🥇</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: '900', color: '#ffd600', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {sortedHof[0]?.nickname}
-              </div>
-              <div style={{ fontSize: '0.95rem', color: 'var(--accent)', fontWeight: '900', marginTop: '2px' }}>
-                {hofCategory === 'earnings' ? `₹${sortedHof[0]?.earnings}` : hofCategory === 'kills' ? `${sortedHof[0]?.kills} Kills` : `${sortedHof[0]?.wins} Wins`}
-              </div>
-              <span className="badge" style={{ background: '#ffd600', color: '#000', fontSize: '0.6rem', fontWeight: '900', marginTop: '4px' }}>
-                MVP #1
-              </span>
+          ) : liveLeaderboard.length === 0 ? (
+            <div className="glass-panel" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🎮</div>
+              <h3 style={{ fontSize: '1.05rem', color: '#fff', margin: '0 0 6px 0' }}>No Prize Winners Yet</h3>
+              <p style={{ fontSize: '0.8rem', maxWidth: '360px', margin: '0 auto', lineHeight: '1.4' }}>
+                Join tournament matches in the Arena to win real cash prizes and claim the #1 spot on the leaderboard!
+              </p>
             </div>
+          ) : (
+            <>
+              {/* Top 3 Podium Cards */}
+              {liveLeaderboard.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', alignItems: 'end', marginTop: '4px' }}>
+                  
+                  {/* Rank 2 - Silver */}
+                  {liveLeaderboard[1] ? (
+                    <div className="glass-panel" style={{ padding: '14px 6px', textAlign: 'center', border: '1px solid #c0c0c0', background: 'rgba(192,192,192,0.08)', borderRadius: '12px' }}>
+                      <div style={{ fontSize: '1.5rem' }}>🥈</div>
+                      <div style={{
+                        fontSize: '0.85rem',
+                        fontWeight: '800',
+                        color: '#fff',
+                        marginTop: '6px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        padding: '0 4px'
+                      }}>
+                        {liveLeaderboard[1].nickname}
+                      </div>
+                      <div style={{ fontSize: '1rem', color: '#c0c0c0', fontWeight: '900', marginTop: '4px', fontFamily: 'var(--font-heading)' }}>
+                        ₹{liveLeaderboard[1].winningAmount}
+                      </div>
+                    </div>
+                  ) : <div />}
 
-            {/* Rank 3 - Bronze */}
-            <div className="glass-panel" style={{ padding: '12px 6px', textAlign: 'center', border: '1px solid #cd7f32', background: 'rgba(205,127,50,0.08)' }}>
-              <div style={{ fontSize: '1.4rem' }}>🥉</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#fff', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {sortedHof[2]?.nickname}
-              </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: '900', marginTop: '2px' }}>
-                {hofCategory === 'earnings' ? `₹${sortedHof[2]?.earnings}` : hofCategory === 'kills' ? `${sortedHof[2]?.kills} Kills` : `${sortedHof[2]?.wins} Wins`}
-              </div>
-            </div>
-
-          </div>
-
-          {/* Full Hall of Fame List */}
-          <div className="glass-panel" style={{ padding: '10px' }}>
-            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              GLOBAL RANKINGS TABLE
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {sortedHof.map((player, idx) => (
-                <div 
-                  key={idx}
-                  className="flex-between"
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: idx < 3 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.03)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontWeight: '900', width: '20px', color: idx === 0 ? '#ffd600' : idx === 1 ? '#c0c0c0' : idx === 2 ? '#cd7f32' : 'var(--text-muted)' }}>
-                      #{idx + 1}
+                  {/* Rank 1 - Gold (Elevated MVP) */}
+                  <div className="glass-panel" style={{
+                    padding: '18px 6px',
+                    textAlign: 'center',
+                    border: '2px solid #ffd600',
+                    background: 'rgba(255,214,0,0.14)',
+                    boxShadow: '0 0 25px rgba(255,214,0,0.3)',
+                    transform: 'translateY(-8px)',
+                    borderRadius: '14px'
+                  }}>
+                    <div style={{ fontSize: '2rem' }}>🥇</div>
+                    <div style={{
+                      fontSize: '0.92rem',
+                      fontWeight: '900',
+                      color: '#ffd600',
+                      marginTop: '6px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      padding: '0 4px'
+                    }}>
+                      {liveLeaderboard[0]?.nickname}
+                    </div>
+                    <div style={{ fontSize: '1.15rem', color: '#00e676', fontWeight: '900', marginTop: '4px', fontFamily: 'var(--font-heading)' }}>
+                      ₹{liveLeaderboard[0]?.winningAmount}
+                    </div>
+                    <span className="badge" style={{ background: '#ffd600', color: '#000', fontSize: '0.62rem', fontWeight: '900', marginTop: '6px' }}>
+                      👑 TOP WINNER #1
                     </span>
-                    <span style={{ fontSize: '1.2rem' }}>{player.avatar}</span>
-                    <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#fff' }}>{player.nickname}</div>
-                      {isHostOrAdmin ? (
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>UID: <span style={{ color: '#00e5ff' }}>{player.uid}</span> • KD: {player.kd}</div>
-                      ) : player.uid === userProfile?.uid ? (
-                        <div style={{ fontSize: '0.7rem', color: 'var(--secondary)' }}>UID: {player.uid} (You) • KD: {player.kd}</div>
-                      ) : (
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>KD: {player.kd}</div>
-                      )}
-                    </div>
                   </div>
 
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.9rem', color: 'var(--accent)', fontWeight: '900', fontFamily: 'var(--font-heading)' }}>
-                      ₹{player.earnings}
+                  {/* Rank 3 - Bronze */}
+                  {liveLeaderboard[2] ? (
+                    <div className="glass-panel" style={{ padding: '14px 6px', textAlign: 'center', border: '1px solid #cd7f32', background: 'rgba(205,127,50,0.08)', borderRadius: '12px' }}>
+                      <div style={{ fontSize: '1.5rem' }}>🥉</div>
+                      <div style={{
+                        fontSize: '0.85rem',
+                        fontWeight: '800',
+                        color: '#fff',
+                        marginTop: '6px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        padding: '0 4px'
+                      }}>
+                        {liveLeaderboard[2].nickname}
+                      </div>
+                      <div style={{ fontSize: '1rem', color: '#cd7f32', fontWeight: '900', marginTop: '4px', fontFamily: 'var(--font-heading)' }}>
+                        ₹{liveLeaderboard[2].winningAmount}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--secondary)' }}>
-                      🎯 {player.kills} Kills | {player.wins} Wins
-                    </div>
-                  </div>
+                  ) : <div />}
+
                 </div>
-              ))}
-            </div>
-          </div>
+              )}
+
+              {/* Full Leaderboard List Table (Only Name & Winning Amount) */}
+              <div className="glass-panel" style={{ padding: '12px' }}>
+                <div className="flex-between" style={{ marginBottom: '10px', paddingBottom: '6px', borderBottom: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Rank & Player
+                  </span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Winning Amount
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {liveLeaderboard.map((player, idx) => {
+                    const isSelf = (userProfile?.uid && (player.id === userProfile.uid || player.id === userProfile.id)) ||
+                                   (userProfile?.nickname && player.nickname.toLowerCase() === userProfile.nickname.toLowerCase());
+                    const isTop1 = idx === 0;
+                    const isTop2 = idx === 1;
+                    const isTop3 = idx === 2;
+
+                    return (
+                      <div 
+                        key={player.id || idx}
+                        className="flex-between"
+                        style={{
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          background: isSelf 
+                            ? 'rgba(0, 229, 255, 0.12)' 
+                            : idx < 3 
+                              ? 'rgba(255, 255, 255, 0.05)' 
+                              : 'rgba(255, 255, 255, 0.02)',
+                          border: isSelf 
+                            ? '1px solid #00e5ff' 
+                            : idx === 0 
+                              ? '1px solid rgba(255, 214, 0, 0.4)' 
+                              : '1px solid rgba(255, 255, 255, 0.04)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {/* Left: Rank & Player Name Only */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                          <span style={{
+                            fontWeight: '900',
+                            fontSize: '0.9rem',
+                            minWidth: '28px',
+                            color: isTop1 ? '#ffd600' : isTop2 ? '#c0c0c0' : isTop3 ? '#cd7f32' : 'var(--text-muted)'
+                          }}>
+                            {isTop1 ? '🥇 #1' : isTop2 ? '🥈 #2' : isTop3 ? '🥉 #3' : `#${idx + 1}`}
+                          </span>
+                          <span style={{
+                            fontSize: '0.9rem',
+                            fontWeight: '800',
+                            color: isSelf ? '#00e5ff' : '#fff',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {player.nickname}
+                            {isSelf && (
+                              <span style={{
+                                marginLeft: '6px',
+                                fontSize: '0.68rem',
+                                color: '#00e5ff',
+                                fontWeight: '900'
+                              }}>
+                                (You)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Right: Winning Amount Only */}
+                        <div style={{
+                          fontSize: '1rem',
+                          color: '#00e676',
+                          fontWeight: '900',
+                          fontFamily: 'var(--font-heading)',
+                          letterSpacing: '0.5px',
+                          flexShrink: 0
+                        }}>
+                          ₹{player.winningAmount}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
 
         </div>
       )}

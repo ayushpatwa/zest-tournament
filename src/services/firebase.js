@@ -948,6 +948,59 @@ export const subscribeToAllUsersRealtime = (onUpdate) => {
   }
 };
 
+/**
+ * Real-time subscription to the competitive player leaderboard.
+ * Ranked strictly by the player's winning amount.
+ * Contains only the player name and winning amount, updated live across all devices!
+ */
+export const subscribeToWinningLeaderboardRealtime = (onUpdate) => {
+  try {
+    const usersCollection = collection(db, "users");
+    const unsubscribe = onSnapshot(usersCollection, (snapshot) => {
+      const list = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        
+        // Exclude host and admin accounts
+        const isAdmin = 
+          String(docSnap.id).trim() === '9084311275' ||
+          String(data.uid || '').trim() === '9084311275' ||
+          String(data.phone || '').trim() === '9084311275' ||
+          data.role === 'admin' ||
+          data.isHost;
+
+        if (isAdmin) return;
+
+        const winAmt = Math.max(
+          parseFloat(data.winningBalance) || 0,
+          parseFloat(data.stats?.earnings) || 0
+        );
+
+        if (winAmt > 0) {
+          const cleanName = String(data.nickname || data.name || 'Player').trim();
+          list.push({
+            id: docSnap.id,
+            nickname: cleanName,
+            winningAmount: Number(winAmt.toFixed(2))
+          });
+        }
+      });
+
+      // Sort strictly by winning amount descending
+      list.sort((a, b) => b.winningAmount - a.winningAmount);
+
+      onUpdate(list);
+    }, (err) => {
+      console.warn("[Firebase] Winning leaderboard subscription notice:", err);
+    });
+
+    return unsubscribe;
+  } catch (err) {
+    console.error("[Firebase] subscribeToWinningLeaderboardRealtime error:", err);
+    return () => {};
+  }
+};
+
 export { getUserBalances, calculateMatchEntrySplit } from "./walletUtils.js";
 
 /**

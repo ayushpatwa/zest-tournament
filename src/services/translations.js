@@ -69,7 +69,7 @@ export const translations = {
     dashboard: {
       arena_tab: 'ARENA',
       my_matches_tab: 'MY MATCHES',
-      hall_of_fame_tab: 'HALL OF FAME',
+      hall_of_fame_tab: 'LEADERBOARD',
       live_tournaments: 'Free Fire Matches',
       search_placeholder: '🔍 Search matches by type, map, mode...',
       refer_banner_title: 'Refer Friends & Win Free Coins!',
@@ -212,7 +212,7 @@ export const translations = {
     dashboard: {
       arena_tab: 'एरीना',
       my_matches_tab: 'मेरे मैच',
-      hall_of_fame_tab: 'हॉल ऑफ फेम',
+      hall_of_fame_tab: 'लीडरबोर्ड',
       live_tournaments: 'फ्री फायर टूर्नामेंट मैच',
       search_placeholder: '🔍 मैच, मैप या मोड सर्च करें...',
       refer_banner_title: 'दोस्तों को रेफर करें और फ्री कॉइन्स पाएं!',
