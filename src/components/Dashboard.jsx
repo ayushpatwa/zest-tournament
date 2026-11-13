@@ -70,11 +70,35 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
 
   useEffect(() => {
     const unsub = subscribeToWinningLeaderboardRealtime((data) => {
-      setLiveLeaderboard((data || []).slice(0, 10));
+      setLiveLeaderboard(data || []);
       setLeaderboardLoading(false);
-    }, 10);
+    });
     return () => unsub();
   }, []);
+
+  // Top 10 players for public leaderboard
+  const top10Leaderboard = liveLeaderboard.slice(0, 10);
+
+  // Compute rank and winning amount of currently watching player
+  const cleanMyUid = String(userProfile?.uid || userProfile?.id || '').trim().toLowerCase();
+  const cleanMyPhone = String(userProfile?.phone || '').trim().toLowerCase();
+  const cleanMyNick = String(userProfile?.nickname || '').trim().toLowerCase();
+
+  const myRankIndex = liveLeaderboard.findIndex(p => {
+    const pId = String(p.id || '').trim().toLowerCase();
+    const pUid = String(p.uid || '').trim().toLowerCase();
+    const pPhone = String(p.phone || '').trim().toLowerCase();
+    const pNick = String(p.nickname || '').trim().toLowerCase();
+
+    return (cleanMyUid && (pId === cleanMyUid || pUid === cleanMyUid)) ||
+           (cleanMyPhone && pPhone === cleanMyPhone) ||
+           (cleanMyNick && pNick === cleanMyNick);
+  });
+
+  const myRank = myRankIndex !== -1 ? myRankIndex + 1 : null;
+  const myWinningAmount = myRankIndex !== -1 
+    ? liveLeaderboard[myRankIndex].winningAmount 
+    : Math.max(parseFloat(userProfile?.winningBalance) || 0, parseFloat(userProfile?.stats?.earnings) || 0);
   const [referralReward, setReferralReward] = useState(0);
 
   useEffect(() => {
@@ -857,7 +881,7 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {liveLeaderboard.map((player, idx) => {
+                  {top10Leaderboard.map((player, idx) => {
                     const isSelf = (userProfile?.uid && (player.id === userProfile.uid || player.id === userProfile.id)) ||
                                    (userProfile?.nickname && player.nickname.toLowerCase() === userProfile.nickname.toLowerCase());
                     const isTop1 = idx === 0;
@@ -943,6 +967,101 @@ export default function Dashboard({ tournaments, onSelectTournament, setCurrentV
                       </div>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Bottom Card: The Viewing Player's Own Rank */}
+              <div 
+                className="glass-panel" 
+                style={{
+                  marginTop: '12px',
+                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.15) 0%, rgba(21, 28, 51, 0.95) 100%)',
+                  border: '1.5px solid #00e5ff',
+                  boxShadow: '0 4px 20px rgba(0, 229, 255, 0.22)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}
+              >
+                <div className="flex-between">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '0.9rem' }}>📍</span>
+                    <span style={{ fontSize: '0.72rem', color: '#00e5ff', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      YOUR LEADERBOARD STANDING
+                    </span>
+                  </div>
+                  {myRank && myRank <= 10 && (
+                    <span className="badge" style={{ background: '#ffd600', color: '#000', fontSize: '0.62rem', fontWeight: '900' }}>
+                      🔥 TOP 10 CHAMPION
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex-between" style={{ gap: '10px' }}>
+                  {/* Left: Your Rank & Your Name */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: '82px',
+                      padding: '5px 10px',
+                      borderRadius: '8px',
+                      fontSize: '0.8rem',
+                      fontWeight: '900',
+                      letterSpacing: '0.5px',
+                      background: myRank === 1 ? 'linear-gradient(135deg, rgba(255, 214, 0, 0.3) 0%, rgba(255, 143, 0, 0.2) 100%)'
+                                : myRank === 2 ? 'linear-gradient(135deg, rgba(224, 224, 224, 0.25) 0%, rgba(158, 158, 158, 0.15) 100%)'
+                                : myRank === 3 ? 'linear-gradient(135deg, rgba(205, 127, 50, 0.25) 0%, rgba(139, 69, 19, 0.15) 100%)'
+                                : myRank ? 'rgba(0, 229, 255, 0.2)'
+                                : 'rgba(255, 255, 255, 0.08)',
+                      color: myRank === 1 ? '#ffd600' : myRank === 2 ? '#e0e0e0' : myRank === 3 ? '#cd7f32' : myRank ? '#00e5ff' : 'var(--text-muted)',
+                      border: `1px solid ${myRank === 1 ? '#ffd600' : myRank === 2 ? '#b0bec5' : myRank === 3 ? '#cd7f32' : myRank ? '#00e5ff' : 'var(--border-color)'}`,
+                      boxShadow: myRank && myRank <= 3 ? '0 0 10px rgba(255, 214, 0, 0.3)' : 'none',
+                      flexShrink: 0
+                    }}>
+                      {myRank === 1 ? '🥇 RANK #1' : myRank === 2 ? '🥈 RANK #2' : myRank === 3 ? '🥉 RANK #3' : myRank ? `RANK #${myRank}` : 'UNRANKED'}
+                    </div>
+
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '0.95rem',
+                        fontWeight: '800',
+                        color: '#fff',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {userProfile?.nickname || userProfile?.name || 'You'}
+                        <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: '#00e5ff', fontWeight: '800' }}>
+                          (You)
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                        {myRank 
+                          ? `Rank #${myRank} of ${liveLeaderboard.length} cash winners` 
+                          : 'Win tournament matches to enter the leaderboard!'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Winning Amount Only */}
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{
+                      fontSize: '1.15rem',
+                      color: '#00e676',
+                      fontWeight: '900',
+                      fontFamily: 'var(--font-heading)',
+                      letterSpacing: '0.5px'
+                    }}>
+                      ₹{myWinningAmount}
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                      Winning Cash
+                    </div>
+                  </div>
                 </div>
               </div>
             </>
