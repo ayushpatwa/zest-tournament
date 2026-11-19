@@ -67,7 +67,7 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
   );
 
   const draftCount = dayMatches.filter(m => m.isDraft === true || m.isPublished === false || m.status === 'draft').length;
-  const publishedCount = dayMatches.filter(m => m.isPublished === true && m.status !== 'draft').length;
+  const publishedCount = dayMatches.filter(m => m.isPublished === true && m.isDraft !== true && m.status !== 'draft').length;
   const totalCount = dayMatches.length;
 
   // Matches in source date for copy feedback
@@ -153,7 +153,7 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
   };
 
   const handleToggleSinglePublish = async (match) => {
-    const isCurrentlyPublished = match.isPublished === true && match.status !== 'draft';
+    const isCurrentlyPublished = match.isPublished === true && match.isDraft !== true && match.status !== 'draft';
     const nextState = !isCurrentlyPublished;
     setIsLoading(true);
     const res = await toggleMatchPublishRealtime(match.id, nextState);
@@ -168,7 +168,7 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
 
   const handleOpenEdit = (match) => {
     setEditingMatch(match);
-    const isPub = match.isPublished === true && match.status !== 'draft';
+    const isPub = match.isPublished === true && match.isDraft !== true && match.status !== 'draft';
     setEditForm({
       title: match.title || '',
       map: match.map || 'Bermuda',
@@ -798,7 +798,7 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {dayMatches.map((match, idx) => {
-              const isPub = match.isPublished === true && match.status !== 'draft';
+              const isPub = match.isPublished === true && match.isDraft !== true && match.status !== 'draft';
               const totalSlots = match.slotsTotal || match.maxSlots || 10;
               const joinedSlots = Math.max(match.slotsJoined || 0, (match.joinedPlayers || []).length);
 

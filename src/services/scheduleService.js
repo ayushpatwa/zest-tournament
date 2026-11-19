@@ -827,6 +827,23 @@ export const copyDayScheduleRealtime = async (sourceDateString, targetDateString
       return slotA - slotB;
     });
 
+    // Clean any existing matches on dstDate first so the target day schedule is 100% clean and fresh
+    const existingDstDocIds = [];
+    snap.forEach(d => {
+      const data = d.data() || {};
+      const docDate = String(data.matchDate || '').trim();
+      if (docDate === dstDate || d.id.includes(dstDate)) {
+        existingDstDocIds.push(d.id);
+      }
+    });
+
+    for (let i = 0; i < existingDstDocIds.length; i += 400) {
+      const delChunk = existingDstDocIds.slice(i, i + 400);
+      const delBatch = writeBatch(db);
+      delChunk.forEach(id => delBatch.delete(doc(db, "tournaments", id)));
+      await delBatch.commit();
+    }
+
     let copiedCount = 0;
     let totalBotsCopied = 0;
     // Chunk writes in groups of 400 to comply with Firestore batch limits
@@ -839,7 +856,7 @@ export const copyDayScheduleRealtime = async (sourceDateString, targetDateString
         if (srcMatch.id.includes(srcDate)) {
           newId = srcMatch.id.split(srcDate).join(dstDate);
         } else {
-          newId = `staged_${dstDate}_${Date.now()}_${i + idx + 1}`;
+          newId = `daily_${dstDate}_slot${String(srcMatch.slotIndex || idx + 1).padStart(2, '0')}_${srcMatch.mode || 'match'}_${idx + 1}`;
         }
 
         // Extract and preserve bot players from source match (real players are strictly NOT copied)
@@ -925,7 +942,7 @@ export const copyDayScheduleRealtime = async (sourceDateString, targetDateString
           delete clonedData.publishedAt;
         }
 
-        batch.set(matchDocRef, cleanFirestoreData(clonedData), { merge: true });
+        batch.set(matchDocRef, cleanFirestoreData(clonedData));
         copiedCount++;
       });
 

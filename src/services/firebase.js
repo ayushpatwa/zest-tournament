@@ -40,13 +40,35 @@ export const db = initializeFirestore(app, {
 
 /**
  * Strips all undefined fields recursively to prevent Firestore arrayUnion / setDoc crashes
+ * Safely preserves Firestore FieldValue sentinels (serverTimestamp, deleteField, arrayUnion, etc.)
  */
 export const cleanFirestoreData = (obj) => {
   if (!obj || typeof obj !== 'object') return obj;
+  // If it's a Firestore Sentinel / FieldValue / Date / Timestamp, preserve intact!
+  if (
+    obj instanceof Date || 
+    typeof obj?.toMillis === 'function' || 
+    obj._methodName || 
+    obj.constructor?.name === 'FieldValue' || 
+    obj.constructor?.name?.includes('FieldValue') || 
+    typeof obj?.isEqual === 'function'
+  ) {
+    return obj;
+  }
   const clean = {};
   for (const [k, v] of Object.entries(obj)) {
     if (v !== undefined) {
-      if (v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date) && typeof v?.toMillis !== 'function') {
+      if (
+        v && 
+        typeof v === 'object' && 
+        !Array.isArray(v) && 
+        !(v instanceof Date) && 
+        typeof v?.toMillis !== 'function' &&
+        !v._methodName &&
+        v.constructor?.name !== 'FieldValue' &&
+        !v.constructor?.name?.includes('FieldValue') &&
+        typeof v?.isEqual !== 'function'
+      ) {
         clean[k] = cleanFirestoreData(v);
       } else {
         clean[k] = v;
