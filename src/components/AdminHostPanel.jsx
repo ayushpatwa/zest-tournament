@@ -45,6 +45,8 @@ import {
 } from '../services/dateUtils';
 import { 
   generateDaily1v1Matches, 
+  generateDaily2v2Matches,
+  generateDaily4v4Matches,
   generateDailyClassicBRMatches,
   generateAllDailyMatches,
   deleteDailyMatchesByDate,
@@ -56,6 +58,7 @@ import {
 
 import paymentQrImg from '../assets/payment_qr.jpg';
 import HostDayPlanner from './HostDayPlanner';
+import GenerateMatchModal from './GenerateMatchModal';
 
 export default function AdminHostPanel({ 
   tournaments = [], 
@@ -192,6 +195,7 @@ export default function AdminHostPanel({
 
   // Daily 1v1 Auto-Scheduler states
   const [isGeneratingSchedule, setIsGeneratingSchedule] = useState(false);
+  const [generateModalConfig, setGenerateModalConfig] = useState(null);
   const [scheduleStatusMsg, setScheduleStatusMsg] = useState('');
   const [manageDateFilter, setManageDateFilter] = useState('all'); // 'all' | 'today' | 'tomorrow'
 
@@ -815,54 +819,89 @@ export default function AdminHostPanel({
     setTimeout(() => setScheduleStatusMsg(''), 7000);
   };
 
-  const handleGenerateTodaySchedule = async () => {
+  const handleGenerateTodaySchedule = () => {
+    setGenerateModalConfig({
+      type: '1v1',
+      targetDate: getTodayDateString(),
+      asDraft: false
+    });
+  };
+
+  const handleGenerateTomorrowSchedule = () => {
+    setGenerateModalConfig({
+      type: '1v1',
+      targetDate: getTomorrowDateString(),
+      asDraft: false
+    });
+  };
+
+  const handleGenerateClassicBRTodaySchedule = () => {
+    setGenerateModalConfig({
+      type: 'br',
+      targetDate: getTodayDateString(),
+      asDraft: false
+    });
+  };
+
+  const handleGenerateClassicBRTomorrowSchedule = () => {
+    setGenerateModalConfig({
+      type: 'br',
+      targetDate: getTomorrowDateString(),
+      asDraft: false
+    });
+  };
+
+  const handleGenerate2v2TomorrowSchedule = () => {
+    setGenerateModalConfig({
+      type: '2v2',
+      targetDate: getTomorrowDateString(),
+      asDraft: false
+    });
+  };
+
+  const handleGenerate4v4TomorrowSchedule = () => {
+    setGenerateModalConfig({
+      type: '4v4',
+      targetDate: getTomorrowDateString(),
+      asDraft: false
+    });
+  };
+
+  const handleConfirmAdminGenerate = async (config) => {
+    const { type, prizePool, entryFee, slotsTotal, perKillPrize, overwriteExisting, asDraft } = config;
+    const targetDate = generateModalConfig?.targetDate || (type === 'br' ? getTodayDateString() : getTomorrowDateString());
     setIsGeneratingSchedule(true);
-    setScheduleStatusMsg("⏳ Generating Today's 100 1v1 matches in real-time...");
-    const res = await generateDaily1v1Matches(getTodayDateString());
+    setScheduleStatusMsg(`⏳ Generating 25 ${type.toUpperCase()} matches for ${targetDate}...`);
+    let res;
+    if (type === 'br') {
+      res = await generateDailyClassicBRMatches(targetDate, overwriteExisting, asDraft, {
+        prizePool,
+        entryFee,
+        slotsTotal,
+        perKillPrize
+      });
+    } else if (type === '2v2') {
+      res = await generateDaily2v2Matches(targetDate, overwriteExisting, asDraft, {
+        prizePool,
+        entryFee
+      });
+    } else if (type === '4v4') {
+      res = await generateDaily4v4Matches(targetDate, overwriteExisting, asDraft, {
+        prizePool,
+        entryFee
+      });
+    } else {
+      res = await generateDaily1v1Matches(targetDate, overwriteExisting, asDraft, {
+        prizePool,
+        entryFee
+      });
+    }
     setIsGeneratingSchedule(false);
+    setGenerateModalConfig(null);
     if (res.success) {
-      setScheduleStatusMsg(`🎉 Done! Created ${res.createdCount} new matches for Today (${res.skippedCount} already existed).`);
+      setScheduleStatusMsg(`🎉 Done! Created ${res.createdCount} ${type.toUpperCase()} matches for ${targetDate} (Prize: ₹${prizePool}, Entry: ₹${entryFee}${type === 'br' ? `, Players: ${slotsTotal}` : ''})!`);
     } else {
       setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to generate schedule'}`);
-    }
-    setTimeout(() => setScheduleStatusMsg(''), 7000);
-  };
-
-  const handleGenerateTomorrowSchedule = async () => {
-    setIsGeneratingSchedule(true);
-    setScheduleStatusMsg("⏳ Generating Tomorrow's 25 sequential 1v1 matches in real-time...");
-    const res = await generateDaily1v1Matches(getTomorrowDateString());
-    setIsGeneratingSchedule(false);
-    if (res.success) {
-      setScheduleStatusMsg(`🎉 Done! Created ${res.createdCount} new matches for Tomorrow (${res.skippedCount} already existed).`);
-    } else {
-      setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to generate schedule'}`);
-    }
-    setTimeout(() => setScheduleStatusMsg(''), 7000);
-  };
-
-  const handleGenerateClassicBRTodaySchedule = async () => {
-    setIsGeneratingSchedule(true);
-    setScheduleStatusMsg("⏳ Generating Today's 25 Classic Battle Royale matches (₹5 Entry / ₹3 Per Kill / 10 Slots) in real-time...");
-    const res = await generateDailyClassicBRMatches(getTodayDateString());
-    setIsGeneratingSchedule(false);
-    if (res.success) {
-      setScheduleStatusMsg(`👑 Done! Created ${res.createdCount} Classic Battle Royale matches for Today (${res.skippedCount} already existed).`);
-    } else {
-      setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to generate Classic BR matches'}`);
-    }
-    setTimeout(() => setScheduleStatusMsg(''), 7000);
-  };
-
-  const handleGenerateClassicBRTomorrowSchedule = async () => {
-    setIsGeneratingSchedule(true);
-    setScheduleStatusMsg("⏳ Generating Tomorrow's 25 Classic Battle Royale matches (₹5 Entry / ₹3 Per Kill / 10 Slots) in real-time...");
-    const res = await generateDailyClassicBRMatches(getTomorrowDateString());
-    setIsGeneratingSchedule(false);
-    if (res.success) {
-      setScheduleStatusMsg(`👑 Done! Created ${res.createdCount} Classic Battle Royale matches for Tomorrow (${res.skippedCount} already existed).`);
-    } else {
-      setScheduleStatusMsg(`⚠️ Error: ${res.error || 'Failed to generate Classic BR matches'}`);
     }
     setTimeout(() => setScheduleStatusMsg(''), 7000);
   };
@@ -4046,7 +4085,7 @@ export default function AdminHostPanel({
                   <br />
                   <span style={{ color: 'var(--secondary)' }}>⚔️ Clash squad 1v1 ➔ 🎯 CS 1v1 (head) ➔ 🐺 Lone wolf 1v1 ➔ 🎯 Lone wolf 1v1 (head)</span>
                   <br />
-                  <strong style={{ color: 'var(--accent)' }}>Entry Fee: ₹4 | Winning Prize: ₹6 | Slots: 2 (30 min gap between matches)</strong>
+                  <strong style={{ color: 'var(--accent)' }}>Entry Fee: ₹25 | Winning Prize: ₹40 | Slots: 2 (30 min gap between matches)</strong>
                 </p>
               </div>
             </div>
@@ -4170,6 +4209,44 @@ export default function AdminHostPanel({
                 }}
               >
                 {isGeneratingSchedule ? '⏳ Processing...' : "⚔️ Generate Tomorrow's 1v1"}
+              </button>
+
+              <button
+                type="button"
+                disabled={isGeneratingSchedule}
+                onClick={handleGenerate2v2TomorrowSchedule}
+                className="btn"
+                style={{
+                  padding: '9px 14px',
+                  fontSize: '0.82rem',
+                  fontWeight: '800',
+                  background: 'rgba(0, 229, 255, 0.15)',
+                  color: '#00e5ff',
+                  border: '1px solid rgba(0, 229, 255, 0.4)',
+                  borderRadius: '8px',
+                  cursor: isGeneratingSchedule ? 'wait' : 'pointer'
+                }}
+              >
+                {isGeneratingSchedule ? '⏳ Processing...' : "⚔️ Generate Tomorrow's 2v2"}
+              </button>
+
+              <button
+                type="button"
+                disabled={isGeneratingSchedule}
+                onClick={handleGenerate4v4TomorrowSchedule}
+                className="btn"
+                style={{
+                  padding: '9px 14px',
+                  fontSize: '0.82rem',
+                  fontWeight: '800',
+                  background: 'rgba(124, 77, 255, 0.18)',
+                  color: '#b388ff',
+                  border: '1px solid rgba(124, 77, 255, 0.4)',
+                  borderRadius: '8px',
+                  cursor: isGeneratingSchedule ? 'wait' : 'pointer'
+                }}
+              >
+                {isGeneratingSchedule ? '⏳ Processing...' : "🛡️ Generate Tomorrow's 4v4"}
               </button>
 
               <button
@@ -7157,6 +7234,19 @@ export default function AdminHostPanel({
             })()}
           </div>
         </div>
+      )}
+
+      {/* Generate 1v1 / BR Matches Custom Settings Modal */}
+      {generateModalConfig && (
+        <GenerateMatchModal
+          isOpen={Boolean(generateModalConfig)}
+          onClose={() => setGenerateModalConfig(null)}
+          type={generateModalConfig.type}
+          targetDate={generateModalConfig.targetDate}
+          asDraft={generateModalConfig.asDraft === true}
+          onConfirm={handleConfirmAdminGenerate}
+          isLoading={isGeneratingSchedule}
+        />
       )}
 
     </div>

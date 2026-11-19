@@ -13,9 +13,12 @@ import {
   updateMatchDetailsRealtime, 
   deleteMatchRealtime,
   generateDaily1v1Matches, 
+  generateDaily2v2Matches,
+  generateDaily4v4Matches,
   generateDailyClassicBRMatches,
   deleteDailyMatchesByDate 
 } from '../services/scheduleService';
+import GenerateMatchModal from './GenerateMatchModal';
 
 export default function HostDayPlanner({ tournaments = [], isHost = true }) {
   const todayStr = getTodayDateString();
@@ -23,6 +26,9 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
 
   // Active view date in planner (defaults to tomorrow or today)
   const [plannerDate, setPlannerDate] = useState(tomorrowStr);
+
+  // Match Generator Modal state
+  const [generateModalConfig, setGenerateModalConfig] = useState(null);
 
   // Copy-paste state
   const [showCopyPanel, setShowCopyPanel] = useState(false);
@@ -43,10 +49,10 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
     type: 'Classic Battle Royale',
     startTime: '10:00 AM',
     matchDate: '',
-    entryFee: 5,
-    prizePool: 10,
-    perKillPrize: 3,
-    maxSlots: 10,
+    entryFee: 30,
+    prizePool: 100,
+    perKillPrize: 25,
+    maxSlots: 48,
     isPublished: false
   });
 
@@ -222,18 +228,46 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
     setTimeout(() => setActionStatus(''), 5000);
   };
 
-  const handleAutoGenerate = async (type, asDraft = true) => {
+  const handleOpenGenerateModal = (type, asDraft = true) => {
+    setGenerateModalConfig({
+      type,
+      targetDate: plannerDate,
+      asDraft
+    });
+  };
+
+  const handleConfirmGenerate = async (config) => {
     setIsLoading(true);
-    setActionStatus(`⏳ Auto-generating ${type === 'br' ? '25 Classic BR' : '25 1v1'} matches for ${plannerDate} (${asDraft ? 'as Drafts' : 'Published'})...`);
+    const { type, prizePool, entryFee, slotsTotal, perKillPrize, overwriteExisting, asDraft } = config;
+    setActionStatus(`⏳ Auto-generating 25 ${type === 'br' ? 'Classic BR' : '1v1'} matches for ${plannerDate} (${asDraft ? 'as Drafts' : 'Published'})...`);
     let res;
     if (type === 'br') {
-      res = await generateDailyClassicBRMatches(plannerDate, false, asDraft);
+      res = await generateDailyClassicBRMatches(plannerDate, overwriteExisting, asDraft, {
+        prizePool,
+        entryFee,
+        slotsTotal,
+        perKillPrize
+      });
+    } else if (type === '2v2') {
+      res = await generateDaily2v2Matches(plannerDate, overwriteExisting, asDraft, {
+        prizePool,
+        entryFee
+      });
+    } else if (type === '4v4') {
+      res = await generateDaily4v4Matches(plannerDate, overwriteExisting, asDraft, {
+        prizePool,
+        entryFee
+      });
     } else if (type === '1v1') {
-      res = await generateDaily1v1Matches(plannerDate, false, asDraft);
+      res = await generateDaily1v1Matches(plannerDate, overwriteExisting, asDraft, {
+        prizePool,
+        entryFee
+      });
     }
     setIsLoading(false);
+    setGenerateModalConfig(null);
     if (res.success) {
-      setActionStatus(`🎉 Created ${res.createdCount} matches for ${plannerDate} (${asDraft ? 'Drafts - Hidden until published' : 'Live'})!`);
+      setActionStatus(`🎉 Created ${res.createdCount} matches for ${plannerDate} (${asDraft ? 'Drafts - Hidden until published' : 'Live'}) with ₹${prizePool} Prize / ₹${entryFee} Entry${type === 'br' ? ` / ${slotsTotal} Players` : ''}!`);
     } else {
       setActionStatus(`⚠️ Error: ${res.error || 'Failed to generate matches'}`);
     }
@@ -537,7 +571,7 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => handleAutoGenerate('br', true)}
+              onClick={() => handleOpenGenerateModal('br', true)}
               disabled={isLoading}
               className="btn btn-outline"
               style={{ padding: '6px 10px', fontSize: '0.75rem', color: '#00e5ff', borderColor: 'rgba(0, 229, 255, 0.4)' }}
@@ -546,12 +580,30 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
             </button>
             <button
               type="button"
-              onClick={() => handleAutoGenerate('1v1', true)}
+              onClick={() => handleOpenGenerateModal('1v1', true)}
               disabled={isLoading}
               className="btn btn-outline"
               style={{ padding: '6px 10px', fontSize: '0.75rem', color: '#ffb74d', borderColor: 'rgba(255, 183, 77, 0.4)' }}
             >
               + Generate 25 1v1 (Draft)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOpenGenerateModal('2v2', true)}
+              disabled={isLoading}
+              className="btn btn-outline"
+              style={{ padding: '6px 10px', fontSize: '0.75rem', color: '#00e5ff', borderColor: 'rgba(0, 229, 255, 0.4)' }}
+            >
+              + Generate 25 2v2 (Draft)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOpenGenerateModal('4v4', true)}
+              disabled={isLoading}
+              className="btn btn-outline"
+              style={{ padding: '6px 10px', fontSize: '0.75rem', color: '#b388ff', borderColor: 'rgba(179, 136, 255, 0.4)' }}
+            >
+              + Generate 25 4v4 (Draft)
             </button>
             {totalCount > 0 && (
               <button
@@ -708,11 +760,35 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
               </button>
               <button
                 type="button"
-                onClick={() => handleAutoGenerate('br', true)}
+                onClick={() => handleOpenGenerateModal('br', true)}
                 className="btn btn-outline"
                 style={{ padding: '8px 18px', fontSize: '0.82rem', color: '#00e5ff' }}
               >
                 👑 Auto-Generate 25 Classic BR
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenGenerateModal('1v1', true)}
+                className="btn btn-outline"
+                style={{ padding: '8px 18px', fontSize: '0.82rem', color: '#ffb74d' }}
+              >
+                ⚔️ Auto-Generate 25 1v1
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenGenerateModal('2v2', true)}
+                className="btn btn-outline"
+                style={{ padding: '8px 18px', fontSize: '0.82rem', color: '#00e5ff' }}
+              >
+                ⚔️ Auto-Generate 25 2v2
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenGenerateModal('4v4', true)}
+                className="btn btn-outline"
+                style={{ padding: '8px 18px', fontSize: '0.82rem', color: '#b388ff' }}
+              >
+                🛡️ Auto-Generate 25 4v4
               </button>
             </div>
           </div>
@@ -1173,6 +1249,19 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* 7. Generate 1v1 / BR Matches Custom Settings Modal */}
+      {generateModalConfig && (
+        <GenerateMatchModal
+          isOpen={Boolean(generateModalConfig)}
+          onClose={() => setGenerateModalConfig(null)}
+          type={generateModalConfig.type}
+          targetDate={generateModalConfig.targetDate || plannerDate}
+          asDraft={generateModalConfig.asDraft !== false}
+          onConfirm={handleConfirmGenerate}
+          isLoading={isLoading}
+        />
       )}
 
     </div>

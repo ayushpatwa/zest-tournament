@@ -16,10 +16,10 @@ import { getTodayDateString, getTomorrowDateString } from './dateUtils.js';
 
 /**
  * 4 Required 1v1 Match Templates:
- * 1. Clash squad 1v1 (winning prize: ₹6, entry fee: ₹4)
- * 2. Clash squad 1v1 (head) (winning prize: ₹6, entry fee: ₹4)
- * 3. Lone wolf 1v1 (winning prize: ₹6, entry fee: ₹4)
- * 4. Lone wolf 1v1 (head) (winning prize: ₹6, entry fee: ₹4)
+ * 1. Clash squad 1v1 (winning prize: ₹40, entry fee: ₹25, per kill: ₹0)
+ * 2. Clash squad 1v1 (head) (winning prize: ₹40, entry fee: ₹25, per kill: ₹0)
+ * 3. Lone wolf 1v1 (winning prize: ₹40, entry fee: ₹25, per kill: ₹0)
+ * 4. Lone wolf 1v1 (head) (winning prize: ₹40, entry fee: ₹25, per kill: ₹0)
  */
 export const DAILY_1V1_TEMPLATES = [
   {
@@ -28,9 +28,9 @@ export const DAILY_1V1_TEMPLATES = [
     mode: 'Solo',
     type: 'Clash Squad 1v1',
     map: 'Bermuda',
-    prizePool: 6,
+    prizePool: 40,
     perKillPrize: 0,
-    entryFee: 4,
+    entryFee: 25,
     slotsTotal: 2,
     maxSlots: 2
   },
@@ -40,9 +40,9 @@ export const DAILY_1V1_TEMPLATES = [
     mode: 'Solo',
     type: 'Clash Squad 1v1 (Headshot)',
     map: 'Bermuda',
-    prizePool: 6,
+    prizePool: 40,
     perKillPrize: 0,
-    entryFee: 4,
+    entryFee: 25,
     slotsTotal: 2,
     maxSlots: 2
   },
@@ -52,9 +52,9 @@ export const DAILY_1V1_TEMPLATES = [
     mode: 'Solo',
     type: 'Lone Wolf 1v1',
     map: 'Iron Cage',
-    prizePool: 6,
+    prizePool: 40,
     perKillPrize: 0,
-    entryFee: 4,
+    entryFee: 25,
     slotsTotal: 2,
     maxSlots: 2
   },
@@ -64,11 +64,97 @@ export const DAILY_1V1_TEMPLATES = [
     mode: 'Solo',
     type: 'Lone Wolf 1v1 (Headshot)',
     map: 'Iron Cage',
-    prizePool: 6,
+    prizePool: 40,
     perKillPrize: 0,
-    entryFee: 4,
+    entryFee: 25,
     slotsTotal: 2,
     maxSlots: 2
+  }
+];
+
+/**
+ * 4 Required 2v2 Match Templates (Duo vs Duo / 4 Players Total):
+ * Entry fee: ₹30, Winning prize: ₹90, Per kill: ₹0
+ */
+export const DAILY_2V2_TEMPLATES = [
+  {
+    key: 'cs_2v2',
+    title: 'Clash squad 2v2',
+    mode: 'Duo',
+    type: 'Clash Squad 2v2',
+    map: 'Bermuda',
+    prizePool: 90,
+    perKillPrize: 0,
+    entryFee: 30,
+    slotsTotal: 4,
+    maxSlots: 4
+  },
+  {
+    key: 'cs_2v2_head',
+    title: 'Clash squad 2v2 (head)',
+    mode: 'Duo',
+    type: 'Clash Squad 2v2 (Headshot)',
+    map: 'Bermuda',
+    prizePool: 90,
+    perKillPrize: 0,
+    entryFee: 30,
+    slotsTotal: 4,
+    maxSlots: 4
+  },
+  {
+    key: 'lw_2v2',
+    title: 'Lone wolf 2v2',
+    mode: 'Duo',
+    type: 'Lone Wolf 2v2',
+    map: 'Iron Cage',
+    prizePool: 90,
+    perKillPrize: 0,
+    entryFee: 30,
+    slotsTotal: 4,
+    maxSlots: 4
+  },
+  {
+    key: 'lw_2v2_head',
+    title: 'Lone wolf 2v2 (head)',
+    mode: 'Duo',
+    type: 'Lone Wolf 2v2 (Headshot)',
+    map: 'Iron Cage',
+    prizePool: 90,
+    perKillPrize: 0,
+    entryFee: 30,
+    slotsTotal: 4,
+    maxSlots: 4
+  }
+];
+
+/**
+ * 2 Required 4v4 Match Templates (Squad vs Squad / 8 Players Total):
+ * Entry fee: ₹40, Winning prize: ₹240, Per kill: ₹0
+ */
+export const DAILY_4V4_TEMPLATES = [
+  {
+    key: 'cs_4v4',
+    title: 'Clash squad 4v4',
+    mode: 'Squad',
+    type: 'Clash Squad',
+    map: 'Bermuda',
+    prizePool: 240,
+    perKillPrize: 0,
+    entryFee: 40,
+    slotsTotal: 8,
+    maxSlots: 8
+  },
+  {
+    key: 'cs_4v4_head',
+    title: 'Clash squad 4v4 (head)',
+    mode: 'Squad',
+    type: 'Clash Squad Headshot',
+    map: 'Bermuda',
+    prizePool: 240,
+    perKillPrize: 0,
+    entryFee: 40,
+    slotsTotal: 8,
+    maxSlots: 8
   }
 ];
 
@@ -78,10 +164,10 @@ export const DAILY_1V1_TEMPLATES = [
  * Mode: Solo
  * Type: Classic Battle Royale
  * Map: Bermuda
- * Entry fee: ₹5
- * Per kill: ₹3
- * Winning prize pool: ₹10
- * Player slot: 10
+ * Entry fee: ₹30
+ * Per kill: ₹25
+ * Winning prize pool: ₹100
+ * Player slot: 48
  */
 export const CLASSIC_BATTLE_ROYALE_TEMPLATE = {
   key: 'classic_br_solo',
@@ -89,11 +175,11 @@ export const CLASSIC_BATTLE_ROYALE_TEMPLATE = {
   mode: 'Solo',
   type: 'Classic Battle Royale',
   map: 'Bermuda',
-  prizePool: 10,
-  perKillPrize: 3,
-  entryFee: 5,
-  slotsTotal: 10,
-  maxSlots: 10
+  prizePool: 100,
+  perKillPrize: 25,
+  entryFee: 30,
+  slotsTotal: 48,
+  maxSlots: 48
 };
 
 /**
@@ -136,10 +222,13 @@ export const DAILY_TIME_SLOTS = [
  * Slot 4 (11:30 AM) -> Lone wolf 1v1 (head)
  * ... (cycles every 30 minutes until 10:00 PM, 25 matches total per day)
  */
-export const generateDaily1v1Matches = async (targetDateString, overwriteExisting = false, asDraft = false) => {
+export const generateDaily1v1Matches = async (targetDateString, overwriteExisting = false, asDraft = false, customConfig = {}) => {
   try {
     const targetDate = targetDateString ? String(targetDateString).trim() : getTomorrowDateString();
-    console.log(`[AutoScheduler] Generating 1v1 daily sequential matches for date: ${targetDate}...`);
+    const shouldOverwrite = customConfig?.overwriteExisting !== undefined ? Boolean(customConfig.overwriteExisting) : overwriteExisting;
+    const customPrize = customConfig?.prizePool !== undefined && customConfig?.prizePool !== '' ? Number(customConfig.prizePool) : null;
+    const customEntry = customConfig?.entryFee !== undefined && customConfig?.entryFee !== '' ? Number(customConfig.entryFee) : null;
+    console.log(`[AutoScheduler] Generating 1v1 daily sequential matches for date: ${targetDate} (Prize: ${customPrize ?? 'default'}, Fee: ${customEntry ?? 'default'})...`);
 
     // 1. Fetch existing tournaments for this date to avoid overwriting registered players
     const tournamentsCol = collection(db, "tournaments");
@@ -161,10 +250,13 @@ export const generateDaily1v1Matches = async (targetDateString, overwriteExistin
       const tpl = DAILY_1V1_TEMPLATES[i % DAILY_1V1_TEMPLATES.length];
       const matchId = `daily_${targetDate}_slot${slotNumStr}_${tpl.key}`;
 
-      if (existingDocIds.has(matchId) && !overwriteExisting) {
+      if (existingDocIds.has(matchId) && !shouldOverwrite) {
         skippedCount++;
         continue;
       }
+
+      const finalPrize = customPrize !== null && !isNaN(customPrize) && customPrize >= 0 ? customPrize : tpl.prizePool;
+      const finalEntry = customEntry !== null && !isNaN(customEntry) && customEntry >= 0 ? customEntry : tpl.entryFee;
 
       const matchDocRef = doc(db, "tournaments", matchId);
       const matchData = {
@@ -173,9 +265,9 @@ export const generateDaily1v1Matches = async (targetDateString, overwriteExistin
         mode: tpl.mode,
         type: tpl.type,
         map: tpl.map,
-        prizePool: tpl.prizePool,
+        prizePool: finalPrize,
         perKillPrize: tpl.perKillPrize,
-        entryFee: tpl.entryFee,
+        entryFee: finalEntry,
         slotsTotal: tpl.slotsTotal,
         maxSlots: tpl.maxSlots,
         slotsJoined: 0,
@@ -232,6 +324,182 @@ export const generateDaily1v1Matches = async (targetDateString, overwriteExistin
 };
 
 /**
+ * Generates 25 daily 2v2 Duo matches spaced 30 minutes apart (10:00 AM to 10:00 PM)
+ * Default: Entry Fee: ₹30, Winning Prize: ₹90, Per Kill: ₹0, Slots: 4 (Duo)
+ */
+export const generateDaily2v2Matches = async (targetDateString, overwriteExisting = false, asDraft = false, customConfig = {}) => {
+  try {
+    const targetDate = targetDateString ? String(targetDateString).trim() : getTomorrowDateString();
+    const shouldOverwrite = customConfig?.overwriteExisting !== undefined ? Boolean(customConfig.overwriteExisting) : overwriteExisting;
+    const customPrize = customConfig?.prizePool !== undefined && customConfig?.prizePool !== '' ? Number(customConfig.prizePool) : null;
+    const customEntry = customConfig?.entryFee !== undefined && customConfig?.entryFee !== '' ? Number(customConfig.entryFee) : null;
+    console.log(`[AutoScheduler] Generating 2v2 daily sequential matches for date: ${targetDate} (Prize: ${customPrize ?? 'default'}, Fee: ${customEntry ?? 'default'})...`);
+
+    const tournamentsCol = collection(db, "tournaments");
+    const q = query(tournamentsCol, where("matchDate", "==", targetDate));
+    const querySnapshot = await getDocs(q);
+    const existingDocIds = new Set();
+    querySnapshot.forEach(docSnap => {
+      existingDocIds.add(docSnap.id);
+    });
+
+    const batch = writeBatch(db);
+    let createdCount = 0;
+    let skippedCount = 0;
+
+    for (let i = 0; i < DAILY_TIME_SLOTS.length; i++) {
+      const slot = DAILY_TIME_SLOTS[i];
+      const slotNumStr = String(slot.slotIndex).padStart(2, '0');
+      const tpl = DAILY_2V2_TEMPLATES[i % DAILY_2V2_TEMPLATES.length];
+      const matchId = `daily_2v2_${targetDate}_slot${slotNumStr}_${tpl.key}`;
+
+      if (existingDocIds.has(matchId) && !shouldOverwrite) {
+        skippedCount++;
+        continue;
+      }
+
+      const finalPrize = customPrize !== null && !isNaN(customPrize) && customPrize >= 0 ? customPrize : tpl.prizePool;
+      const finalEntry = customEntry !== null && !isNaN(customEntry) && customEntry >= 0 ? customEntry : tpl.entryFee;
+
+      const matchDocRef = doc(db, "tournaments", matchId);
+      const matchData = {
+        id: matchId,
+        title: tpl.title,
+        mode: tpl.mode,
+        type: tpl.type,
+        map: tpl.map,
+        prizePool: finalPrize,
+        perKillPrize: tpl.perKillPrize,
+        entryFee: finalEntry,
+        slotsTotal: tpl.slotsTotal,
+        maxSlots: tpl.maxSlots,
+        slotsJoined: 0,
+        joinedPlayers: [],
+        matchDate: targetDate,
+        startTime: slot.time,
+        status: asDraft ? 'draft' : 'upcoming',
+        isDraft: Boolean(asDraft),
+        isPublished: !asDraft,
+        roomId: '',
+        roomPassword: '',
+        leaderboard: [],
+        isDailyScheduled: true,
+        slotIndex: slot.slotIndex,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      batch.set(matchDocRef, matchData, { merge: true });
+      createdCount++;
+    }
+
+    if (createdCount > 0) {
+      await batch.commit();
+      console.log(`[AutoScheduler] Successfully committed ${createdCount} 2v2 matches for ${targetDate}`);
+    }
+
+    return {
+      success: true,
+      createdCount,
+      skippedCount,
+      totalSlots: DAILY_TIME_SLOTS.length,
+      targetDate
+    };
+  } catch (err) {
+    console.error(`[AutoScheduler] Error generating 2v2 matches:`, err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Generates 25 daily 4v4 Squad matches spaced 30 minutes apart (10:00 AM to 10:00 PM)
+ * Default: Entry Fee: ₹40, Winning Prize: ₹240, Per Kill: ₹0, Slots: 8 (Squad)
+ */
+export const generateDaily4v4Matches = async (targetDateString, overwriteExisting = false, asDraft = false, customConfig = {}) => {
+  try {
+    const targetDate = targetDateString ? String(targetDateString).trim() : getTomorrowDateString();
+    const shouldOverwrite = customConfig?.overwriteExisting !== undefined ? Boolean(customConfig.overwriteExisting) : overwriteExisting;
+    const customPrize = customConfig?.prizePool !== undefined && customConfig?.prizePool !== '' ? Number(customConfig.prizePool) : null;
+    const customEntry = customConfig?.entryFee !== undefined && customConfig?.entryFee !== '' ? Number(customConfig.entryFee) : null;
+    console.log(`[AutoScheduler] Generating 4v4 daily sequential matches for date: ${targetDate} (Prize: ${customPrize ?? 'default'}, Fee: ${customEntry ?? 'default'})...`);
+
+    const tournamentsCol = collection(db, "tournaments");
+    const q = query(tournamentsCol, where("matchDate", "==", targetDate));
+    const querySnapshot = await getDocs(q);
+    const existingDocIds = new Set();
+    querySnapshot.forEach(docSnap => {
+      existingDocIds.add(docSnap.id);
+    });
+
+    const batch = writeBatch(db);
+    let createdCount = 0;
+    let skippedCount = 0;
+
+    for (let i = 0; i < DAILY_TIME_SLOTS.length; i++) {
+      const slot = DAILY_TIME_SLOTS[i];
+      const slotNumStr = String(slot.slotIndex).padStart(2, '0');
+      const tpl = DAILY_4V4_TEMPLATES[i % DAILY_4V4_TEMPLATES.length];
+      const matchId = `daily_4v4_${targetDate}_slot${slotNumStr}_${tpl.key}`;
+
+      if (existingDocIds.has(matchId) && !shouldOverwrite) {
+        skippedCount++;
+        continue;
+      }
+
+      const finalPrize = customPrize !== null && !isNaN(customPrize) && customPrize >= 0 ? customPrize : tpl.prizePool;
+      const finalEntry = customEntry !== null && !isNaN(customEntry) && customEntry >= 0 ? customEntry : tpl.entryFee;
+
+      const matchDocRef = doc(db, "tournaments", matchId);
+      const matchData = {
+        id: matchId,
+        title: tpl.title,
+        mode: tpl.mode,
+        type: tpl.type,
+        map: tpl.map,
+        prizePool: finalPrize,
+        perKillPrize: tpl.perKillPrize,
+        entryFee: finalEntry,
+        slotsTotal: tpl.slotsTotal,
+        maxSlots: tpl.maxSlots,
+        slotsJoined: 0,
+        joinedPlayers: [],
+        matchDate: targetDate,
+        startTime: slot.time,
+        status: asDraft ? 'draft' : 'upcoming',
+        isDraft: Boolean(asDraft),
+        isPublished: !asDraft,
+        roomId: '',
+        roomPassword: '',
+        leaderboard: [],
+        isDailyScheduled: true,
+        slotIndex: slot.slotIndex,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      batch.set(matchDocRef, matchData, { merge: true });
+      createdCount++;
+    }
+
+    if (createdCount > 0) {
+      await batch.commit();
+      console.log(`[AutoScheduler] Successfully committed ${createdCount} 4v4 matches for ${targetDate}`);
+    }
+
+    return {
+      success: true,
+      createdCount,
+      skippedCount,
+      totalSlots: DAILY_TIME_SLOTS.length,
+      targetDate
+    };
+  } catch (err) {
+    console.error(`[AutoScheduler] Error generating 4v4 matches:`, err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
  * Generates 25 Classic Battle Royale matches spaced 30 minutes apart (10:00 AM to 10:00 PM)
  * for the target date.
  * Title: "Classic battle royal"
@@ -243,10 +511,15 @@ export const generateDaily1v1Matches = async (targetDateString, overwriteExistin
  * Winning prize pool: ₹10
  * Player slots: 10
  */
-export const generateDailyClassicBRMatches = async (targetDateString, overwriteExisting = false, asDraft = false) => {
+export const generateDailyClassicBRMatches = async (targetDateString, overwriteExisting = false, asDraft = false, customConfig = {}) => {
   try {
     const targetDate = targetDateString ? String(targetDateString).trim() : getTodayDateString();
-    console.log(`[AutoScheduler] Generating Classic Battle Royale daily matches for date: ${targetDate}...`);
+    const shouldOverwrite = customConfig?.overwriteExisting !== undefined ? Boolean(customConfig.overwriteExisting) : overwriteExisting;
+    const customPrize = customConfig?.prizePool !== undefined && customConfig?.prizePool !== '' ? Number(customConfig.prizePool) : null;
+    const customEntry = customConfig?.entryFee !== undefined && customConfig?.entryFee !== '' ? Number(customConfig.entryFee) : null;
+    const customSlots = customConfig?.slotsTotal !== undefined && customConfig?.slotsTotal !== '' ? Number(customConfig.slotsTotal) : null;
+    const customPerKill = customConfig?.perKillPrize !== undefined && customConfig?.perKillPrize !== '' ? Number(customConfig.perKillPrize) : null;
+    console.log(`[AutoScheduler] Generating Classic Battle Royale daily matches for date: ${targetDate} (Prize: ${customPrize ?? 'default'}, Fee: ${customEntry ?? 'default'}, Slots: ${customSlots ?? 'default'}, PerKill: ${customPerKill ?? 'default'})...`);
 
     const tournamentsCol = collection(db, "tournaments");
     const q = query(tournamentsCol, where("matchDate", "==", targetDate));
@@ -266,10 +539,15 @@ export const generateDailyClassicBRMatches = async (targetDateString, overwriteE
       const tpl = CLASSIC_BATTLE_ROYALE_TEMPLATE;
       const matchId = `daily_br_${targetDate}_slot${slotNumStr}_${tpl.key}`;
 
-      if (existingDocIds.has(matchId) && !overwriteExisting) {
+      if (existingDocIds.has(matchId) && !shouldOverwrite) {
         skippedCount++;
         continue;
       }
+
+      const finalPrize = customPrize !== null && !isNaN(customPrize) && customPrize >= 0 ? customPrize : tpl.prizePool;
+      const finalEntry = customEntry !== null && !isNaN(customEntry) && customEntry >= 0 ? customEntry : tpl.entryFee;
+      const finalSlots = customSlots !== null && !isNaN(customSlots) && customSlots >= 2 ? customSlots : tpl.slotsTotal;
+      const finalPerKill = customPerKill !== null && !isNaN(customPerKill) && customPerKill >= 0 ? customPerKill : tpl.perKillPrize;
 
       const matchDocRef = doc(db, "tournaments", matchId);
       const matchData = {
@@ -278,11 +556,11 @@ export const generateDailyClassicBRMatches = async (targetDateString, overwriteE
         mode: tpl.mode,
         type: tpl.type,
         map: tpl.map,
-        prizePool: tpl.prizePool,
-        perKillPrize: tpl.perKillPrize,
-        entryFee: tpl.entryFee,
-        slotsTotal: tpl.slotsTotal,
-        maxSlots: tpl.maxSlots,
+        prizePool: finalPrize,
+        perKillPrize: finalPerKill,
+        entryFee: finalEntry,
+        slotsTotal: finalSlots,
+        maxSlots: finalSlots,
         slotsJoined: 0,
         joinedPlayers: [],
         matchDate: targetDate,
@@ -327,9 +605,9 @@ export const generateDailyClassicBRMatches = async (targetDateString, overwriteE
 /**
  * Generates both Classic Battle Royale and 1v1 match schedules for the specified date
  */
-export const generateAllDailyMatches = async (targetDateString, overwriteExisting = false, asDraft = false) => {
-  const brRes = await generateDailyClassicBRMatches(targetDateString, overwriteExisting, asDraft);
-  const oneVoneRes = await generateDaily1v1Matches(targetDateString, overwriteExisting, asDraft);
+export const generateAllDailyMatches = async (targetDateString, overwriteExisting = false, asDraft = false, customConfig = {}) => {
+  const brRes = await generateDailyClassicBRMatches(targetDateString, overwriteExisting, asDraft, customConfig.br || customConfig);
+  const oneVoneRes = await generateDaily1v1Matches(targetDateString, overwriteExisting, asDraft, customConfig.oneVone || customConfig);
   return {
     success: brRes.success && oneVoneRes.success,
     createdCount: (brRes.createdCount || 0) + (oneVoneRes.createdCount || 0),
