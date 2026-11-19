@@ -238,6 +238,9 @@ export default function AdminHostPanel({
   const [webhookStatus, setWebhookStatus] = useState('');
   const [testingWebhook, setTestingWebhook] = useState(false);
 
+  // Filter for published matches: draft staged matches appear ONLY in Day Planner & Staging until published!
+  const publishedTournaments = tournaments.filter(t => t.isPublished === true && t.isDraft !== true && t.status !== 'draft');
+
   // Resend.com Email Delivery Gateway states
   const [resendApiKeyInput, setResendApiKeyInput] = useState(getResendApiKey());
   const [resendFromEmailInput, setResendFromEmailInput] = useState(getResendFromEmail());
@@ -1799,7 +1802,7 @@ export default function AdminHostPanel({
               fontWeight: '700'
             }}
           >
-            🗑️ Delete Match ({tournaments.length})
+            🗑️ Delete Match ({publishedTournaments.length})
           </button>
 
           {/* Super Admin Exclusive Tabs */}
@@ -2345,7 +2348,7 @@ export default function AdminHostPanel({
             <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
               <div>
                 <h3 style={{ fontSize: '1rem', color: 'var(--secondary)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>✏️</span> Active Tournaments ({tournaments.length})
+                  <span>✏️</span> Active Tournaments ({publishedTournaments.length})
                 </h3>
                 <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
                   Tap <strong>Edit Match</strong> on any match below to modify its details, timing, prize pool, or room ID.
@@ -2357,8 +2360,8 @@ export default function AdminHostPanel({
                 {(() => {
                   const todayStr = getTodayDateString();
                   const tomorrowStr = getTomorrowDateString();
-                  const todayCount = tournaments.filter(t => t.matchDate === todayStr).length;
-                  const tomorrowCount = tournaments.filter(t => t.matchDate === tomorrowStr).length;
+                  const todayCount = publishedTournaments.filter(t => t.matchDate === todayStr).length;
+                  const tomorrowCount = publishedTournaments.filter(t => t.matchDate === tomorrowStr).length;
                   return (
                     <>
                       <button
@@ -2375,7 +2378,7 @@ export default function AdminHostPanel({
                           cursor: 'pointer'
                         }}
                       >
-                        All ({tournaments.length})
+                        All ({publishedTournaments.length})
                       </button>
                       <button
                         type="button"
@@ -2461,13 +2464,13 @@ export default function AdminHostPanel({
               </div>
             </div>
 
-            {tournaments.length === 0 ? (
+            {publishedTournaments.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', fontSize: '0.85rem' }}>
-                No matches found in the catalog.
+                No active published matches found. (Draft staged matches are managed in Day Planner &amp; Staging).
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {sortTournamentsByTime(tournaments.filter(t => {
+                {sortTournamentsByTime(publishedTournaments.filter(t => {
                   const todayStr = getTodayDateString();
                   const tomorrowStr = getTomorrowDateString();
                   if (manageDateFilter === 'today') return t.matchDate === todayStr;
@@ -2698,7 +2701,7 @@ export default function AdminHostPanel({
               onChange={(e) => setSelectedTourneyId(e.target.value)} 
               className="form-input"
             >
-              {tournaments.map(t => (
+              {publishedTournaments.map(t => (
                 <option key={t.id} value={t.id}>
                   {t.title} ({t.map} - {t.mode})
                 </option>
@@ -4008,19 +4011,19 @@ export default function AdminHostPanel({
           <div className="flex-between" style={{ flexWrap: 'wrap', gap: '8px' }}>
             <div>
               <h3 style={{ fontSize: '1.1rem', color: 'var(--danger)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>🗑️</span> Manage & Delete Tournaments ({tournaments.length})
+                <span>🗑️</span> Manage & Delete Tournaments ({publishedTournaments.length})
               </h3>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-                Permanently remove matches or populate them with demo players in real-time.
+                Permanently remove live published matches. (Draft staged matches are managed in Day Planner & Staging).
               </p>
             </div>
-            {tournaments.length > 0 && (
+            {publishedTournaments.length > 0 && (
               <button
                 type="button"
                 onClick={async () => {
                   const promptVal = window.prompt(
                     `🤖 ADD BOTS TO ALL ACTIVE MATCHES\n\n` +
-                    `Total Active Tournaments: ${tournaments.length}\n` +
+                    `Total Active Published Tournaments: ${publishedTournaments.length}\n` +
                     `Total Available Bots in Catalog: ${DEMO_PLAYERS.length}\n\n` +
                     `Enter number of bots to add per match (e.g. 1, 2, or 5):`,
                     "1"
@@ -4094,8 +4097,8 @@ export default function AdminHostPanel({
               {(() => {
                 const todayStr = getTodayDateString();
                 const tomorrowStr = getTomorrowDateString();
-                const todayCount = tournaments.filter(t => t.matchDate === todayStr).length;
-                const tomorrowCount = tournaments.filter(t => t.matchDate === tomorrowStr).length;
+                const todayCount = publishedTournaments.filter(t => t.matchDate === todayStr).length;
+                const tomorrowCount = publishedTournaments.filter(t => t.matchDate === tomorrowStr).length;
                 return (
                   <>
                     <div style={{
@@ -4327,8 +4330,8 @@ export default function AdminHostPanel({
             {(() => {
               const todayStr = getTodayDateString();
               const tomorrowStr = getTomorrowDateString();
-              const todayCount = tournaments.filter(t => t.matchDate === todayStr).length;
-              const tomorrowCount = tournaments.filter(t => t.matchDate === tomorrowStr).length;
+              const todayCount = publishedTournaments.filter(t => t.matchDate === todayStr).length;
+              const tomorrowCount = publishedTournaments.filter(t => t.matchDate === tomorrowStr).length;
               return (
                 <>
                   <button
@@ -4345,7 +4348,7 @@ export default function AdminHostPanel({
                       cursor: 'pointer'
                     }}
                   >
-                    All Matches ({tournaments.length})
+                    All Matches ({publishedTournaments.length})
                   </button>
                   <button
                     type="button"
@@ -4425,7 +4428,7 @@ export default function AdminHostPanel({
                       <span>🗑️</span> Delete Tomorrow's ({tomorrowCount})
                     </button>
                   )}
-                  {tournaments.length > 0 && (
+                  {publishedTournaments.length > 0 && (
                     <button
                       type="button"
                       disabled={isGeneratingSchedule}
@@ -4445,7 +4448,7 @@ export default function AdminHostPanel({
                       }}
                       title="Permanently delete all matches in the app"
                     >
-                      <span>⚠️</span> Delete All ({tournaments.length})
+                      <span>⚠️</span> Delete All ({publishedTournaments.length})
                     </button>
                   )}
                 </>
@@ -4459,13 +4462,13 @@ export default function AdminHostPanel({
             </div>
           )}
 
-          {tournaments.length === 0 ? (
+          {publishedTournaments.length === 0 ? (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0' }}>
-              No matches found in the catalog.
+              No published matches found in the catalog. (Draft staged matches are managed in Day Planner &amp; Staging).
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {sortTournamentsByTime(tournaments.filter(t => {
+              {sortTournamentsByTime(publishedTournaments.filter(t => {
                 const todayStr = getTodayDateString();
                 const tomorrowStr = getTomorrowDateString();
                 if (manageDateFilter === 'today') return t.matchDate === todayStr;
