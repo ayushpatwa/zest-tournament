@@ -823,7 +823,7 @@ export default function AdminHostPanel({
     setGenerateModalConfig({
       type: '1v1',
       targetDate: getTodayDateString(),
-      asDraft: false
+      asDraft: true
     });
   };
 
@@ -831,7 +831,7 @@ export default function AdminHostPanel({
     setGenerateModalConfig({
       type: '1v1',
       targetDate: getTomorrowDateString(),
-      asDraft: false
+      asDraft: true
     });
   };
 
@@ -839,7 +839,7 @@ export default function AdminHostPanel({
     setGenerateModalConfig({
       type: 'br',
       targetDate: getTodayDateString(),
-      asDraft: false
+      asDraft: true
     });
   };
 
@@ -847,7 +847,7 @@ export default function AdminHostPanel({
     setGenerateModalConfig({
       type: 'br',
       targetDate: getTomorrowDateString(),
-      asDraft: false
+      asDraft: true
     });
   };
 
@@ -855,7 +855,7 @@ export default function AdminHostPanel({
     setGenerateModalConfig({
       type: '2v2',
       targetDate: getTomorrowDateString(),
-      asDraft: false
+      asDraft: true
     });
   };
 
@@ -863,7 +863,7 @@ export default function AdminHostPanel({
     setGenerateModalConfig({
       type: '4v4',
       targetDate: getTomorrowDateString(),
-      asDraft: false
+      asDraft: true
     });
   };
 

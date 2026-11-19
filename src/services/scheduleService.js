@@ -24,7 +24,7 @@ const demoBotIds = new Set((DEMO_PLAYERS || []).map(p => String(p.id || '').trim
  */
 export const isBotPlayer = (p) => {
   if (!p || typeof p !== 'object') return false;
-  if (p.isBot === true || p.isDemo === true) return true;
+  if (p.isBot === true || p.isBot === 'true' || p.isDemo === true || p.isDemo === 'true') return true;
   const uid = String(p.uid || '').trim();
   const id = String(p.id || '').trim();
   const email = String(p.email || '').trim().toLowerCase();
@@ -858,37 +858,49 @@ export const copyDayScheduleRealtime = async (sourceDateString, targetDateString
             joinedAt: new Date().toISOString()
           }));
 
-        // Fallback: If source match had slotsJoined or botCount set without full bot objects in joinedPlayers,
-        // preserve the exact same bot count from the DEMO_PLAYERS catalog so slot fill is strictly maintained!
-        const recordedBotCount = typeof srcMatch.botCount === 'number'
-          ? srcMatch.botCount
-          : (rawPlayers.length === 0 && typeof srcMatch.slotsJoined === 'number' ? srcMatch.slotsJoined : 0);
+        // Calculate expected bot count from source match:
+        // If rawPlayers exists, count bots (rawPlayers - realPlayers); else use recorded botCount or slotsJoined
+        const realPlayers = rawPlayers.filter(p => !isBotPlayer(p));
+        const expectedBotCount = rawPlayers.length > 0 
+          ? (rawPlayers.length - realPlayers.length) 
+          : (typeof srcMatch.botCount === 'number' ? srcMatch.botCount : (Number(srcMatch.slotsJoined) || 0));
 
-        if (copiedBots.length === 0 && recordedBotCount > 0) {
+        // If copiedBots count is less than expectedBotCount, top up with bots from DEMO_PLAYERS catalog
+        if (copiedBots.length < expectedBotCount) {
           const maxSlots = srcMatch.slotsTotal || srcMatch.maxSlots || 48;
-          const neededCount = Math.min(recordedBotCount, maxSlots);
-          const fallbackBots = DEMO_PLAYERS.slice(0, neededCount).map(b => ({
-            uid: b.uid,
-            nickname: b.nickname,
-            email: b.email || 'bot@demo.com',
-            phone: b.phone || 'N/A',
-            isBot: true,
-            isDemo: true,
-            joinedAt: new Date().toISOString()
-          }));
-          copiedBots = fallbackBots;
+          const neededCount = Math.min(expectedBotCount, maxSlots);
+          const currentUids = new Set(copiedBots.map(b => String(b.uid).trim()));
+          const availableCatalogBots = DEMO_PLAYERS.filter(dp => !currentUids.has(String(dp.uid).trim()));
+          
+          let botIndex = 0;
+          while (copiedBots.length < neededCount) {
+            const fallback = availableCatalogBots[botIndex % availableCatalogBots.length] || DEMO_PLAYERS[botIndex % DEMO_PLAYERS.length];
+            copiedBots.push({
+              uid: fallback.uid || `bot_${Date.now()}_${copiedBots.length + 1}`,
+              nickname: fallback.nickname || `Bot_${copiedBots.length + 1}`,
+              email: fallback.email || 'bot@demo.com',
+              phone: fallback.phone || 'N/A',
+              isBot: true,
+              isDemo: true,
+              joinedAt: new Date().toISOString()
+            });
+            botIndex++;
+          }
         }
 
         totalBotsCopied += copiedBots.length;
+
+        // By default, copied staging matches are ALWAYS created in Draft mode (hidden from players)
+        const shouldBeDraft = asDraft !== false;
 
         const matchDocRef = doc(db, "tournaments", newId);
         const clonedData = {
           ...srcMatch,
           id: newId,
           matchDate: dstDate,
-          status: asDraft ? 'draft' : 'upcoming',
-          isDraft: Boolean(asDraft),
-          isPublished: !asDraft,
+          status: shouldBeDraft ? 'draft' : 'upcoming',
+          isDraft: Boolean(shouldBeDraft),
+          isPublished: !shouldBeDraft,
           slotsJoined: copiedBots.length,
           joinedPlayers: copiedBots,
           botCount: copiedBots.length,
@@ -903,12 +915,15 @@ export const copyDayScheduleRealtime = async (sourceDateString, targetDateString
           clonedData.registeredPlayers = copiedBots;
         }
 
-        // Clean any historical completion or refund flags
+        // Clean any historical completion, refund, or publish flags
         delete clonedData.isCompleted;
         delete clonedData.completedAt;
         delete clonedData.isRefunded;
         delete clonedData.refundedAt;
         delete clonedData.refundReason;
+        if (shouldBeDraft) {
+          delete clonedData.publishedAt;
+        }
 
         batch.set(matchDocRef, cleanFirestoreData(clonedData), { merge: true });
         copiedCount++;
@@ -923,9 +938,6 @@ export const copyDayScheduleRealtime = async (sourceDateString, targetDateString
       success: true,
       copiedCount,
       botsCount: totalBotsCopied,
-      sourceDate: srcDate,
-      targetDate: dstDate
-    };
       sourceDate: srcDate,
       targetDate: dstDate,
       asDraft: Boolean(asDraft)

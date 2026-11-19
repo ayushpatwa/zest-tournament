@@ -92,14 +92,14 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
     }
 
     setIsLoading(true);
-    setActionStatus(`⏳ Copying ${sourceDateMatches.length} matches from ${copySourceDate} to ${copyTargetDate} (${copyAsDraft ? 'as Drafts' : 'and Publishing'})...`);
+    setActionStatus(`⏳ Copying ${sourceDateMatches.length} matches from ${copySourceDate} to ${copyTargetDate} as Staged Drafts...`);
 
-    const res = await copyDayScheduleRealtime(copySourceDate, copyTargetDate, copyAsDraft);
+    const res = await copyDayScheduleRealtime(copySourceDate, copyTargetDate, copyAsDraft !== false);
     setIsLoading(false);
 
     if (res.success) {
       const botsNote = res.botsCount > 0 ? ` (preserving ${res.botsCount} bots across matches)` : '';
-      setActionStatus(`🎉 Success! Copied ${res.copiedCount} matches to ${copyTargetDate}${botsNote} as ${copyAsDraft ? 'Drafts (Hidden from players)' : 'Published (Live in Arena)'}!`);
+      setActionStatus(`🎉 Success! Copied ${res.copiedCount} matches to ${copyTargetDate}${botsNote} as Staged Drafts (Hidden from players until published)!`);
       setPlannerDate(copyTargetDate);
       setShowCopyPanel(false);
     } else {
