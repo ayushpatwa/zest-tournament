@@ -16,8 +16,10 @@ import {
   generateDaily2v2Matches,
   generateDaily4v4Matches,
   generateDailyClassicBRMatches,
-  deleteDailyMatchesByDate 
+  deleteDailyMatchesByDate,
+  isBotPlayer
 } from '../services/scheduleService';
+import { addDemoPlayersToTournamentRealtime } from '../services/firebase';
 import GenerateMatchModal from './GenerateMatchModal';
 
 export default function HostDayPlanner({ tournaments = [], isHost = true }) {
@@ -96,7 +98,8 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
     setIsLoading(false);
 
     if (res.success) {
-      setActionStatus(`🎉 Success! Copied ${res.copiedCount} matches to ${copyTargetDate} as ${copyAsDraft ? 'Drafts (Hidden from players)' : 'Published (Live in Arena)'}!`);
+      const botsNote = res.botsCount > 0 ? ` (preserving ${res.botsCount} bots across matches)` : '';
+      setActionStatus(`🎉 Success! Copied ${res.copiedCount} matches to ${copyTargetDate}${botsNote} as ${copyAsDraft ? 'Drafts (Hidden from players)' : 'Published (Live in Arena)'}!`);
       setPlannerDate(copyTargetDate);
       setShowCopyPanel(false);
     } else {
@@ -380,8 +383,8 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
             </h3>
           </div>
           <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            This will take every match from your Source Date, duplicate its settings (time, title, mode, entry fee, prizes),
-            and paste them into your Target Date with fresh player slots (0 joined).
+            This will take every match from your Source Date, duplicate its settings (time, title, mode, entry fee, prizes, and exact bot counts),
+            and paste them into your Target Date (real human player registrations are reset for safety).
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
@@ -858,7 +861,18 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
                         {match.perKillPrize > 0 && (
                           <span style={{ color: '#ff4081', fontWeight: '700' }}>Kill: ₹{match.perKillPrize}</span>
                         )}
-                        <span>👥 Slots: {joinedSlots}/{totalSlots}</span>
+                        <span>
+                          👥 Slots: {joinedSlots}/{totalSlots}
+                          {(() => {
+                            const rawP = Array.isArray(match.joinedPlayers) ? match.joinedPlayers : [];
+                            const bCount = rawP.filter(p => isBotPlayer(p)).length;
+                            return bCount > 0 ? (
+                              <span style={{ marginLeft: '4px', color: '#00e676', fontWeight: '700' }}>
+                                ({bCount} bot{bCount > 1 ? 's' : ''})
+                              </span>
+                            ) : null;
+                          })()}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -881,6 +895,56 @@ export default function HostDayPlanner({ tournaments = [], isHost = true }) {
                       }}
                     >
                       {isPub ? '⏸️ Hide (Draft)' : '🚀 Publish (Live)'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const currentJoined = (match.joinedPlayers || []).length;
+                        const maxSlots = match.slotsTotal || match.maxSlots || 48;
+                        const availableSlots = Math.max(0, maxSlots - currentJoined);
+                        if (availableSlots <= 0) {
+                          alert(`⚠️ Match is already full (${currentJoined}/${maxSlots})!`);
+                          return;
+                        }
+                        const promptVal = window.prompt(
+                          `🤖 ADD BOTS TO MATCH\n\n` +
+                          `Tournament: ${match.title}\n` +
+                          `Current Joined: ${currentJoined}/${maxSlots}\n` +
+                          `Available Slots: ${availableSlots}\n\n` +
+                          `Enter number of bots to add (1 - ${availableSlots}):`,
+                          String(Math.min(10, availableSlots))
+                        );
+                        if (promptVal === null) return;
+                        const countNum = parseInt(promptVal, 10);
+                        if (isNaN(countNum) || countNum <= 0) {
+                          alert("⚠️ Please enter a valid positive number of bots.");
+                          return;
+                        }
+                        const finalCount = Math.min(countNum, availableSlots);
+                        setIsLoading(true);
+                        const res = await addDemoPlayersToTournamentRealtime(match.id, finalCount);
+                        setIsLoading(false);
+                        if (res.success) {
+                          setActionStatus(`🎉 Added ${res.added} bots to "${match.title}"! (Total: ${res.total}/${maxSlots})`);
+                        } else {
+                          setActionStatus(`⚠️ ${res.error || 'Failed to add bots'}`);
+                        }
+                        setTimeout(() => setActionStatus(''), 6000);
+                      }}
+                      className="btn"
+                      style={{
+                        padding: '6px 10px',
+                        fontSize: '0.75rem',
+                        fontWeight: '800',
+                        background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.15) 0%, rgba(0, 229, 255, 0.15) 100%)',
+                        color: '#00e676',
+                        border: '1px solid rgba(0, 230, 118, 0.4)',
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🤖 +Bots
                     </button>
 
                     <button
